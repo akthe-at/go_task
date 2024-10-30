@@ -67,6 +67,17 @@ var setupCmd = &cobra.Command{
 			fmt.Println("Error creating task:", err)
 		}
 
+		updated_task := data.Task{
+			ID:             1,
+			Title:          "do laundry again and again and again",
+			UpdateArchived: false,
+		}
+
+		err = db.UpdateTask(conn, updated_task)
+		if err != nil {
+			fmt.Println("Error updating task:", err)
+		}
+
 		// Query Data
 		results, err := conn.Query(`SELECT * FROM tasks`)
 		if err != nil {
