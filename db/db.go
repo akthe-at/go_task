@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/akthe-at/go_task/data"
@@ -91,5 +92,64 @@ func CreateTask(db *sql.DB, task data.Task) error {
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := db.Exec(query, task.Title, task.Description, task.Priority, task.Status, task.Archived, task.CreatedAt, task.LastModified, task.DueDate)
+	return err
+}
+
+func UpdateTask(db *sql.DB, task data.Task) error {
+	now := time.Now()
+	task.LastModified = now
+
+	queryParts := []string{}
+	args := []interface{}{}
+	argCounter := 1
+
+	if task.Title != "" {
+		queryParts = append(queryParts, fmt.Sprintf("title = $%d", argCounter))
+		args = append(args, task.Title)
+		argCounter++
+	}
+
+	if task.Description != "" {
+		queryParts = append(queryParts, fmt.Sprintf("description = $%d", argCounter))
+		args = append(args, task.Description)
+		argCounter++
+	}
+
+	if task.Priority != "" {
+		queryParts = append(queryParts, fmt.Sprintf("priority = $%d", argCounter))
+		args = append(args, task.Priority)
+		argCounter++
+	}
+
+	if task.Status != "" {
+		queryParts = append(queryParts, fmt.Sprintf("status = $%d", argCounter))
+		args = append(args, task.Status)
+		argCounter++
+	}
+
+	if task.UpdateArchived != false {
+		queryParts = append(queryParts, fmt.Sprintf("archived = $%d", argCounter))
+		args = append(args, task.Archived)
+		argCounter++
+	}
+
+	if !task.DueDate.IsZero() {
+		queryParts = append(queryParts, fmt.Sprintf("due_date = $%d", argCounter))
+		args = append(args, task.DueDate)
+		argCounter++
+	}
+
+	queryParts = append(queryParts, fmt.Sprintf("last_mod = $%d", argCounter))
+	args = append(args, task.LastModified)
+	argCounter++
+
+	if len(queryParts) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	query := fmt.Sprintf("UPDATE tasks SET %s WHERE id = $%d", strings.Join(queryParts, ", "), argCounter)
+	args = append(args, task.ID)
+
+	_, err := db.Exec(query, args...)
 	return err
 }
