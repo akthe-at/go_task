@@ -60,6 +60,23 @@ func SetupDB(db *sql.DB) error {
 			last_mod TEXT,
 			due_date TEXT
 	);
+		CREATE TABLE IF NOT EXISTS notes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			title TEXT NOT NULL,
+			path TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS task_notes (
+			note_id INTEGER,
+			task_id INTEGER,
+			FOREIGN KEY(note_id) REFERENCES notes(id),
+			FOREIGN KEY(task_id) REFERENCES tasks(id)
+		);
+		CREATE TABLE IF NOT EXISTS area_notes (
+			note_id INTEGER,
+			area_id INTEGER,
+			FOREIGN KEY(note_id) REFERENCES notes(id),
+			FOREIGN KEY(area_id) REFERENCES areas(id)
+		);
 `
 	tx, err := db.Begin()
 	if err != nil {
