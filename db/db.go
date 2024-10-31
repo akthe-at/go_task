@@ -105,6 +105,7 @@ func (t *TaskTable) Create(db *sql.DB) error {
 	now := time.Now()
 	t.Task.CreatedAt = now
 	t.Task.LastModified = now
+	// TODO: This is just a filler for DueDate, should be set by user.
 	if t.Task.DueDate.IsZero() {
 		t.Task.DueDate = now.AddDate(0, 0, 7)
 	}
@@ -113,7 +114,10 @@ func (t *TaskTable) Create(db *sql.DB) error {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `
 	_, err := db.Exec(query, t.Task.Title, t.Task.Description, t.Task.Priority, t.Task.Status, t.Task.Archived, t.Task.CreatedAt, t.Task.LastModified, t.Task.DueDate)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (t *TaskTable) Read(db *sql.DB) (data.Task, error) {
@@ -123,7 +127,84 @@ func (t *TaskTable) Read(db *sql.DB) (data.Task, error) {
 	if err != nil {
 		return task, err
 	}
+
+	notesQuery := `
+		SELECT notes.id, notes.title, notes.path
+		FROM notes
+		JOIN task_notes ON notes.id = task_notes.note_id
+		WHERE task_notes.task_id = ?
+	`
+	rows, err := db.Query(notesQuery, t.Task.ID)
+	if err != nil {
+		return task, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var note data.Note
+		if err := rows.Scan(&note.ID, &note.Title, &note.Path); err != nil {
+			return task, err
+		}
+		task.Notes = append(task.Notes, note)
+	}
+
+	if err := rows.Err(); err != nil {
+		return task, err
+	}
+
 	return task, nil
+}
+
+func (t *TaskTable) ReadAll(db *sql.DB) ([]data.Task, error) {
+	var tasks []data.Task
+	query := `SELECT id, title, description, priority, status, archived, created_at, last_mod, due_date FROM tasks`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var task data.Task
+		err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
+		if err != nil {
+			return nil, err
+		}
+
+		notesQuery := `
+			SELECT notes.id, notes.title, notes.path
+			FROM notes
+			JOIN task_notes ON notes.id = task_notes.note_id
+			WHERE task_notes.task_id = ?
+		`
+		noteRows, err := db.Query(notesQuery, task.ID)
+		if err != nil {
+			return nil, err
+		}
+		defer noteRows.Close()
+
+		for noteRows.Next() {
+			var note data.Note
+			if err := noteRows.Scan(&note.ID, &note.Title, &note.Path); err != nil {
+				return nil, err
+			}
+			task.Notes = append(task.Notes, note)
+		}
+
+		if err := noteRows.Err(); err != nil {
+			return nil, err
+		}
+
+		tasks = append(tasks, task)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }
 
 func (t *TaskTable) Update(db *sql.DB) error {
@@ -186,8 +267,73 @@ func (t *TaskTable) Update(db *sql.DB) error {
 }
 
 func (t *TaskTable) Delete(db *sql.DB) error {
-	query := `DELETE FROM tasks WHERE id = ?`
-	_, err := db.Exec(query, t.Task.ID)
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	_, err = tx.Exec(`DELETE FROM task_notes where task_id = ?`, t.Task.ID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete task notes: %w", err)
+	}
+
+	_, err = tx.Exec(`DELETE FROM tasks WHERE id = ?`, t.Task.ID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete task: %w", err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (t *TaskTable) DeleteMultiple(db *sql.DB, ID ...int) error {
+	if len(ID) == 0 {
+		return nil
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	query := "DELETE FROM tasks WHERE id IN ("
+	args := make([]interface{}, len(ID))
+
+	for i, id := range ID {
+		if i > 0 {
+			query += ","
+		}
+		query += "?"
+		args[i] = id
+	}
+	query += ")"
+
+	notesQuery := strings.Replace(query, "tasks", "task_notes", 1)
+	notesQuery = strings.Replace(notesQuery, "id", "task_id", 1)
+	_, err = tx.Exec(notesQuery, args...)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete task notes: %w", err)
+	}
+
+	_, err = tx.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to delete tasks: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 func UpdateNotePath(db *sql.DB, noteID int, newPath string) error {
 	query := "UPDATE notes SET path = ? WHERE id = ?"
 	_, err := db.Exec(query, newPath, noteID)
