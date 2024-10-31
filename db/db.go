@@ -188,5 +188,8 @@ func (t *TaskTable) Update(db *sql.DB) error {
 func (t *TaskTable) Delete(db *sql.DB) error {
 	query := `DELETE FROM tasks WHERE id = ?`
 	_, err := db.Exec(query, t.Task.ID)
+func UpdateNotePath(db *sql.DB, noteID int, newPath string) error {
+	query := "UPDATE notes SET path = ? WHERE id = ?"
+	_, err := db.Exec(query, newPath, noteID)
 	return err
 }
