@@ -1,6 +1,16 @@
 package data
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
+
+type CRUD interface {
+	Create(db *sql.DB) error
+	Read(db *sql.DB) (interface{}, error)
+	Update(db *sql.DB) error
+	Delete(db *sql.DB) error
+}
 
 type Task struct {
 	ID             int

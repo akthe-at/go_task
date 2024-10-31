@@ -54,28 +54,40 @@ var setupCmd = &cobra.Command{
 		}
 
 		// // Create and Insert a new Task
-		test := data.Task{
-			Title:       "do laundry",
-			Description: "wash underwear",
-			Priority:    "high",
-			Status:      "Pending",
-			Archived:    false,
+		test := db.TaskTable{
+			Task: data.Task{
+				Title:       "do laundry",
+				Description: "wash underwear",
+				Priority:    "high",
+				Status:      "Pending",
+				Archived:    false,
+			},
 		}
 
-		err = db.CreateTask(conn, test)
+		err = test.Create(conn)
 		if err != nil {
 			fmt.Println("Error creating task:", err)
 		}
 
-		updated_task := data.Task{
-			ID:             1,
-			Title:          "do laundry again and again and again",
-			UpdateArchived: false,
+		updated_task := db.TaskTable{
+			Task: data.Task{
+				ID:             1,
+				Title:          "do laundry again and again and again",
+				UpdateArchived: false,
+			},
 		}
 
-		err = db.UpdateTask(conn, updated_task)
+		err = updated_task.Update(conn)
 		if err != nil {
 			fmt.Println("Error updating task:", err)
+		}
+
+		deleted_task := db.TaskTable{
+			Task: data.Task{ID: 1},
+		}
+		err = deleted_task.Delete(conn)
+		if err != nil {
+			fmt.Println("Error deleting task:", err)
 		}
 
 		// Query Data

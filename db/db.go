@@ -80,67 +80,81 @@ func SetupDB(db *sql.DB) error {
 	return nil
 }
 
-func CreateTask(db *sql.DB, task data.Task) error {
+type TaskTable struct {
+	Task data.Task
+}
+
+func (t *TaskTable) Create(db *sql.DB) error {
 	now := time.Now()
-	task.CreatedAt = now
-	task.LastModified = now
-	if task.DueDate.IsZero() {
-		task.DueDate = now.AddDate(0, 0, 7)
+	t.Task.CreatedAt = now
+	t.Task.LastModified = now
+	if t.Task.DueDate.IsZero() {
+		t.Task.DueDate = now.AddDate(0, 0, 7)
 	}
 	query := `
-	INSERT INTO tasks (title, description, priority, status, archived, created_at, last_mod, due_date)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`
-	_, err := db.Exec(query, task.Title, task.Description, task.Priority, task.Status, task.Archived, task.CreatedAt, task.LastModified, task.DueDate)
+    INSERT INTO tasks (title, description, priority, status, archived, created_at, last_mod, due_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `
+	_, err := db.Exec(query, t.Task.Title, t.Task.Description, t.Task.Priority, t.Task.Status, t.Task.Archived, t.Task.CreatedAt, t.Task.LastModified, t.Task.DueDate)
 	return err
 }
 
-func UpdateTask(db *sql.DB, task data.Task) error {
+func (t *TaskTable) Read(db *sql.DB) (data.Task, error) {
+	var task data.Task
+	query := `SELECT id, title, description, priority, status, archived, created_at, last_mod, due_date FROM tasks WHERE id = ?`
+	err := db.QueryRow(query, t.Task.ID).Scan(&task.ID, &task.Title, &task.Description, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
+	if err != nil {
+		return task, err
+	}
+	return task, nil
+}
+
+func (t *TaskTable) Update(db *sql.DB) error {
 	now := time.Now()
-	task.LastModified = now
+	t.Task.LastModified = now
 
 	queryParts := []string{}
 	args := []interface{}{}
 	argCounter := 1
 
-	if task.Title != "" {
+	if t.Task.Title != "" {
 		queryParts = append(queryParts, fmt.Sprintf("title = $%d", argCounter))
-		args = append(args, task.Title)
+		args = append(args, t.Task.Title)
 		argCounter++
 	}
 
-	if task.Description != "" {
+	if t.Task.Description != "" {
 		queryParts = append(queryParts, fmt.Sprintf("description = $%d", argCounter))
-		args = append(args, task.Description)
+		args = append(args, t.Task.Description)
 		argCounter++
 	}
 
-	if task.Priority != "" {
+	if t.Task.Priority != "" {
 		queryParts = append(queryParts, fmt.Sprintf("priority = $%d", argCounter))
-		args = append(args, task.Priority)
+		args = append(args, t.Task.Priority)
 		argCounter++
 	}
 
-	if task.Status != "" {
+	if t.Task.Status != "" {
 		queryParts = append(queryParts, fmt.Sprintf("status = $%d", argCounter))
-		args = append(args, task.Status)
+		args = append(args, t.Task.Status)
 		argCounter++
 	}
 
-	if task.UpdateArchived != false {
+	if t.Task.UpdateArchived != false {
 		queryParts = append(queryParts, fmt.Sprintf("archived = $%d", argCounter))
-		args = append(args, task.Archived)
+		args = append(args, t.Task.Archived)
 		argCounter++
 	}
 
-	if !task.DueDate.IsZero() {
+	if !t.Task.DueDate.IsZero() {
 		queryParts = append(queryParts, fmt.Sprintf("due_date = $%d", argCounter))
-		args = append(args, task.DueDate)
+		args = append(args, t.Task.DueDate)
 		argCounter++
 	}
 
 	queryParts = append(queryParts, fmt.Sprintf("last_mod = $%d", argCounter))
-	args = append(args, task.LastModified)
+	args = append(args, t.Task.LastModified)
 	argCounter++
 
 	if len(queryParts) == 0 {
@@ -148,8 +162,14 @@ func UpdateTask(db *sql.DB, task data.Task) error {
 	}
 
 	query := fmt.Sprintf("UPDATE tasks SET %s WHERE id = $%d", strings.Join(queryParts, ", "), argCounter)
-	args = append(args, task.ID)
+	args = append(args, t.Task.ID)
 
 	_, err := db.Exec(query, args...)
+	return err
+}
+
+func (t *TaskTable) Delete(db *sql.DB) error {
+	query := `DELETE FROM tasks WHERE id = ?`
+	_, err := db.Exec(query, t.Task.ID)
 	return err
 }
