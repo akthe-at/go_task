@@ -339,3 +339,93 @@ func UpdateNotePath(db *sql.DB, noteID int, newPath string) error {
 	_, err := db.Exec(query, newPath, noteID)
 	return err
 }
+
+type AreaTable struct {
+	Area data.Area
+}
+
+func (a *AreaTable) Create(db *sql.DB) error {
+	query := `
+		INSERT INTO areas (title, type, deadline, status, archived)
+		VALUES (?, ?, ?, ?, ?)
+	`
+	_, err := db.Exec(query, a.Area.Title, a.Area.Type, a.Area.Deadline, a.Area.Status, a.Area.Archived)
+	if err != nil {
+		return fmt.Errorf("Failed to create Area/Project in DB: %w", err)
+	}
+
+	return nil
+}
+
+func (a *AreaTable) Read(db *sql.DB) (data.Area, error) {
+	var area data.Area
+	query := `SELECT id, title, type, deadline, status, archived FROM areas WHERE id = ?`
+	err := db.QueryRow(query, a.Area.ID).Scan(&area.ID, &area.Title, &area.Type, &area.Deadline, &area.Status, &area.Archived)
+	if err != nil {
+		return area, err
+	}
+	notesQuery := `
+		SELECT notes.id, notes.title, notes.path
+		FROM notes
+		JOIN area_notes ON notes.id = area_notes.note_id
+		WHERE area_notes.area_id = ?
+	`
+	rows, err := db.Query(notesQuery, area.ID)
+	if err != nil {
+		return area, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var note data.Note
+		if err := rows.Scan(&note.ID, &note.Title, &note.Path); err != nil {
+			return area, err
+		}
+		area.Notes = append(area.Notes, note)
+	}
+	if err := rows.Err(); err != nil {
+		return area, err
+	}
+	return area, nil
+}
+
+func (a *AreaTable) ReadAll(db *sql.DB) ([]data.Area, error) {
+	var areas []data.Area
+	query := `SELECT id, title, type, deadline, status, archived FROM areas`
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var area data.Area
+		err := rows.Scan(&area.ID, &area.Title, &area.Type, &area.Deadline, &area.Status, &area.Archived)
+		if err != nil {
+			return nil, err
+		}
+		notesQuery := `
+			SELECT notes.id, notes.title, notes.path
+			FROM notes
+			JOIN area_notes ON notes.id = area_notes.note_id
+			WHERE area_notes.area_id = ?
+		`
+		noteRows, err := db.Query(notesQuery, area.ID)
+		if err != nil {
+			return nil, err
+		}
+		defer noteRows.Close()
+		for noteRows.Next() {
+			var note data.Note
+			if err := noteRows.Scan(&note.ID, &note.Title, &note.Path); err != nil {
+				return nil, err
+			}
+			area.Notes = append(area.Notes, note)
+		}
+		if err := noteRows.Err(); err != nil {
+			return nil, err
+		}
+		areas = append(areas, area)
+	}
+
+	return areas, nil
+}
