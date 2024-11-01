@@ -105,6 +105,37 @@ func SetupDB(db *sql.DB) error {
 	return nil
 }
 
+// ResetDB drops all tables and recreates them.
+func ResetDB(db *sql.DB) error {
+	queries := `
+		DROP TABLE IF EXISTS areas;
+		DROP TABLE IF EXISTS tasks;
+		DROP TABLE IF EXISTS notes;
+		DROP TABLE IF EXISTS task_notes;
+		DROP TABLE IF EXISTS area_notes;
+	`
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	_, err = tx.Exec(queries)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to drop tables: %w", err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	err = SetupDB(db)
+	if err != nil {
+		return fmt.Errorf("failed to setup database: %w", err)
+	}
+
+	return nil
+}
+
 func UpdateNotePath(db *sql.DB, noteID int, newPath string) error {
 	query := "UPDATE notes SET path = ? WHERE id = ?"
 	_, err := db.Exec(query, newPath, noteID)
