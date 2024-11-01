@@ -16,7 +16,11 @@ import (
 func ConnectDB() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "file:new_demo.db")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return nil, fmt.Errorf("invalid sql.Open() arguments: %w", err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatal("failed to ping database: ", err)
 	}
 	return db, nil
 }
