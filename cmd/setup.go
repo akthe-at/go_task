@@ -44,7 +44,7 @@ var setupCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		if !db.IsDatabaseSetup(conn) {
+		if !db.IsSetup(conn) {
 			fmt.Println("Setting up the database...")
 
 			err = db.SetupDB(conn)
@@ -54,7 +54,7 @@ var setupCmd = &cobra.Command{
 		}
 
 		// // Create and Insert a new Task
-		test := db.TaskTable{
+		test := data.TaskTable{
 			Task: data.Task{
 				Title:       "do laundry",
 				Description: "wash underwear",
@@ -69,7 +69,7 @@ var setupCmd = &cobra.Command{
 			fmt.Println("Error creating task:", err)
 		}
 
-		updated_task := db.TaskTable{
+		updated_task := data.TaskTable{
 			Task: data.Task{
 				ID:             1,
 				Title:          "do laundry again and again and again",
@@ -77,12 +77,12 @@ var setupCmd = &cobra.Command{
 			},
 		}
 
-		err = updated_task.Update(conn)
+		_, err = updated_task.Update(conn)
 		if err != nil {
 			fmt.Println("Error updating task:", err)
 		}
 
-		deleted_task := db.TaskTable{
+		deleted_task := data.TaskTable{
 			Task: data.Task{ID: 1},
 		}
 		err = deleted_task.Delete(conn)
