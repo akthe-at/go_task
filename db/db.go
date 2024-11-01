@@ -3,10 +3,8 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"strings"
-	"time"
+	"log"
 
-	"github.com/akthe-at/go_task/data"
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
 )
@@ -25,8 +23,12 @@ func ConnectDB() (*sql.DB, error) {
 	return db, nil
 }
 
-// isDatabaseSetup checks if the database has been set up.
-func IsDatabaseSetup(db *sql.DB) bool {
+/*
+IsSetup checks if the database has been set up.
+ 1. Returns false if the tasks table does not exist
+ 2. Returns true if the tasks table exists
+*/
+func IsSetup(db *sql.DB) bool {
 	query := `SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'`
 	var name string
 	err := db.QueryRow(query).Scan(&name)
@@ -38,11 +40,13 @@ func IsDatabaseSetup(db *sql.DB) bool {
 	return true
 }
 
-// SetupDB Setup the Initial DB Schema
-// 1. Creates the areas and tasks tables if they do not exist
-// 2. Returns an error if any occurs
-// 3. Uses transactions for safety
-// 4. Uses prepared statements for better performance
+/*
+SetupDB Setup the Initial DB Schema
+ 1. Creates the areas and tasks tables if they do not exist
+ 2. Returns an error if any occurs
+ 3. Uses transactions for safety
+ 4. Uses prepared statements for better performance
+*/
 func SetupDB(db *sql.DB) error {
 	initialQueries := `
 		CREATE TABLE IF NOT EXISTS areas (
