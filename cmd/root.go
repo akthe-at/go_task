@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"os"
 
+	dataTable "github.com/akthe-at/go_task/tui/dataTable"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -34,16 +36,18 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "go_task",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Short: "This launches the go_task TUI application",
+	Long: `This application consists of a TUI interface and a CLI interface
+	To launch the TUI version, simpy run go_task with no arguments. All other subcommands
+	interact with the CLI version of the application`,
+	Run: func(cmd *cobra.Command, args []string) {
+		model := dataTable.NewTable()
+		p := tea.NewProgram(dataTable.RunTableModel(model))
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Alas, there's been an error: %v", err)
+			os.Exit(1)
+		}
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
