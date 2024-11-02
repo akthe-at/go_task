@@ -29,6 +29,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var resetTarget string
+
 // setupCmd represents the setup command
 var setupCmd = &cobra.Command{
 	Use:   "setup",
@@ -114,14 +116,43 @@ var setupCmd = &cobra.Command{
 	},
 }
 
+var resetCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "Reset the DB to its initial state.",
+	Long: `This command will drop all of the tables, thus deleting all tasks, projects, and areas.
+	The tables will be then recreated to their blank, default state.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// Open a database connection
+		conn, err := db.ConnectDB()
+		if err != nil {
+			fmt.Println("Error opening database:", err)
+		}
+		defer conn.Close()
+
+		if resetTarget == "db" {
+			err = db.ResetDB(conn)
+			if err != nil {
+				fmt.Println("Error resetting database:", err)
+			}
+			fmt.Println("Database reset complete")
+		} else if resetTarget == "" {
+			fmt.Println("No target specified. Please specify a target to reset.")
+		} else {
+			fmt.Println("Invalid target specified. Please specify a valid target to reset.")
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(setupCmd)
+	setupCmd.AddCommand(resetCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// setupCmd.PersistentFlags().String("foo", "", "A help for foo")
+	resetCmd.Flags().StringVarP(&resetTarget, "target", "t", "", "The target to reset. Options: db, tasks, areas, projects")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
