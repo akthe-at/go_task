@@ -239,8 +239,8 @@ func (m *Model) updateFooter() {
 	m.tableModel = m.tableModel.WithStaticFooter(footerText)
 }
 
-func RunModel(m *TableModel) {
-	if _, err := tea.NewProgram(RunTableModel(m), tea.WithAltScreen()).Run(); err != nil {
+func RunModel(m *Model) {
+	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
