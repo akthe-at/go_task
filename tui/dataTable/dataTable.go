@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 
 	data "github.com/akthe-at/go_task/data"
 	db "github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -44,6 +47,23 @@ var customBorder = table.Border{
 	InnerDivider: "║",
 }
 
+type Model struct {
+	tableModel    table.Model
+	deleteMessage string
+}
+
+func (m *Model) Init() tea.Cmd { return nil }
+
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		cmd  tea.Cmd
+		cmds []tea.Cmd
+	)
+
+	m.tableModel, cmd = m.tableModel.Update(msg)
+	cmds = append(cmds, cmd)
+
+	m.updateFooter()
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -58,56 +78,37 @@ var customBorder = table.Border{
 	return m, tea.Batch(cmds...)
 }
 
-func NewTable() *TableModel {
-	re := lipgloss.NewRenderer(os.Stdout)
-	baseStyle := re.NewStyle().Padding(0, 1)
-	headerStyle := baseStyle.Foreground(lipgloss.Color("#f6c177")).Bold(true)
-	// selectedStyle := baseStyle.Foreground(lipgloss.Color("#9ccfd8")).Background(lipgloss.Color("#44415a"))
-
-	headers := []string{"ID", "Title", "Description", "Priority", "Status", "Archived", "Created At", "Last Modified", "Due Date"}
-	var rows [][]string
-
-	// Open a database connection
+func (m *Model) loadRowsFromDatabase() ([]table.Row, error) {
 	conn, err := db.ConnectDB()
 	if err != nil {
-		fmt.Println("Error opening database:", err)
+		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
 	defer conn.Close()
 
 	taskTable := data.TaskTable{}
 	tasks, err := taskTable.ReadAll(conn)
 	if err != nil {
-		log.Fatal("Error reading tasks:", err)
+		return nil, fmt.Errorf("error reading tasks: %w", err)
 	}
 
+	var rows []table.Row
 	for _, task := range tasks {
-		row := []string{
-			fmt.Sprintf("%d", task.ID),
-			task.Title,
-			task.Description,
-			task.Priority,
-			task.Status,
-			fmt.Sprintf("%t", task.Archived),
-			task.CreatedAt.Format("2006-01-02 15:04:05"),
-			task.LastModified.Format("2006-01-02 15:04:05"),
-			task.DueDate.Format("2006-01-02 15:04:05"),
-		}
+		row := table.NewRow(table.RowData{
+			columnKeyID:           fmt.Sprintf("%d", task.ID),
+			columnKeyTask:         task.Title,
+			columnKeyPriority:     task.Priority,
+			columnKeyStatus:       task.Status,
+			columnKeyArchived:     fmt.Sprintf("%t", task.Archived),
+			columnKeyCreatedAt:    task.CreatedAt.Format("2006-01-02 15:04:05"),
+			columnKeyLastModified: task.LastModified.Format("2006-01-02 15:04:05"),
+			columnKeyDueDate:      task.DueDate.Format("2006-01-02 15:04:05"),
+		})
 		rows = append(rows, row)
 	}
 
-	t := table.New().
-		Headers(headers...).
-		Rows(rows...).
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(re.NewStyle().Foreground(lipgloss.Color("#908caa"))).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			switch {
-			case row == 0:
-				return headerStyle
-			case row%2 == 0:
-				return baseStyle.Foreground(lipgloss.Color("#3e8fb0"))
-			default:
-				return baseStyle.Foreground(lipgloss.Color("#eb6f92"))
+	return rows, nil
+}
+
 func (m *Model) deleteTask() tea.Cmd {
 	selectedIDs := []string{}
 
