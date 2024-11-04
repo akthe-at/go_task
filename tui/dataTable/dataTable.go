@@ -168,6 +168,58 @@ func (m *Model) deleteTask() tea.Cmd {
 	return nil
 }
 
+func NewModel() Model {
+	columns := []table.Column{
+		table.NewColumn(columnKeyID, "ID", 5).WithStyle(
+			lipgloss.NewStyle().
+				Faint(true).
+				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).
+				Align(lipgloss.Center)),
+		table.NewColumn(columnKeyTask, "Task", 10),
+		table.NewColumn(columnKeyPriority, "Priority", 10),
+		table.NewColumn(columnKeyStatus, "Status", 10),
+		table.NewColumn(columnKeyArchived, "Archived", 10),
+		table.NewColumn(columnKeyCreatedAt, "Created At", 20),
+		table.NewColumn(columnKeyLastModified, "Last Modified", 20),
+		table.NewColumn(columnKeyDueDate, "Due Date", 20),
+	}
+
+	model := Model{}
+
+	rows, err := model.loadRowsFromDatabase()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	keys := table.DefaultKeyMap()
+	keys.RowDown.SetKeys("j", "down", "s")
+	keys.RowUp.SetKeys("k", "up", "w")
+
+	model.tableModel = table.New(columns).
+		WithRows(rows).
+		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Foam)).Bold(true)).
+		SelectableRows(true).
+		Focused(true).
+		Border(customBorder).
+		WithKeyMap(keys).
+		WithStaticFooter("Footer!").
+		WithPageSize(10).
+		WithSelectedText(" ", " 󰄲  ").
+		WithBaseStyle(
+			lipgloss.NewStyle().
+				BorderForeground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).
+				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Gold)).
+				Align(lipgloss.Left),
+		).
+		SortByAsc(columnKeyID).
+		WithMissingDataIndicatorStyled(table.StyledCell{
+			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)),
+			Data:  "<ない>",
+		})
+
+	model.updateFooter()
+
+	return model
 }
 
 func RunTableModel(m *TableModel) tea.Model {
