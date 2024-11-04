@@ -168,6 +168,40 @@ func (m *Model) deleteTask() tea.Cmd {
 	return nil
 }
 
+func (m Model) View() string {
+	body := strings.Builder{}
+
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Iris)).Render("Press left/right or page up/down to move between pages") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Iris)).Render("Press space/enter to select a row, q or ctrl+c to quit") + "\n")
+
+	selectedIDs := []string{}
+
+	for _, row := range m.tableModel.SelectedRows() {
+		selectedIDs = append(selectedIDs, row.Data[columnKeyID].(string))
+	}
+
+	body.WriteString(
+		lipgloss.NewStyle().
+			Foreground(lipgloss.Color(
+				tui.Themes.RosePineMoon.Love)).
+			Render(
+				fmt.Sprintf("Selected IDs: %s", strings.Join(selectedIDs, ", "))) + "\n")
+
+	if m.deleteMessage != "" {
+		body.WriteString(
+			lipgloss.NewStyle().
+				Foreground(lipgloss.Color(
+					tui.Themes.RosePineMoon.Love)).
+				Render(m.deleteMessage) + "\n")
+	}
+
+	body.WriteString(m.tableModel.View())
+
+	body.WriteString("\n")
+
+	return body.String()
+}
+
 func NewModel() Model {
 	columns := []table.Column{
 		table.NewColumn(columnKeyID, "ID", 5).WithStyle(
