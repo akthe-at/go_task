@@ -9,14 +9,41 @@ import (
 	db "github.com/akthe-at/go_task/db"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+
+	"github.com/evertras/bubble-table/table"
 )
 
-type TableModel struct {
-	table *table.Table
+const (
+	columnKeyID           = "id"
+	columnKeyTask         = "title"
+	columnKeyPriority     = "priority"
+	columnKeyStatus       = "status"
+	columnKeyArchived     = "archived"
+	columnKeyCreatedAt    = "created_at"
+	columnKeyLastModified = "last_modified"
+	columnKeyDueDate      = "due_date"
+)
+
+var customBorder = table.Border{
+	Top:    "─",
+	Left:   "│",
+	Right:  "│",
+	Bottom: "─",
+
+	TopRight:    "╮",
+	TopLeft:     "╭",
+	BottomRight: "╯",
+	BottomLeft:  "╰",
+
+	TopJunction:    "╥",
+	LeftJunction:   "├",
+	RightJunction:  "┤",
+	BottomJunction: "╨",
+	InnerJunction:  "╫",
+
+	InnerDivider: "║",
 }
 
-func (t *TableModel) Init() tea.Cmd { return nil }
 
 func (t *TableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
