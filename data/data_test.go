@@ -22,13 +22,13 @@ func TestMain(m *testing.M) {
 
 	// Create tables and insert test data
 	_, err = dbConn.Exec(`
-	CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT, description TEXT, priority TEXT, status TEXT, archived BOOLEAN, created_at DATETIME, last_mod DATETIME, due_date DATETIME);
+	CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT, priority TEXT, status TEXT, archived BOOLEAN, created_at DATETIME, last_mod DATETIME, due_date DATETIME);
 	CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT, path TEXT);
 	CREATE TABLE task_notes (note_id INTEGER, task_id INTEGER);
 	CREATE TABLE areas (id INTEGER PRIMARY KEY, title TEXT, type TEXT, deadline DATETIME, status TEXT, archived BOOLEAN);
 	CREATE TABLE area_notes (note_id INTEGER, area_id INTEGER);
-	INSERT INTO tasks (id, title, description, priority, status, archived, created_at, last_mod, due_date) VALUES (1, 'Test Task', 'Description', 'High', 'Open', 0, '2023-01-01', '2023-01-01', '2023-01-01');
-INSERT INTO tasks (id, title, description, priority, status, archived, created_at, last_mod, due_date) VALUES (2, 'Test Task 2', 'Description 2', 'Medium', 'Open', 0, '2023-01-01', '2023-01-01', '2023-01-01');
+	INSERT INTO tasks (id, title, priority, status, archived, created_at, last_mod, due_date) VALUES (1, 'Test Task', 'High', 'Open', 0, '2023-01-01', '2023-01-01', '2023-01-01');
+INSERT INTO tasks (id, title, priority, status, archived, created_at, last_mod, due_date) VALUES (2, 'Test Task 2', 'Medium', 'Open', 0, '2023-01-01', '2023-01-01', '2023-01-01');
 	INSERT INTO notes (id, title, path) VALUES (1, 'Note 1', '/path/to/note1'), (2, 'Note 2', '/path/to/note2');
 INSERT INTO notes (id, title, path) VALUES (3, 'Note 3', '/path/to/note3'), (4, 'Note 4', '/path/to/note4');
 	INSERT INTO task_notes (note_id, task_id) VALUES (1, 1), (2, 1);
@@ -107,7 +107,7 @@ func TestAreaTable_ReadAll(t *testing.T) {
 }
 
 func TestTaskTable_Update(t *testing.T) {
-	taskTable := &data.TaskTable{Task: data.Task{ID: 1, Title: "Updated Task", Description: "Updated Description"}}
+	taskTable := &data.TaskTable{Task: data.Task{ID: 1, Title: "Updated Task"}}
 	_, err := taskTable.Update(dbConn)
 	if err != nil {
 		t.Fatalf("failed to update task: %v", err)
@@ -120,9 +120,6 @@ func TestTaskTable_Update(t *testing.T) {
 
 	if task.Title != "Updated Task" {
 		t.Errorf("expected task title 'Updated Task', got %s", task.Title)
-	}
-	if task.Description != "Updated Description" {
-		t.Errorf("expected task description 'Updated Description', got %s", task.Description)
 	}
 }
 
