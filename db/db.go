@@ -60,7 +60,6 @@ func SetupDB(db *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
-			description TEXT,
 			priority TEXT,
 			status INTEGER,
 			archived BOOLEAN,
