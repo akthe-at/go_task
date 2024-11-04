@@ -53,7 +53,7 @@ func SetupDB(db *sql.DB) error {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
 			type TEXT,
-			deadline TEXT,
+			deadline DATETIME,
 			status INTEGER,
 			archived BOOLEAN
 	);
@@ -64,9 +64,9 @@ func SetupDB(db *sql.DB) error {
 			priority TEXT,
 			status INTEGER,
 			archived BOOLEAN,
-			created_at TEXT,
-			last_mod TEXT,
-			due_date TEXT
+			created_at DATETIME,
+			last_mod DATETIME,
+			due_date DATETIME
 	);
 		CREATE TABLE IF NOT EXISTS notes (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
