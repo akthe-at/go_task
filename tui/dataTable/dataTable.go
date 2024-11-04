@@ -222,8 +222,21 @@ func NewModel() Model {
 	return model
 }
 
-func RunTableModel(m *TableModel) tea.Model {
-	return m
+func (m *Model) updateFooter() {
+	highlightedRow := m.tableModel.HighlightedRow()
+	rowID, ok := highlightedRow.Data[columnKeyID]
+	if !ok {
+		rowID = "No Rows Available"
+	}
+
+	footerText := fmt.Sprintf(
+		"Pg. %d/%d - Currently looking at ID: %s",
+		m.tableModel.CurrentPage(),
+		m.tableModel.MaxPages(),
+		rowID,
+	)
+
+	m.tableModel = m.tableModel.WithStaticFooter(footerText)
 }
 
 func RunModel(m *TableModel) {
