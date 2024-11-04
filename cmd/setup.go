@@ -152,7 +152,6 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// setupCmd.PersistentFlags().String("foo", "", "A help for foo")
-	resetCmd.Flags().StringVarP(&resetTarget, "target", "t", "", "The target to reset. Options: db, tasks, areas, projects")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
