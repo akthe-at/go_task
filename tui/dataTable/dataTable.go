@@ -17,14 +17,13 @@ import (
 )
 
 const (
-	columnKeyID           = "id"
-	columnKeyTask         = "title"
-	columnKeyPriority     = "priority"
-	columnKeyStatus       = "status"
-	columnKeyArchived     = "archived"
-	columnKeyCreatedAt    = "created_at"
-	columnKeyLastModified = "last_modified"
-	columnKeyDueDate      = "due_date"
+	columnKeyID        = "id"
+	columnKeyTask      = "title"
+	columnKeyPriority  = "priority"
+	columnKeyStatus    = "status"
+	columnKeyArchived  = "archived"
+	columnKeyCreatedAt = "created_at"
+	columnKeyDueDate   = "due_date"
 )
 
 var customBorder = table.Border{
@@ -94,14 +93,13 @@ func (m *Model) loadRowsFromDatabase() ([]table.Row, error) {
 	var rows []table.Row
 	for _, task := range tasks {
 		row := table.NewRow(table.RowData{
-			columnKeyID:           fmt.Sprintf("%d", task.ID),
-			columnKeyTask:         task.Title,
-			columnKeyPriority:     task.Priority,
-			columnKeyStatus:       task.Status,
-			columnKeyArchived:     fmt.Sprintf("%t", task.Archived),
-			columnKeyCreatedAt:    task.CreatedAt.Format("2006-01-02 15:04:05"),
-			columnKeyLastModified: task.LastModified.Format("2006-01-02 15:04:05"),
-			columnKeyDueDate:      task.DueDate.Format("2006-01-02 15:04:05"),
+			columnKeyID:        fmt.Sprintf("%d", task.ID),
+			columnKeyTask:      task.Title,
+			columnKeyPriority:  task.Priority,
+			columnKeyStatus:    task.Status,
+			columnKeyArchived:  fmt.Sprintf("%t", task.Archived),
+			columnKeyCreatedAt: task.CreatedAt.Format("2006-01-02 15:04:05"),
+			columnKeyDueDate:   task.DueDate.Format("2006-01-02 15:04:05"),
 		})
 		rows = append(rows, row)
 	}
@@ -215,7 +213,6 @@ func NewModel() Model {
 		table.NewColumn(columnKeyStatus, "Status", 10),
 		table.NewColumn(columnKeyArchived, "Archived", 10),
 		table.NewColumn(columnKeyCreatedAt, "Created At", 20),
-		table.NewColumn(columnKeyLastModified, "Last Modified", 20),
 		table.NewColumn(columnKeyDueDate, "Due Date", 20),
 	}
 
