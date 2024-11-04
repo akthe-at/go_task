@@ -38,6 +38,59 @@ type Task struct {
 	Notes          []Note
 }
 
+func (t *Task) Create(db *sql.DB) error {
+	return nil
+}
+
+func (t *Task) Read(db *sql.DB) (interface{}, error) {
+	return nil, nil
+}
+
+func (t *Task) ReadAll(db *sql.DB) ([]interface{}, error) {
+	return nil, nil
+}
+
+func (t *Task) Update(db *sql.DB) (sql.Result, error) {
+	return nil, nil
+}
+
+func (t *Task) UpdateMultiple(db *sql.DB, ID ...int) error {
+	return nil
+}
+
+func (t *Task) Delete(db *sql.DB) error {
+	if t.ID == 0 {
+		return fmt.Errorf("invalid task ID: %d", t.ID)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	_, err = tx.Exec(`DELETE FROM task_notes where task_id = ?`, t.ID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete task notes: %w", err)
+	}
+
+	_, err = tx.Exec(`DELETE FROM tasks WHERE id = ?`, t.ID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete task: %w", err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (t *Task) DeleteMultiple(db *sql.DB, ID ...int) error {
+	return nil
+}
+
 /*
 Create inserts a new task into the database.
  1. Sets the created_at and last_mod fields to the current time.
