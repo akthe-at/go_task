@@ -58,11 +58,10 @@ var setupCmd = &cobra.Command{
 		// // Create and Insert a new Task
 		test := data.TaskTable{
 			Task: data.Task{
-				Title:       "do laundry",
-				Description: "wash underwear",
-				Priority:    "high",
-				Status:      "Pending",
-				Archived:    false,
+				Title:    "do laundry",
+				Priority: "high",
+				Status:   "Pending",
+				Archived: false,
 			},
 		}
 
