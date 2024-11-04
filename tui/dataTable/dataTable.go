@@ -45,24 +45,17 @@ var customBorder = table.Border{
 }
 
 
-func (t *TableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		t.table = t.table.Width(msg.Width)
-		t.table = t.table.Height(msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "ctrl+c":
-			return t, tea.Quit
+		case "ctrl+c", "esc", "q":
+			cmds = append(cmds, tea.Quit)
+		case "D", "dd":
+			cmds = append(cmds, m.deleteTask())
 		}
-
 	}
-	return t, cmd
-}
 
-func (t *TableModel) View() string {
-	return "\n" + t.table.String() + "\n"
+	return m, tea.Batch(cmds...)
 }
 
 func NewTable() *TableModel {
@@ -115,11 +108,66 @@ func NewTable() *TableModel {
 				return baseStyle.Foreground(lipgloss.Color("#3e8fb0"))
 			default:
 				return baseStyle.Foreground(lipgloss.Color("#eb6f92"))
-			}
-		}).
-		Border(lipgloss.ThickBorder())
+func (m *Model) deleteTask() tea.Cmd {
+	selectedIDs := []string{}
 
-	return &TableModel{t}
+	for _, row := range m.tableModel.SelectedRows() {
+		selectedIDs = append(selectedIDs, row.Data[columnKeyID].(string))
+	}
+	highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
+	taskID, err := strconv.Atoi(highlightedInfo)
+	if err != nil {
+		log.Printf("Error converting ID to int: %s", err)
+		return nil
+	}
+
+	conn, err := db.ConnectDB()
+	if err != nil {
+		log.Printf("Error connecting to database: %s", err)
+		return nil
+	}
+	defer conn.Close()
+
+	if len(selectedIDs) == 1 {
+		task := data.Task{ID: taskID}
+		err = task.Delete(conn)
+		if err != nil {
+			log.Printf("Error deleting task: %s", err)
+			return nil
+		}
+		m.deleteMessage = fmt.Sprintf("You deleted this task:  IDs: %s", highlightedInfo)
+	} else if len(selectedIDs) > 1 {
+		deletedTasks := make([]string, len(selectedIDs))
+		for idx, id := range selectedIDs {
+			converted_id, err := strconv.Atoi(id)
+			if err != nil {
+				log.Printf("Error converting ID to int: %s", err)
+			}
+			task := data.Task{ID: converted_id}
+			err = task.Delete(conn)
+			if err != nil {
+				log.Printf("Error deleting task: %s", err)
+				return nil
+			}
+			deletedTasks[idx] = id
+		}
+		m.deleteMessage = fmt.Sprintf("You deleted these tasks:  IDs: %s", strings.Join(deletedTasks, ", "))
+	}
+
+	// Requery the database and update the table model
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		log.Printf("Error loading rows from database: %s", err)
+		return nil
+	}
+	m.tableModel = m.tableModel.WithRows(rows)
+
+	// Update the footer
+	m.updateFooter()
+
+	return nil
+}
+
 }
 
 func RunTableModel(m *TableModel) tea.Model {
