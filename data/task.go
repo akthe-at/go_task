@@ -28,7 +28,6 @@ type TaskTable struct {
 type Task struct {
 	ID             int
 	Title          string
-	Description    string
 	Priority       string
 	Status         string
 	Archived       bool
@@ -55,10 +54,10 @@ func (t *TaskTable) Create(db *sql.DB) error {
 		t.Task.DueDate = now.AddDate(0, 0, 7)
 	}
 	query := `
-    INSERT INTO tasks (title, description, priority, status, archived, created_at, last_mod, due_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (title, priority, status, archived, created_at, last_mod, due_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     `
-	_, err := db.Exec(query, t.Task.Title, t.Task.Description, t.Task.Priority, t.Task.Status, t.Task.Archived, t.Task.CreatedAt, t.Task.LastModified, t.Task.DueDate)
+	_, err := db.Exec(query, t.Task.Title, t.Task.Priority, t.Task.Status, t.Task.Archived, t.Task.CreatedAt, t.Task.LastModified, t.Task.DueDate)
 	if err != nil {
 		return err
 	}
@@ -67,8 +66,8 @@ func (t *TaskTable) Create(db *sql.DB) error {
 
 func (t *TaskTable) Read(db *sql.DB) (Task, error) {
 	var task Task
-	query := `SELECT id, title, description, priority, status, archived, created_at, last_mod, due_date FROM tasks WHERE id = ?`
-	err := db.QueryRow(query, t.Task.ID).Scan(&task.ID, &task.Title, &task.Description, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
+	query := `SELECT id, title, priority, status, archived, created_at, last_mod, due_date FROM tasks WHERE id = ?`
+	err := db.QueryRow(query, t.Task.ID).Scan(&task.ID, &task.Title, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
 	if err != nil {
 		return task, err
 	}
@@ -83,7 +82,7 @@ func (t *TaskTable) Read(db *sql.DB) (Task, error) {
 
 func (t *TaskTable) ReadAll(db *sql.DB) ([]Task, error) {
 	var tasks []Task
-	query := `SELECT id, title, description, priority, status, archived, created_at, last_mod, due_date FROM tasks`
+	query := `SELECT id, title, priority, status, archived, created_at, last_mod, due_date FROM tasks`
 
 	rows, err := db.Query(query)
 	if err != nil {
@@ -94,7 +93,8 @@ func (t *TaskTable) ReadAll(db *sql.DB) ([]Task, error) {
 
 	for rows.Next() {
 		var task Task
-		err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
+
+		err := rows.Scan(&task.ID, &task.Title, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
 		if err != nil {
 			return nil, err
 		}
@@ -123,12 +123,6 @@ func (t *TaskTable) Update(db *sql.DB) (sql.Result, error) {
 	if t.Task.Title != "" {
 		queryParts = append(queryParts, fmt.Sprintf("title = $%d", argCounter))
 		args = append(args, t.Task.Title)
-		argCounter++
-	}
-
-	if t.Task.Description != "" {
-		queryParts = append(queryParts, fmt.Sprintf("description = $%d", argCounter))
-		args = append(args, t.Task.Description)
 		argCounter++
 	}
 
