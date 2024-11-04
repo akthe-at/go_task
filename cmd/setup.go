@@ -129,17 +129,11 @@ var resetCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		if resetTarget == "db" {
-			err = db.ResetDB(conn)
-			if err != nil {
-				fmt.Println("Error resetting database:", err)
-			}
-			fmt.Println("Database reset complete")
-		} else if resetTarget == "" {
-			fmt.Println("No target specified. Please specify a target to reset.")
-		} else {
-			fmt.Println("Invalid target specified. Please specify a valid target to reset.")
+		err = db.ResetDB(conn)
+		if err != nil {
+			fmt.Println("Error resetting database:", err)
 		}
+		fmt.Println("Database reset complete")
 	},
 }
 
