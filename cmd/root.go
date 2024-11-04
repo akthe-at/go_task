@@ -85,7 +85,7 @@ func initConfig() {
 
 		// Search config in home directory with name ".go_task" (without extension).
 		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
+		viper.SetConfigType("toml")
 		viper.SetConfigName(".go_task")
 	}
 
