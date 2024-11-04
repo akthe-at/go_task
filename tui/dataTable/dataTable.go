@@ -49,6 +49,7 @@ var customBorder = table.Border{
 type Model struct {
 	tableModel    table.Model
 	deleteMessage string
+	archiveFilter bool
 }
 
 func (m *Model) Init() tea.Cmd { return nil }
@@ -71,6 +72,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tea.Quit)
 		case "D", "dd":
 			cmds = append(cmds, m.deleteTask())
+		case "A":
+			cmds = append(cmds, m.filterArchives())
 		}
 	}
 
@@ -105,6 +108,63 @@ func (m *Model) loadRowsFromDatabase() ([]table.Row, error) {
 	}
 
 	return rows, nil
+}
+
+func (m *Model) filterArchives() tea.Cmd {
+	var filteredRows []table.Row
+	// toggle m.archiveFilter from current status
+	m.archiveFilter = !m.archiveFilter
+
+	if m.archiveFilter {
+
+		rows, err := m.loadRowsFromDatabase()
+		if err != nil {
+			log.Printf("Error loading rows from database: %s", err)
+			return nil
+		}
+
+		for _, row := range rows {
+			archived, ok := row.Data[columnKeyArchived]
+			if !ok {
+				log.Printf("Error getting archived status from row: %s", err)
+				return nil
+			}
+			if archived == "false" {
+				filteredRows = append(filteredRows, row)
+			}
+		}
+
+		m.tableModel = m.tableModel.WithRows(filteredRows)
+
+		// Update the footer
+		m.updateFooter()
+
+		return nil
+	} else {
+		rows, err := m.loadRowsFromDatabase()
+		if err != nil {
+			log.Printf("Error loading rows from database: %s", err)
+			return nil
+		}
+
+		for _, row := range rows {
+			archived, ok := row.Data[columnKeyArchived]
+			if !ok {
+				log.Printf("Error getting archived status from row: %s", err)
+				return nil
+			}
+			if archived == "true" {
+				filteredRows = append(filteredRows, row)
+			}
+		}
+
+		m.tableModel = m.tableModel.WithRows(rows)
+
+		// Update the footer
+		m.updateFooter()
+
+		return nil
+	}
 }
 
 func (m *Model) deleteTask() tea.Cmd {
@@ -170,6 +230,7 @@ func (m *Model) deleteTask() tea.Cmd {
 func (m Model) View() string {
 	body := strings.Builder{}
 
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Iris)).Render("Filter Archived Tasks by pressing 'A'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Iris)).Render("Press left/right or page up/down to move between pages") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Iris)).Render("Press space/enter to select a row, q or ctrl+c to quit") + "\n")
 
@@ -195,7 +256,6 @@ func (m Model) View() string {
 	}
 
 	body.WriteString(m.tableModel.View())
-
 	body.WriteString("\n")
 
 	return body.String()
@@ -216,11 +276,20 @@ func NewModel() Model {
 		table.NewColumn(columnKeyDueDate, "Due Date", 20),
 	}
 
-	model := Model{}
-
+	model := Model{archiveFilter: true}
+	var filteredRows []table.Row
 	rows, err := model.loadRowsFromDatabase()
 	if err != nil {
 		log.Fatal(err)
+	}
+	for _, row := range rows {
+		archived, ok := row.Data[columnKeyArchived]
+		if !ok {
+			log.Printf("Error getting archived status from row: %s", err)
+		}
+		if archived == "false" {
+			filteredRows = append(filteredRows, row)
+		}
 	}
 
 	keys := table.DefaultKeyMap()
@@ -228,7 +297,7 @@ func NewModel() Model {
 	keys.RowUp.SetKeys("k", "up", "w")
 
 	model.tableModel = table.New(columns).
-		WithRows(rows).
+		WithRows(filteredRows).
 		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Foam)).Bold(true)).
 		SelectableRows(true).
 		Focused(true).
@@ -246,7 +315,7 @@ func NewModel() Model {
 		SortByAsc(columnKeyID).
 		WithMissingDataIndicatorStyled(table.StyledCell{
 			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)),
-			Data:  "<ない>",
+			Data:  "<Missing Data>",
 		})
 
 	model.updateFooter()
