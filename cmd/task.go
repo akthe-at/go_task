@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 
+	form "github.com/akthe-at/go_task/tui/formInput"
 	"github.com/spf13/cobra"
 )
 
@@ -48,12 +49,7 @@ var addCmd = &cobra.Command{
 	Short: "This is the command for creating new tasks via CLI",
 	Long:  `This is the command for creating new tasks via CLI...`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("The new task command was called")
-		if Name != "" {
-			fmt.Println("A new task called", Name, "was created")
-		} else {
-			fmt.Println("A new task was created")
-		}
+		form.Run()
 	},
 }
 
