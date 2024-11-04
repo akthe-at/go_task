@@ -101,7 +101,7 @@ var setupCmd = &cobra.Command{
 			defer results.Close()
 			for results.Next() {
 				var task data.Task
-				err := results.Scan(&task.ID, &task.Title, &task.Description, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
+				err := results.Scan(&task.ID, &task.Title, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
 				if err != nil {
 					fmt.Println("Error when scanning data:", err)
 					continue
