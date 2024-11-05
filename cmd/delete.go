@@ -24,63 +24,34 @@ package cmd
 import (
 	"fmt"
 
-	form "github.com/akthe-at/go_task/tui/formInput"
 	"github.com/spf13/cobra"
 )
 
-var (
-	Name   string
-	taskID string
-)
-
-// taskCmd represents the task command
-var taskCmd = &cobra.Command{
-	Use:   "task",
-	Short: "This is the parent command for all task related commands",
-	Long: `This is the parent command for all task related cli commands and 
-	has features like new, delete, list, etc.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("The new task command was called")
-	},
-}
-
-var addCmd = &cobra.Command{
-	Use:   "new",
-	Short: "This is the command for creating new tasks via CLI",
-	Long:  `This is the command for creating new tasks via CLI...`,
-	Run: func(cmd *cobra.Command, args []string) {
-		form.Run()
-	},
-}
-
+// deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "This is the command for deleting tasks via CLI",
-	Long:  `This is the command for deleting tasks via CLI`,
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("The delete task command was called")
-		if taskID != "" {
-			fmt.Printf("You deleted the task with the id of %v", taskID)
-		} else {
-			fmt.Println("You deleted a task") // not really, they didn't provide an id...
-		}
+		fmt.Println("delete called")
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(taskCmd)
-	taskCmd.AddCommand(addCmd)
-	taskCmd.AddCommand(deleteCmd)
+	rootCmd.AddCommand(deleteCmd)
 
 	// Here you will define your flags and configuration settings.
 
-	addCmd.Flags().StringVarP(&Name, "name", "n", "", "What do you like to be called?")
-	deleteCmd.Flags().StringVarP(&taskID, "taskid", "t", "", "What task did you want to delete?")
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// taskCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// deleteCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// taskCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// deleteCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
