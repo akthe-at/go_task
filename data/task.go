@@ -7,6 +7,22 @@ import (
 	"time"
 )
 
+type (
+	PriorityType string
+	StatusType   string
+)
+
+const (
+	PriorityTypeLow    PriorityType = "low"
+	PriorityTypeMedium PriorityType = "medium"
+	PriorityTypeHigh   PriorityType = "high"
+	PriorityTypeUrgent PriorityType = "urgent"
+	StatusToDo         StatusType   = "todo"
+	StatusPlanning     StatusType   = "planning"
+	StatusDoing        StatusType   = "doing"
+	StatusDone         StatusType   = "done"
+)
+
 type CRUD interface {
 	Create(db *sql.DB) error
 	Read(db *sql.DB) (interface{}, error)
@@ -28,8 +44,8 @@ type TaskTable struct {
 type Task struct {
 	ID             int
 	Title          string
-	Priority       string
-	Status         string
+	Priority       PriorityType
+	Status         StatusType
 	Archived       bool
 	UpdateArchived bool
 	CreatedAt      time.Time

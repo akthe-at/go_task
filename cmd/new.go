@@ -23,11 +23,15 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/akthe-at/go_task/data"
+	"github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/tui/formInput"
 	"github.com/spf13/cobra"
 )
 
-// newCmd represents the new command
+// newCmd rep
 var newCmd = &cobra.Command{
 	Use:   "new",
 	Short: "A brief description of your command",
@@ -42,8 +46,52 @@ to quickly create a Cobra application.`,
 	},
 }
 
+// newTaskCmd represents the new command
+var newTaskCmd = &cobra.Command{
+	Use:   "task",
+	Short: "Creates a new task with a form",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+`,
+	Run: func(cmd *cobra.Command, args []string) {
+		form := formInput.NewTaskForm()
+		err := form.Run()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Type assertions for form values
+		taskTitle := form.Get("TaskTitle")
+		priority := form.Get("Priority")
+		status := form.Get("Status")
+		archived := form.Get("Archived")
+
+		newTask := data.Task{
+			Title:          taskTitle.(string),
+			Priority:       priority.(data.PriorityType),
+			Status:         status.(data.StatusType),
+			Archived:       archived.(bool),
+			UpdateArchived: false,
+			Notes:          nil,
+		}
+
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatal(err)
+		}
+		completedTask := data.TaskTable{
+			Task: newTask,
+		}
+		err = completedTask.Create(conn)
+		if err != nil {
+			log.Fatal(err)
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(newCmd)
+	newCmd.AddCommand(newTaskCmd)
 
 	// Here you will define your flags and configuration settings.
 
