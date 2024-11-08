@@ -58,8 +58,18 @@ func (t *Task) Create(db *sql.DB) error {
 	return nil
 }
 
-func (t *Task) Read(db *sql.DB) (interface{}, error) {
-	return nil, nil
+func (t *Task) Read(db *sql.DB, id int) error {
+	if id == 0 {
+		return fmt.Errorf("invalid task ID: %d", id)
+	}
+
+	query := "select id, title, priority, status, archived, created_at, last_mod, due_date from tasks where id = ?"
+	row := db.QueryRow(query, id)
+	err := row.Scan(&t.ID, &t.Title, &t.Priority, &t.Status, &t.Archived, &t.CreatedAt, &t.LastModified, &t.DueDate)
+	if err != nil {
+		return fmt.Errorf("failed to read task: %w", err)
+	}
+	return nil
 }
 
 func (t *Task) ReadAll(db *sql.DB) ([]interface{}, error) {
