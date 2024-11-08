@@ -141,7 +141,7 @@ func (t *TaskTable) Read(db *sql.DB) (Task, error) {
 		return task, err
 	}
 
-	task.Notes, err = getNotes(db, t.Task.ID, "task_notes")
+	task.Notes, err = GetNotes(db, t.Task.ID, "task_notes")
 	if err != nil {
 		return task, err
 	}
@@ -168,7 +168,7 @@ func (t *TaskTable) ReadAll(db *sql.DB) ([]Task, error) {
 			return nil, err
 		}
 
-		task.Notes, err = getNotes(db, task.ID, "task_notes")
+		task.Notes, err = GetNotes(db, task.ID, "task_notes")
 		if err != nil {
 			return nil, err
 		}
@@ -268,6 +268,45 @@ func (t *TaskTable) Delete(db *sql.DB) error {
 
 func (t *TaskTable) DeleteMultiple(db *sql.DB, ids []int) error {
 	return deleteMultiple(db, "tasks", ids)
+}
+
+func (t *TaskTable) AddNoteToEntity(db *sql.DB, taskID int, note Note) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	notesQuery := `
+INSERT INTO notes (title, path)
+VALUES (?, ?)
+	`
+	results, err := tx.Exec(notesQuery, note.Title, note.Path)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to insert note: %w", err)
+	}
+
+	noteID, err := results.LastInsertId()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to get last insert ID: %w", err)
+	}
+
+	taskNoteQuery := `
+INSERT INTO task_notes(task_id, note_id)
+VALUES (?, ?)
+	`
+
+	_, err = tx.Exec(taskNoteQuery, taskID, noteID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to insert task_note association: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("Failed to commit transaction: %w", err)
+	}
+	return nil
 }
 
 /***************************************************** Area ******************************************************/
@@ -440,7 +479,66 @@ func (a *AreaTable) DeleteMultiple(db *sql.DB, ids []int) error {
 	return deleteMultiple(db, "areas", ids)
 }
 
+func (a *AreaTable) AddNoteToEntity(db *sql.DB, areaID int, note Note) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	notesQuery := `
+INSERT INTO notes (title, path)
+VALUES (?, ?)
+`
+
+	result, err := tx.Exec(notesQuery, note.Title, note.Path)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to insert note: %w", err)
+	}
+
+	noteID, err := result.LastInsertId()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("Failed to get last insert ID: %w", err)
+	}
+
+	areaNoteQuery := `
+INSERT INTO area_notes (area_id, note_id)
+VALUES (?, ?)
+`
+
+	_, err = tx.Exec(areaNoteQuery, areaID, noteID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to insert area_note association: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("Failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// NoteAdder An interface for adding notes to entities like tasks and areas/projects.
+type NoteAdder interface {
+	AddNoteToEntity(db *sql.DB, entityID int, note Note) error
+}
+
 /******************** Helper Functions ********************/
+
+/*
+AddNoteToEntity adds a note to a task or area.
+ 1. Takes a NoteAdder interface, a database connection, an entity ID, and a note as parameters.
+ 2. Calls the AddNoteToEntity method of the NoteAdder interface.
+ 3. Returns an error if any occurs.
+ 4. This function is used by the newTaskNoteCmd and newAreaNoteCmd commands.
+ 5. It is also used by the TaskTable and AreaTable structs.
+*/
+func AddNoteToEntity(noteAdder NoteAdder, db *sql.DB, entityID int, note Note) error {
+	return noteAdder.AddNoteToEntity(db, entityID, note)
+}
 
 /*
 deleteMultiple deletes multiple rows from a table based on the provided IDs.
@@ -465,11 +563,11 @@ func deleteMultiple(db *sql.DB, tableName string, ids []int) error {
 }
 
 /*
-getNotes retrieves notes associated with a specific task or area.
+GetNotes retrieves notes associated with a specific task or area.
  1. Takes a database connection, an ID, and a table name as parameters.
  2. Returns a slice of notes and an error if any occurs.
 */
-func getNotes(db *sql.DB, id int, table string) ([]Note, error) {
+func GetNotes(db *sql.DB, id int, table string) ([]Note, error) {
 	notesQuery := fmt.Sprintf(`
         SELECT notes.id, notes.title, notes.path
         FROM notes
