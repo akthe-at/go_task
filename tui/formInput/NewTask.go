@@ -51,8 +51,6 @@ func (n *NewTaskForm) NewForm() error {
 					huh.NewOption("Done", data.StatusDone),
 				).
 				Value(&n.Status),
-		),
-		huh.NewGroup(
 			huh.NewSelect[bool]().
 				Title("Do you want to archive this task right away?").
 				Options(
@@ -60,8 +58,6 @@ func (n *NewTaskForm) NewForm() error {
 					huh.NewOption("Yes", true),
 				).
 				Value(&n.Archived),
-		),
-		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Are you ready to save your task?").
 				Affirmative("Yes").
