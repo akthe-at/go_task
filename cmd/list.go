@@ -196,7 +196,15 @@ func styleTaskTable(tasks []data.Task) *table.Table {
 		}
 
 		for _, note := range task.Notes {
-			row = append(row, note.Title)
+			// NOTE: Perhaps I will need to break out of the range and truncate the notes entry
+			// if more than ?3? Notes?
+			var formattedEntry string
+			if len(task.Notes) > 1 {
+				formattedEntry = fmt.Sprintf("%d: %s, ", note.ID, note.Title)
+			} else {
+				formattedEntry = fmt.Sprintf("%d: %s", note.ID, note.Title)
+			}
+			row = append(row, formattedEntry)
 		}
 
 		rows = append(rows, row)
@@ -226,7 +234,7 @@ func styleTaskTable(tasks []data.Task) *table.Table {
 			}
 			return style
 		}).
-		Headers("ID", "Task", "Due Date").
+		Headers("ID", "Task", "Due Date", "Notes").
 		Rows(rows...)
 	return &t
 }
