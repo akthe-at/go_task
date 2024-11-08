@@ -23,7 +23,11 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 
+	"github.com/akthe-at/go_task/data"
+	"github.com/akthe-at/go_task/db"
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
 
@@ -42,8 +46,98 @@ to quickly create a Cobra application.`,
 	},
 }
 
+var deleteTaskCmd = &cobra.Command{
+	Use:   "task",
+	Short: "Delete a task given a task ID",
+	Long: `
+	You can delete a task by providing the unique task ID.
+	You can use this command like this: go_task delete task <task_id>
+	
+	You can also provide multiple task IDs to delete multiple tasks at once:
+	"go_task delete task <task_id> <task_id> <task_id> ..."
+
+	You can find the task ID by using the 'go_task list tasks' command.
+	`,
+	Run: func(cmd *cobra.Command, args []string) {
+		var taskIDs []int
+		for _, task := range args {
+			taskID, err := strconv.Atoi(task)
+			if err != nil {
+				log.Errorf("Error converting task ID to integer: %v", err)
+				return
+			}
+			taskIDs = append(taskIDs, taskID)
+		}
+
+		fmt.Println("delete called for task(s):", taskIDs)
+		if len(taskIDs) == 0 {
+			log.Errorf("No task IDs provided - delete command requires at least one task ID")
+			return
+		}
+
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+		defer conn.Close()
+
+		taskTable := data.TaskTable{}
+		err = taskTable.DeleteMultiple(conn, taskIDs)
+		if err != nil {
+			log.Errorf("Error deleting task(s): %v", err)
+			return
+		}
+	},
+}
+
+var deleteProjectCmd = &cobra.Command{
+	Use:   "project",
+	Short: "Delete a project/area given a unique ID",
+	Long: `
+	You can delete a task by providing the unique task ID.
+	You can use this command like this: go_task delete project <project_id>
+
+	Additionally, you can provide multiple project IDs to delete multiple projects at once:
+	"go_task delete project <project_id> <project_id> <project_id> ..."
+
+	You can find the task ID by using the 'go_task list projects' command.
+	`,
+	Run: func(cmd *cobra.Command, args []string) {
+		var projectIDs []int
+		for _, project := range args {
+			projectID, err := strconv.Atoi(project)
+			if err != nil {
+				log.Errorf("Error converting task ID to integer: %v", err)
+				return
+			}
+			projectIDs = append(projectIDs, projectID)
+		}
+
+		fmt.Println("delete called for task(s):", projectIDs)
+		if len(projectIDs) == 0 {
+			log.Errorf("No project IDs provided - delete command requires at least one project ID")
+			return
+		}
+
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+		defer conn.Close()
+
+		projectTable := data.AreaTable{}
+		err = projectTable.DeleteMultiple(conn, projectIDs)
+		if err != nil {
+			log.Errorf("Error deleting project(s): %v", err)
+			return
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(deleteCmd)
+	deleteCmd.AddCommand(deleteTaskCmd)
+	deleteCmd.AddCommand(deleteProjectCmd)
 
 	// Here you will define your flags and configuration settings.
 
