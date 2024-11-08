@@ -275,9 +275,8 @@ func (t *TaskTable) DeleteMultiple(db *sql.DB, ids []int) error {
 type Area struct {
 	ID             int
 	Title          string
-	Type           string
 	Tasks          []Task
-	Status         string
+	Status         StatusType
 	Archived       bool
 	UpdateArchived bool
 	CreatedAt      time.Time
@@ -308,10 +307,10 @@ type AreaTable struct {
 
 func (a *AreaTable) Create(db *sql.DB) error {
 	query := `
-		INSERT INTO areas (title, type, deadline, status, archived)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO areas (title, deadline, status, archived)
+		VALUES (?, ?, ?, ?)
 	`
-	_, err := db.Exec(query, a.Area.Title, a.Area.Type, a.Area.DueDate, a.Area.Status, a.Area.Archived)
+	_, err := db.Exec(query, a.Area.Title, a.Area.DueDate, a.Area.Status, a.Area.Archived)
 	if err != nil {
 		return fmt.Errorf("Failed to create Area/Project in DB: %w", err)
 	}
@@ -321,13 +320,13 @@ func (a *AreaTable) Create(db *sql.DB) error {
 
 func (a *AreaTable) Read(db *sql.DB) (Area, error) {
 	var area Area
-	query := `SELECT id, title, type, deadline, status, archived FROM areas WHERE id = ?`
-	err := db.QueryRow(query, a.Area.ID).Scan(&area.ID, &area.Title, &area.Type, &area.DueDate, &area.Status, &area.Archived)
+	query := `SELECT id, title, deadline, status, archived FROM areas WHERE id = ?`
+	err := db.QueryRow(query, a.Area.ID).Scan(&area.ID, &area.Title, &area.DueDate, &area.Status, &area.Archived)
 	if err != nil {
 		return area, err
 	}
 
-	area.Notes, err = getNotes(db, a.Area.ID, "area_notes")
+	area.Notes, err = GetNotes(db, a.Area.ID, "area_notes")
 	if err != nil {
 		return area, err
 	}
@@ -344,7 +343,7 @@ ReadAll retrieves all areas from the database.
 */
 func (a *AreaTable) ReadAll(db *sql.DB) ([]Area, error) {
 	var areas []Area
-	query := `SELECT id, title, type, deadline, status, archived FROM areas`
+	query := `SELECT id, title, deadline, status, archived FROM areas`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -353,12 +352,12 @@ func (a *AreaTable) ReadAll(db *sql.DB) ([]Area, error) {
 
 	for rows.Next() {
 		var area Area
-		err := rows.Scan(&area.ID, &area.Title, &area.Type, &area.DueDate, &area.Status, &area.Archived)
+		err := rows.Scan(&area.ID, &area.Title, &area.DueDate, &area.Status, &area.Archived)
 		if err != nil {
 			return nil, err
 		}
 
-		area.Notes, err = getNotes(db, area.ID, "area_notes")
+		area.Notes, err = GetNotes(db, area.ID, "area_notes")
 		if err != nil {
 			return nil, err
 		}
@@ -380,11 +379,6 @@ func (a *AreaTable) Update(db *sql.DB) (results sql.Result, err error) {
 	if a.Area.Title != "" {
 		queryParts = append(queryParts, fmt.Sprintf("title = $%d", argCounter))
 		args = append(args, a.Area.Title)
-		argCounter++
-	}
-	if a.Area.Type != "" {
-		queryParts = append(queryParts, fmt.Sprintf("type = $%d", argCounter))
-		args = append(args, a.Area.Type)
 		argCounter++
 	}
 	if a.Area.Status != "" {
