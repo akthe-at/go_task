@@ -137,7 +137,7 @@ func TestTaskTable_Delete(t *testing.T) {
 }
 
 func TestAreaTable_Update(t *testing.T) {
-	areaTable := &data.AreaTable{Area: data.Area{ID: 1, Title: "Updated Area", Type: "Updated Type"}}
+	areaTable := &data.AreaTable{Area: data.Area{ID: 1, Title: "Updated Area", Status: "Updated Status"}}
 	_, err := areaTable.Update(dbConn)
 	if err != nil {
 		t.Fatalf("failed to update area: %v", err)
@@ -151,8 +151,8 @@ func TestAreaTable_Update(t *testing.T) {
 	if area.Title != "Updated Area" {
 		t.Errorf("expected area title 'Updated Area', got %s", area.Title)
 	}
-	if area.Type != "Updated Type" {
-		t.Errorf("expected area type 'Updated Type', got %s", area.Type)
+	if area.Status != "Updated Status" {
+		t.Errorf("expected area status 'Updated Status', got %s", area.Status)
 	}
 }
 
