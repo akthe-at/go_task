@@ -54,14 +54,14 @@ func SetupDB(db *sql.DB) error {
 			title TEXT NOT NULL,
 			type TEXT,
 			deadline DATETIME,
-			status INTEGER,
+			status TEXT,
 			archived BOOLEAN
 	);
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
 			priority TEXT,
-			status INTEGER,
+			status TEXT,
 			archived BOOLEAN,
 			created_at DATETIME,
 			last_mod DATETIME,
