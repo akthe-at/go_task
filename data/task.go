@@ -3,6 +3,7 @@ package data
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -555,20 +556,41 @@ deleteMultiple deletes multiple rows from a table based on the provided IDs.
 This function is called by the DeleteMultiple methods of the TaskTable and AreaTable structs.
 */
 func deleteMultiple(db *sql.DB, tableName string, ids []int) error {
-	if len(ids) == 0 {
-		return fmt.Errorf("no IDs provided for deletion")
-	}
-
 	query := fmt.Sprintf("DELETE FROM %s WHERE id IN (%s)", tableName, strings.Trim(strings.Repeat("?,", len(ids)), ","))
 	args := make([]interface{}, len(ids))
 	for i, id := range ids {
 		args[i] = id
 	}
 
-	_, err := db.Exec(query, args...)
+	result, err := db.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("failed to execute delete query: %w", err)
+		log.Printf("failed to execute delete query: %v", err)
+		return err
 	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("failed to retrieve rows affected: %v", err)
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows were deleted, possibly invalid IDs")
+	}
+
+	if int(rowsAffected) < len(ids) {
+		return fmt.Errorf("some rows were not deleted, possibly invalid IDs")
+	} else if int(rowsAffected) != len(ids) {
+		return fmt.Errorf(`There was a mismatch between the number of IDs supplied and
+the number of rows successfully deleted. Perhaps you assigned an ID that didn't exist?.`)
+	}
+
+	if int(rowsAffected) == len(ids) && len(ids) == 1 {
+		fmt.Printf("%d row successfully deleted\n", rowsAffected)
+	} else if int(rowsAffected) == len(ids) {
+		fmt.Printf("%d rows successfully deleted\n", rowsAffected)
+	}
+
 	return nil
 }
 
