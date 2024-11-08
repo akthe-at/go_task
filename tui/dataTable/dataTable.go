@@ -10,6 +10,7 @@ import (
 	data "github.com/akthe-at/go_task/data"
 	db "github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/tui"
+	"github.com/akthe-at/go_task/tui/formInput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -72,8 +73,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tea.Quit)
 		case "D", "dd":
 			cmds = append(cmds, m.deleteTask())
-		case "A":
+		case "F":
 			cmds = append(cmds, m.filterArchives())
+		case "A":
+			cmds = append(cmds, m.addTask())
 		}
 	}
 
@@ -167,6 +170,50 @@ func (m *Model) filterArchives() tea.Cmd {
 	}
 }
 
+func (m *Model) addTask() tea.Cmd {
+	form := &formInput.NewTaskForm{}
+
+	err := form.NewForm()
+	if err != nil {
+		log.Fatalf("Error creating form: %v", err)
+	}
+
+	if form.Submit {
+
+		newTask := data.Task{
+			Title:    form.TaskTitle,
+			Priority: form.Priority,
+			Status:   form.Status,
+			Archived: form.Archived,
+		}
+
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+		defer conn.Close()
+		theTask := data.TaskTable{
+			Task: newTask,
+		}
+		err = theTask.Create(conn)
+		if err != nil {
+			log.Fatalf("Error creating task: %v", err)
+		}
+		// Requery the database and update the table model
+		rows, err := m.loadRowsFromDatabase()
+		if err != nil {
+			log.Printf("Error loading rows from database: %s", err)
+			return nil
+		}
+		m.tableModel = m.tableModel.WithRows(rows)
+
+		// Update the footer
+		m.updateFooter()
+	}
+
+	return nil
+}
+
 func (m *Model) deleteTask() tea.Cmd {
 	selectedIDs := []string{}
 
@@ -230,9 +277,11 @@ func (m *Model) deleteTask() tea.Cmd {
 func (m Model) View() string {
 	body := strings.Builder{}
 
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Iris)).Render("Filter Archived Tasks by pressing 'A'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Iris)).Render("Press left/right or page up/down to move between pages") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Iris)).Render("Press space/enter to select a row, q or ctrl+c to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Add new task by pressing 'A'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Press left/right or page up/down to move between pages") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Press D/dd to delete row(s) after selecting them.") + "\n")
 
 	selectedIDs := []string{}
 
