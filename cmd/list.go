@@ -73,8 +73,8 @@ var taskCmd = &cobra.Command{
 		}
 
 		defer conn.Close()
-		task := &data.Task{}
-		err = task.Read(conn, taskID)
+		task := &data.Task{ID: taskID}
+		err = task.Read(conn)
 		if err != nil {
 			log.Errorf("There was an error reading the tasks from the database: %v", err)
 		}
@@ -96,8 +96,8 @@ var tasksCmd = &cobra.Command{
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
 		defer conn.Close()
-		taskTable := data.TaskTable{}
-		tasks, err := taskTable.ReadAll(conn)
+		task := data.Task{}
+		tasks, err := task.ReadAll(conn)
 		if err != nil {
 			log.Errorf("There was an error reading the tasks from the database: %v", err)
 		}
@@ -125,7 +125,8 @@ var taskNotesCmd = &cobra.Command{
 			log.Errorf("There was an error converting the task ID to an integer: %v", err)
 		}
 
-		notes, err := data.GetNotes(conn, taskID, "task_notes")
+		note := data.Note{ID: taskID}
+		notes, err := note.ReadAll(conn, data.TaskNoteType)
 		if err != nil {
 			log.Errorf("There was an error reading the areas/projects from the database: %v", err)
 		}
@@ -148,8 +149,8 @@ var projectsCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		areaTable := data.AreaTable{}
-		areas, err := areaTable.ReadAll(conn)
+		area := data.Area{}
+		areas, err := area.ReadAll(conn)
 		if err != nil {
 			log.Errorf("There was an error reading the areas/projects from the database: %v", err)
 		}
@@ -285,7 +286,7 @@ func styleAreaTable(areas []data.Area) *table.Table {
 	return &t
 }
 
-func styleTaskNotesTable(notesList []data.Note) *table.Table {
+func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
 		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).Bold(true).Align(lipgloss.Center)
@@ -297,9 +298,9 @@ func styleTaskNotesTable(notesList []data.Note) *table.Table {
 	var rows [][]string
 	for _, note := range notesList {
 		row := []string{
-			fmt.Sprintf("%d", note.ID),
-			note.Title,
-			note.Path,
+			fmt.Sprintf("%d", note.NoteID),
+			note.NoteTitle,
+			note.NotePath,
 		}
 		rows = append(rows, row)
 	}

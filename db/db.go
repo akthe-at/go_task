@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
@@ -21,6 +22,16 @@ func ConnectDB() (*sql.DB, error) {
 		log.Fatal("failed to ping database: ", err)
 	}
 	return db, nil
+}
+
+// FileExists This function checks if a file exists, if it does returns true.
+// Otherwise it returns false.
+func FileExists(filePath string) bool {
+	_, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return err == nil
 }
 
 /*
@@ -49,6 +60,7 @@ SetupDB Setup the Initial DB Schema
 */
 func SetupDB(db *sql.DB) error {
 	initialQueries := `
+PRAGMA foreign_keys = ON;
 		CREATE TABLE IF NOT EXISTS areas (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
@@ -72,14 +84,15 @@ func SetupDB(db *sql.DB) error {
 			title TEXT NOT NULL,
 			path TEXT NOT NULL
 		);
-		CREATE TABLE IF NOT EXISTS bridge_notes (
+		CREATE TABLE bridge_notes (
 			note_id INTEGER,
 			parent_cat INTEGER,
-			parentID INTEGER,
+			parent_task_id INTEGER,
+			parent_area_id INTEGER,
 			FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE ON UPDATE CASCADE,
 			CHECK (parent_cat IN (1, 2)),
-			FOREIGN KEY(parentID) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE,
-			FOREIGN KEY(parentID) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE
+			FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE,
+			FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE
 		);
 `
 	tx, err := db.Begin()
@@ -108,6 +121,8 @@ func ResetDB(db *sql.DB) error {
 		DROP TABLE IF EXISTS tasks;
 		DROP TABLE IF EXISTS notes;
 		DROP TABLE IF EXISTS bridge_notes;
+		DROP TABLE IF EXISTS task_notes;
+		DROP TABLE IF EXISTS area_notes;
 	`
 	tx, err := db.Begin()
 	if err != nil {

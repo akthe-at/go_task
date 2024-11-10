@@ -81,8 +81,8 @@ var deleteTaskCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		taskTable := data.TaskTable{}
-		err = taskTable.DeleteMultiple(conn, taskIDs)
+		task := data.Task{}
+		err = task.DeleteMultiple(conn, taskIDs)
 		if err != nil {
 			log.Errorf("Error deleting task(s): %v", err)
 			return
@@ -125,8 +125,8 @@ var deleteProjectCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		projectTable := data.AreaTable{}
-		err = projectTable.DeleteMultiple(conn, projectIDs)
+		projects := data.Area{}
+		err = projects.DeleteMultiple(conn, projectIDs)
 		if err != nil {
 			log.Errorf("Error deleting project(s): %v", err)
 			return

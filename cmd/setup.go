@@ -46,7 +46,8 @@ var setupCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		if !db.IsSetup(conn) {
+		// FIXME: This path can't stay hard coded like this.
+		if !db.IsSetup(conn) && !db.FileExists("../new_demo.db") {
 			fmt.Println("Setting up the database...")
 
 			err = db.SetupDB(conn)
@@ -56,26 +57,23 @@ var setupCmd = &cobra.Command{
 		}
 
 		// // Create and Insert a new Task
-		test := data.TaskTable{
-			Task: data.Task{
-				Title:    "do laundry",
-				Priority: "high",
-				Status:   "Pending",
-				Archived: false,
-			},
+		test := data.Task{
+			Title:    "do laundry",
+			Priority: "high",
+			Status:   "Pending",
+			Archived: false,
 		}
+		test.Create(conn)
 
 		err = test.Create(conn)
 		if err != nil {
 			fmt.Println("Error creating task:", err)
 		}
 
-		updated_task := data.TaskTable{
-			Task: data.Task{
-				ID:             1,
-				Title:          "do laundry again and again and again",
-				UpdateArchived: false,
-			},
+		updated_task := data.Task{
+			ID:             1,
+			Title:          "do laundry again and again and again",
+			UpdateArchived: false,
 		}
 
 		_, err = updated_task.Update(conn)
@@ -83,9 +81,7 @@ var setupCmd = &cobra.Command{
 			fmt.Println("Error updating task:", err)
 		}
 
-		deleted_task := data.TaskTable{
-			Task: data.Task{ID: 1},
-		}
+		deleted_task := data.Task{ID: 1}
 		err = deleted_task.Delete(conn)
 		if err != nil {
 			fmt.Println("Error deleting task:", err)

@@ -43,22 +43,19 @@ and usage of using your command. For example:
 
 		if form.Submit {
 
+			conn, err := db.ConnectDB()
+			if err != nil {
+				log.Fatalf("Error connecting to database: %v", err)
+			}
+			defer conn.Close()
+
 			newTask := data.Task{
 				Title:    form.TaskTitle,
 				Priority: form.Priority,
 				Status:   form.Status,
 				Archived: form.Archived,
 			}
-
-			conn, err := db.ConnectDB()
-			if err != nil {
-				log.Fatalf("Error connecting to database: %v", err)
-			}
-			defer conn.Close()
-			theTask := data.TaskTable{
-				Task: newTask,
-			}
-			err = theTask.Create(conn)
+			err = newTask.Create(conn)
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
 			}
@@ -83,21 +80,19 @@ and usage of using your command. For example:
 
 		if form.Submit {
 
-			newTask := data.Area{
-				Title:    form.AreaTitle,
-				Status:   form.Status,
-				Archived: form.Archived,
-			}
-
 			conn, err := db.ConnectDB()
 			if err != nil {
 				log.Fatalf("Error connecting to database: %v", err)
 			}
 			defer conn.Close()
-			theArea := data.AreaTable{
-				Area: newTask,
+
+			newArea := data.Area{
+				Title:    form.AreaTitle,
+				Status:   form.Status,
+				Archived: form.Archived,
 			}
-			err = theArea.Create(conn)
+
+			err = newArea.Create(conn)
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
 			}
@@ -136,10 +131,9 @@ and usage of using your command. For example:
 			Path:  notePath,
 		}
 
-		taskTable := data.TaskTable{}
-		err = data.AddNoteToEntity(&taskTable, conn, taskID, note)
+		err = note.Create(conn, data.TaskNoteType, taskID)
 		if err != nil {
-			log.Fatalf("Error adding note to task: %v", err)
+			fmt.Printf("Create: There was an error creating the note: %v", err)
 		}
 
 		fmt.Println("Note added to task successfully")

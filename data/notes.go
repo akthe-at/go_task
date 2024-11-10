@@ -59,7 +59,7 @@ func (n *Note) Create(db *sql.DB, noteType NoteType, parentID int) error {
 		tx.Rollback()
 		return err
 	}
-	// TODO: Create this in the database module...
+
 	query := "INSERT INTO bridge_notes (note_id, cat_type, parentID) VALUES (?, ?, ?)"
 	_, err = db.Exec(query, noteID, noteType, parentID)
 	if err != nil {
@@ -109,7 +109,7 @@ func (tn *Note) Read(db *sql.DB, id int) ([]Note, error) {
 func (n *Note) ReadByID(db *sql.DB, noteID int) error {
 	query := `
 SELECT id, title, path, type
-FROM notesTy
+FROM notes
 WHERE id = ?
 `
 	row := db.QueryRow(query, noteID)

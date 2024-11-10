@@ -47,7 +47,7 @@ func (a *Area) Read(db *sql.DB) error {
 SELECT notes.id, notes.title, notes.path
 FROM notes
 INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
-WHERE bridge_notes.parent_area_id = ?
+WHERE bridge_notes.parent_id = ?
 and bridge_notes.parent_cat = 2
 		`, a.ID)
 	if err != nil {
