@@ -72,17 +72,14 @@ func SetupDB(db *sql.DB) error {
 			title TEXT NOT NULL,
 			path TEXT NOT NULL
 		);
-		CREATE TABLE IF NOT EXISTS task_notes (
+		CREATE TABLE IF NOT EXISTS bridge_notes (
 			note_id INTEGER,
-			task_id INTEGER,
-			FOREIGN KEY(note_id) REFERENCES notes(id),
-			FOREIGN KEY(task_id) REFERENCES tasks(id)
-		);
-		CREATE TABLE IF NOT EXISTS area_notes (
-			note_id INTEGER,
-			area_id INTEGER,
-			FOREIGN KEY(note_id) REFERENCES notes(id),
-			FOREIGN KEY(area_id) REFERENCES areas(id)
+			parent_cat INTEGER,
+			parentID INTEGER,
+			FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE ON UPDATE CASCADE,
+			CHECK (parent_cat IN (1, 2)),
+			FOREIGN KEY(parentID) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE,
+			FOREIGN KEY(parentID) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE
 		);
 `
 	tx, err := db.Begin()
@@ -110,8 +107,7 @@ func ResetDB(db *sql.DB) error {
 		DROP TABLE IF EXISTS areas;
 		DROP TABLE IF EXISTS tasks;
 		DROP TABLE IF EXISTS notes;
-		DROP TABLE IF EXISTS task_notes;
-		DROP TABLE IF EXISTS area_notes;
+		DROP TABLE IF EXISTS bridge_notes;
 	`
 	tx, err := db.Begin()
 	if err != nil {
