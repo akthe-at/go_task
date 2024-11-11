@@ -11,9 +11,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newCmd rep
-var newCmd = &cobra.Command{
-	Use:   "new",
+// addCmd Used for adding new tasks, projects, notes, etc.
+var addCmd = &cobra.Command{
+	Use:   "add",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
@@ -22,12 +22,12 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("new called")
+		fmt.Println("add called")
 	},
 }
 
-// newTaskCmd represents the new command
-var newTaskCmd = &cobra.Command{
+// addTaskCmd represents the new command
+var addTaskCmd = &cobra.Command{
 	Use:   "task",
 	Short: "Creates a new task with a form",
 	Long: `A longer description that spans multiple lines and likely contains examples
@@ -63,8 +63,8 @@ and usage of using your command. For example:
 	},
 }
 
-// newProjectCmd represents the new command
-var newProjectCmd = &cobra.Command{
+// addProjectCmd represents the new command
+var addProjectCmd = &cobra.Command{
 	Use:   "project",
 	Short: "Creates a new project with a form",
 	Long: `A longer description that spans multiple lines and likely contains examples
@@ -100,8 +100,8 @@ and usage of using your command. For example:
 	},
 }
 
-// newTaskNoteCmd represents the new command
-var newTaskNoteCmd = &cobra.Command{
+// addTaskNoteCmd represents the new command
+var addTaskNoteCmd = &cobra.Command{
 	Use:   "note",
 	Short: "Add a note to a specific task",
 	Long: `A longer description that spans multiple lines and likely contains examples
@@ -142,10 +142,10 @@ and usage of using your command. For example:
 }
 
 func init() {
-	rootCmd.AddCommand(newCmd)
-	newCmd.AddCommand(newTaskCmd)
-	newCmd.AddCommand(newProjectCmd)
-	newCmd.AddCommand(newTaskNoteCmd)
+	rootCmd.AddCommand(addCmd)
+	addCmd.AddCommand(addTaskCmd)
+	addCmd.AddCommand(addProjectCmd)
+	addCmd.AddCommand(addTaskNoteCmd)
 
 	// Here you will define your flags and configuration settings.
 
