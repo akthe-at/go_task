@@ -75,7 +75,7 @@ ReadAll retrieves all areas from the database.
 */
 func (a *Area) ReadAll(db *sql.DB) ([]Area, error) {
 	var areas []Area
-	query := `SELECT id, title, deadline, status, archived FROM areas`
+	query := `SELECT id, title, status, archived, due_date FROM areas`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (a *Area) ReadAll(db *sql.DB) ([]Area, error) {
 
 	for rows.Next() {
 		var area Area
-		err := rows.Scan(&area.ID, &area.Title, &area.DueDate, &area.Status, &area.Archived)
+		err := rows.Scan(&area.ID, &area.Title, &area.Status, &area.Archived, &area.DueDate)
 		if err != nil {
 			return nil, err
 		}
