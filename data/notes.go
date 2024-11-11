@@ -29,7 +29,7 @@ type Note struct {
 	ID    int
 	Title string
 	Path  string
-	Type  int
+	Type  NoteType
 }
 
 type NoteCRUD interface {
@@ -42,16 +42,21 @@ type NoteCRUD interface {
 }
 
 // Create creates a new note for a specific task/area/project
-func (n *Note) Create(db *sql.DB, noteType NoteType, parentID int) error {
+func (n *Note) Create(db *sql.DB, parentID int) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
-	noteQuery := "INSERT INTO notes (title, path, type) VALUES  (?, ?, ?)"
-	result, err := tx.Exec(noteQuery, n.Title, n.Path, n.Type)
+
+	noteQuery := "INSERT INTO notes (title, path) VALUES  (?, ?)"
+	result, err := tx.Exec(noteQuery, n.Title, n.Path)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("NoteQueryInsert: %v", err)
+	}
+	_, err = result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("Note Creation - Rows Affected: %v", err)
 	}
 
 	noteID, err := result.LastInsertId()
@@ -60,11 +65,17 @@ func (n *Note) Create(db *sql.DB, noteType NoteType, parentID int) error {
 		return err
 	}
 
-	query := "INSERT INTO bridge_notes (note_id, cat_type, parentID) VALUES (?, ?, ?)"
-	_, err = db.Exec(query, noteID, noteType, parentID)
+	var query string
+	if n.Type == TaskNoteType {
+		query = "INSERT INTO bridge_notes (note_id, parent_cat, parent_task_id) VALUES (?, ?, ?)"
+	} else if n.Type == AreaNoteType {
+		query = "INSERT INTO bridge_notes (note_id, parent_cat, parent_area_id) VALUES (?, ?, ?)"
+	}
+
+	_, err = tx.Exec(query, noteID, n.Type, parentID)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("task_noteInsert: %v", err)
+		fmt.Printf("task_note Insert: %v", err)
 	}
 	return tx.Commit()
 }

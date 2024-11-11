@@ -129,9 +129,10 @@ and usage of using your command. For example:
 		note := data.Note{
 			Title: noteTitle,
 			Path:  notePath,
+			Type:  data.TaskNoteType,
 		}
 
-		err = note.Create(conn, data.TaskNoteType, taskID)
+		err = note.Create(conn, taskID)
 		if err != nil {
 			fmt.Printf("Create: There was an error creating the note: %v", err)
 		}
