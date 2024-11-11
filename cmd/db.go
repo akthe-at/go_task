@@ -29,15 +29,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var resetTarget string
+// dbCmd represents the db command
+var dbCmd = &cobra.Command{
+	Use:   "db",
+	Short: "This command is for interacting with the database.",
+	Long:  `With these commands you can initialize/setup the database, or reset the database to clear it to an initial state.`,
+	Run: func(cmd *cobra.Command, args []string) {
+	},
+}
 
-// setupCmd represents the setup command
-var setupCmd = &cobra.Command{
-	Use:   "setup",
+// dbCmd represents the db command
+var dbInitCmd = &cobra.Command{
+	Use:   "init",
 	Short: "Initial setup of DB",
 	Long:  `This command will perform the initial setup of the sqlite database to hold the tasks and user data.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("setup called")
+		fmt.Println("DB is being setup...")
 
 		// Open a database connection
 		conn, err := db.ConnectDB()
@@ -111,7 +118,7 @@ var setupCmd = &cobra.Command{
 	},
 }
 
-var resetCmd = &cobra.Command{
+var dbResetCmd = &cobra.Command{
 	Use:   "reset",
 	Short: "Reset the DB to its initial state.",
 	Long: `This command will drop all of the tables, thus deleting all tasks, projects, and areas.
@@ -133,16 +140,17 @@ var resetCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(setupCmd)
-	setupCmd.AddCommand(resetCmd)
+	rootCmd.AddCommand(dbCmd)
+	dbCmd.AddCommand(dbInitCmd)
+	dbCmd.AddCommand(dbResetCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// setupCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// dbCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// setupCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// dbCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
