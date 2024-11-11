@@ -29,13 +29,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// setupCmd represents the setup command
-var setupCmd = &cobra.Command{
-	Use:   "setup",
+// dbCmd represents the db command
+var dbCmd = &cobra.Command{
+	Use:   "db",
+	Short: "This command is for interacting with the database.",
+	Long:  `With these commands you can initialize/setup the database, or reset the database to clear it to an initial state.`,
+	Run: func(cmd *cobra.Command, args []string) {
+	},
+}
+
+// dbCmd represents the db command
+var dbInitCmd = &cobra.Command{
+	Use:   "init",
 	Short: "Initial setup of DB",
 	Long:  `This command will perform the initial setup of the sqlite database to hold the tasks and user data.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("setup called")
+		fmt.Println("DB is being setup...")
 
 		// Open a database connection
 		conn, err := db.ConnectDB()
@@ -44,7 +53,8 @@ var setupCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		if !db.IsDatabaseSetup(conn) {
+		// FIXME: This path can't stay hard coded like this.
+		if !db.IsSetup(conn) && !db.FileExists("../new_demo.db") {
 			fmt.Println("Setting up the database...")
 
 			err = db.SetupDB(conn)
@@ -55,16 +65,33 @@ var setupCmd = &cobra.Command{
 
 		// // Create and Insert a new Task
 		test := data.Task{
-			Title:       "do laundry",
-			Description: "wash underwear",
-			Priority:    "high",
-			Status:      "Pending",
-			Archived:    false,
+			Title:    "do laundry",
+			Priority: "high",
+			Status:   "Pending",
+			Archived: false,
 		}
+		test.Create(conn)
 
-		err = db.CreateTask(conn, test)
+		err = test.Create(conn)
 		if err != nil {
 			fmt.Println("Error creating task:", err)
+		}
+
+		updated_task := data.Task{
+			ID:             1,
+			Title:          "do laundry again and again and again",
+			UpdateArchived: false,
+		}
+
+		_, err = updated_task.Update(conn)
+		if err != nil {
+			fmt.Println("Error updating task:", err)
+		}
+
+		deleted_task := data.Task{ID: 1}
+		err = deleted_task.Delete(conn)
+		if err != nil {
+			fmt.Println("Error deleting task:", err)
 		}
 
 		// Query Data
@@ -76,7 +103,7 @@ var setupCmd = &cobra.Command{
 			defer results.Close()
 			for results.Next() {
 				var task data.Task
-				err := results.Scan(&task.ID, &task.Title, &task.Description, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
+				err := results.Scan(&task.ID, &task.Title, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
 				if err != nil {
 					fmt.Println("Error when scanning data:", err)
 					continue
@@ -91,16 +118,39 @@ var setupCmd = &cobra.Command{
 	},
 }
 
+var dbResetCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "Reset the DB to its initial state.",
+	Long: `This command will drop all of the tables, thus deleting all tasks, projects, and areas.
+	The tables will be then recreated to their blank, default state.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// Open a database connection
+		conn, err := db.ConnectDB()
+		if err != nil {
+			fmt.Println("Error opening database:", err)
+		}
+		defer conn.Close()
+
+		err = db.ResetDB(conn)
+		if err != nil {
+			fmt.Println("Error resetting database:", err)
+		}
+		fmt.Println("Database reset complete")
+	},
+}
+
 func init() {
-	rootCmd.AddCommand(setupCmd)
+	rootCmd.AddCommand(dbCmd)
+	dbCmd.AddCommand(dbInitCmd)
+	dbCmd.AddCommand(dbResetCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// setupCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// dbCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// setupCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// dbCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

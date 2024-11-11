@@ -3,9 +3,9 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"time"
+	"log"
+	"os"
 
-	"github.com/akthe-at/go_task/data"
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
 )
@@ -15,13 +15,31 @@ import (
 func ConnectDB() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "file:new_demo.db")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return nil, fmt.Errorf("invalid sql.Open() arguments: %w", err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatal("failed to ping database: ", err)
 	}
 	return db, nil
 }
 
-// isDatabaseSetup checks if the database has been set up.
-func IsDatabaseSetup(db *sql.DB) bool {
+// FileExists This function checks if a file exists, if it does returns true.
+// Otherwise it returns false.
+func FileExists(filePath string) bool {
+	_, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return err == nil
+}
+
+/*
+IsSetup checks if the database has been set up.
+ 1. Returns false if the tasks table does not exist
+ 2. Returns true if the tasks table exists
+*/
+func IsSetup(db *sql.DB) bool {
 	query := `SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'`
 	var name string
 	err := db.QueryRow(query).Scan(&name)
@@ -33,32 +51,51 @@ func IsDatabaseSetup(db *sql.DB) bool {
 	return true
 }
 
-// SetupDB Setup the Initial DB Schema
-// 1. Creates the areas and tasks tables if they do not exist
-// 2. Returns an error if any occurs
-// 3. Uses transactions for safety
-// 4. Uses prepared statements for better performance
+/*
+SetupDB Setup the Initial DB Schema
+ 1. Creates the areas and tasks tables if they do not exist
+ 2. Returns an error if any occurs
+ 3. Uses transactions for safety
+ 4. Uses prepared statements for better performance
+*/
 func SetupDB(db *sql.DB) error {
 	initialQueries := `
+PRAGMA foreign_keys = ON;
 		CREATE TABLE IF NOT EXISTS areas (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
 			type TEXT,
-			deadline TEXT,
-			status INTEGER,
+			deadline DATETIME,
+			status TEXT,
 			archived BOOLEAN
 	);
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
-			description TEXT,
 			priority TEXT,
-			status INTEGER,
+			status TEXT,
 			archived BOOLEAN,
-			created_at TEXT,
-			last_mod TEXT,
-			due_date TEXT
+			created_at DATETIME,
+			last_mod DATETIME,
+			due_date DATETIME
+	area_id INTEGER,
+	FOREIGN KEY(area_id) REFERENCES areas(id) ON DELETE SET NULL ON UPDATE CASCADE
 	);
+		CREATE TABLE IF NOT EXISTS notes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			title TEXT NOT NULL,
+			path TEXT NOT NULL
+		);
+		CREATE TABLE bridge_notes (
+			note_id INTEGER,
+			parent_cat INTEGER,
+			parent_task_id INTEGER,
+			parent_area_id INTEGER,
+			FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE ON UPDATE CASCADE,
+			CHECK (parent_cat IN (1, 2)),
+			FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE,
+			FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE
+		);
 `
 	tx, err := db.Begin()
 	if err != nil {
@@ -79,17 +116,38 @@ func SetupDB(db *sql.DB) error {
 	return nil
 }
 
-func CreateTask(db *sql.DB, task data.Task) error {
-	now := time.Now()
-	task.CreatedAt = now
-	task.LastModified = now
-	if task.DueDate.IsZero() {
-		task.DueDate = now.AddDate(0, 0, 7)
-	}
-	query := `
-	INSERT INTO tasks (title, description, priority, status, archived, created_at, last_mod, due_date)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+// ResetDB drops all tables and recreates them.
+func ResetDB(db *sql.DB) error {
+	queries := `
+		DROP TABLE IF EXISTS areas;
+		DROP TABLE IF EXISTS tasks;
+		DROP TABLE IF EXISTS notes;
+		DROP TABLE IF EXISTS bridge_notes;
 	`
-	_, err := db.Exec(query, task.Title, task.Description, task.Priority, task.Status, task.Archived, task.CreatedAt, task.LastModified, task.DueDate)
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	_, err = tx.Exec(queries)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to drop tables: %w", err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	err = SetupDB(db)
+	if err != nil {
+		return fmt.Errorf("failed to setup database: %w", err)
+	}
+
+	return nil
+}
+
+func UpdateNotePath(db *sql.DB, noteID int, newPath string) error {
+	query := "UPDATE notes SET path = ? WHERE id = ?"
+	_, err := db.Exec(query, newPath, noteID)
 	return err
 }
