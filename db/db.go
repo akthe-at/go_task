@@ -78,6 +78,8 @@ PRAGMA foreign_keys = ON;
 			created_at DATETIME,
 			last_mod DATETIME,
 			due_date DATETIME
+	area_id INTEGER,
+	FOREIGN KEY(area_id) REFERENCES areas(id) ON DELETE SET NULL ON UPDATE CASCADE
 	);
 		CREATE TABLE IF NOT EXISTS notes (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,8 +123,6 @@ func ResetDB(db *sql.DB) error {
 		DROP TABLE IF EXISTS tasks;
 		DROP TABLE IF EXISTS notes;
 		DROP TABLE IF EXISTS bridge_notes;
-		DROP TABLE IF EXISTS task_notes;
-		DROP TABLE IF EXISTS area_notes;
 	`
 	tx, err := db.Begin()
 	if err != nil {

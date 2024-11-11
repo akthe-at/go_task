@@ -45,6 +45,7 @@ type Task struct {
 	LastModified   time.Time
 	DueDate        time.Time
 	Notes          []Note
+	Area           *Area
 }
 
 // Create creates a new task in the database.
