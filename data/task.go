@@ -31,6 +31,7 @@ type CRUD interface {
 	Update(db *sql.DB) (sql.Result, error)
 	Delete(db *sql.DB) error
 	DeleteMultiple(db *sql.DB, ID ...int) error
+	Query(db *sql.DB, query string) ([]interface{}, error)
 }
 
 type Task struct {
@@ -289,6 +290,47 @@ func (t *Task) DeleteMultiple(db *sql.DB, ids []int) error {
 	err = tx.Commit()
 	if err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (t *Task) Query(db *sql.DB, query string) error {
+	return QueryAndPrint(db, query)
+}
+
+func QueryAndPrint(db *sql.DB, query string) error {
+	rows, err := db.Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	values := make([]interface{}, len(columns))
+	valuePtrs := make([]interface{}, len(columns))
+
+	for rows.Next() {
+		for i := range columns {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			return err
+		}
+
+		for i, col := range columns {
+			fmt.Printf("%s: %v\n", col, values[i])
+		}
+		fmt.Println("-----")
+	}
+
+	if err = rows.Err(); err != nil {
+		return err
 	}
 
 	return nil
