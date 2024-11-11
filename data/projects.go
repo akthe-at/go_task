@@ -246,3 +246,7 @@ func (a *Area) DeleteMultiple(db *sql.DB, ids []int) error {
 
 	return nil
 }
+
+func (a *Area) Query(db *sql.DB, query string) error {
+	return QueryAndPrint(db, query)
+}
