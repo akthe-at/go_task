@@ -107,7 +107,6 @@ func (t *Task) ReadAll(db *sql.DB) ([]Task, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	defer rows.Close()
 
 	for rows.Next() {
@@ -118,10 +117,27 @@ func (t *Task) ReadAll(db *sql.DB) ([]Task, error) {
 			return nil, err
 		}
 
-		// 	task.Notes, err = GetNotes(db, task.ID, "task_notes")
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
+		notesQuery := `
+SELECT notes.id, notes.title, notes.path
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_cat = 1
+`
+
+		// Fetch any associated notes
+		noteRows, err := db.Query(notesQuery)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch area notes: %w", err)
+		}
+		defer noteRows.Close()
+
+		for noteRows.Next() {
+			var note Note
+			if err := noteRows.Scan(&note.ID, &note.Title, &note.Path); err != nil {
+				return nil, err
+			}
+			task.Notes = append(task.Notes, note)
+		}
 		tasks = append(tasks, task)
 	}
 
