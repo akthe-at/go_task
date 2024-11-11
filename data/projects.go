@@ -36,8 +36,8 @@ func (a *Area) Create(db *sql.DB) error {
 
 // Read retrieves a single row from the areas table based on the provided ID.
 func (a *Area) Read(db *sql.DB) error {
-	query := `SELECT id, title, deadline, status, archived FROM areas WHERE id = ?`
-	err := db.QueryRow(query, a.ID).Scan(&a.ID, &a.Title, &a.DueDate, &a.Status, &a.Archived)
+	query := `SELECT id, title, status, archived, due_date FROM areas WHERE id = ?`
+	err := db.QueryRow(query, a.ID).Scan(&a.ID, &a.Title, &a.Status, &a.Archived, &a.DueDate)
 	if err != nil {
 		return fmt.Errorf("AreaRead: failed to read area: %w", err)
 	}
@@ -47,7 +47,7 @@ func (a *Area) Read(db *sql.DB) error {
 SELECT notes.id, notes.title, notes.path
 FROM notes
 INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
-WHERE bridge_notes.parent_id = ?
+WHERE bridge_notes.parent_area_id = ?
 and bridge_notes.parent_cat = 2
 		`, a.ID)
 	if err != nil {
