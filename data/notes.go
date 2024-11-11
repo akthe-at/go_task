@@ -184,3 +184,6 @@ func (tn *Note) ReadAll(db *sql.DB, noteType NoteType) ([]NoteTable, error) {
 
 	return notes, nil
 }
+func (n *Note) Query(db *sql.DB, query string) error {
+	return QueryAndPrint(db, query)
+}
