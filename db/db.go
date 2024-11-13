@@ -64,10 +64,11 @@ PRAGMA foreign_keys = ON;
 		CREATE TABLE IF NOT EXISTS areas (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
-			type TEXT,
-			deadline DATETIME,
 			status TEXT,
 			archived BOOLEAN
+			created_at DATETIME,
+			last_mod DATETIME,
+			due_date DATETIME
 	);
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
