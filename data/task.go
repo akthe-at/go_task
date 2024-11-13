@@ -26,7 +26,7 @@ const (
 type CRUD interface {
 	Create(db *sql.DB) error
 	Read(db *sql.DB) ([]interface{}, error)
-	ReadByID(db *sql.DB, id int) (interface{}, error)
+	// ReadByID(db *sql.DB, id int) (interface{}, error)
 	ReadAll(db *sql.DB) ([]interface{}, error)
 	Update(db *sql.DB) (sql.Result, error)
 	Delete(db *sql.DB) error
@@ -45,6 +45,7 @@ type Task struct {
 	LastModified   time.Time
 	DueDate        time.Time
 	Notes          []Note
+	NoteTitles     string
 	Area           *Area
 }
 
@@ -103,7 +104,14 @@ AND bridge_notes.parent_cat = 1
 // ReadAll retrieves all tasks from the database.
 func (t *Task) ReadAll(db *sql.DB) ([]Task, error) {
 	var tasks []Task
-	query := `SELECT id, title, priority, status, archived, created_at, last_mod, due_date FROM tasks`
+	query := `
+	SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived, tasks.created_at, tasks.last_mod, tasks.due_date,
+		IFNULL(GROUP_CONCAT(notes.title, ', '), '') as note_titles
+	FROM tasks
+	LEFT OUTER JOIN bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
+	LEFT OUTER JOIN notes ON bridge_notes.note_id = notes.id
+	GROUP BY tasks.id
+	`
 
 	rows, err := db.Query(query)
 	if err != nil {
@@ -114,32 +122,18 @@ func (t *Task) ReadAll(db *sql.DB) ([]Task, error) {
 	for rows.Next() {
 		var task Task
 
-		err := rows.Scan(&task.ID, &task.Title, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
+		err := rows.Scan(&task.ID, &task.Title, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate, &task.NoteTitles)
 		if err != nil {
 			return nil, err
 		}
 
-		notesQuery := `
-SELECT notes.id, notes.title, notes.path
-FROM notes
-INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
-WHERE bridge_notes.parent_cat = 1
-`
+		// if task.NoteTitles != "" {
+		// 	noteTitles := strings.Split(task.NoteTitles, ", ")
+		// 	for _, title := range noteTitles {
+		// 		task.Notes = append(task.Notes, Note{Title: title})
+		// 	}
+		// }
 
-		// Fetch any associated notes
-		noteRows, err := db.Query(notesQuery)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch area notes: %w", err)
-		}
-		defer noteRows.Close()
-
-		for noteRows.Next() {
-			var note Note
-			if err := noteRows.Scan(&note.ID, &note.Title, &note.Path); err != nil {
-				return nil, err
-			}
-			task.Notes = append(task.Notes, note)
-		}
 		tasks = append(tasks, task)
 	}
 
@@ -206,10 +200,10 @@ func (t *Task) Update(db *sql.DB) (sql.Result, error) {
 	return result, nil
 }
 
-// UpdateMultiple updates multiple rows in a table based on the provided IDs.
-func (t *Task) UpdateMultiple(db *sql.DB, ID ...int) error {
-	return nil
-}
+// // UpdateMultiple updates multiple rows in a table based on the provided IDs.
+// func (t *Task) UpdateMultiple(db *sql.DB, ID ...int) error {
+// 	return error.
+// }
 
 func (t *Task) Delete(db *sql.DB) error {
 	if t.ID == 0 {
