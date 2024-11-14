@@ -65,7 +65,7 @@ PRAGMA foreign_keys = ON;
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
 			status TEXT,
-			archived BOOLEAN
+			archived BOOLEAN,
 			created_at DATETIME,
 			last_mod DATETIME,
 			due_date DATETIME
