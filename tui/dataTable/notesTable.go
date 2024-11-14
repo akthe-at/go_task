@@ -24,8 +24,12 @@ const (
 )
 
 type NotesModel struct {
-	tableModel table.Model
-	Note       data.Note
+	tableModel       table.Model
+	Note             data.Note
+	totalWidth       int
+	totalHeight      int
+	horizontalMargin int
+	verticalMargin   int
 }
 
 func (m *NotesModel) Init() tea.Cmd { return nil }
@@ -51,10 +55,49 @@ func (m *NotesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+t":
 			taskView := TaskViewModel()
 			return taskView.Update(msg)
+		case "left":
+			if m.calculateWidth() > minWidth {
+				m.horizontalMargin++
+				m.recalculateTable()
+			}
+		case "right":
+			if m.horizontalMargin > 0 {
+				m.horizontalMargin--
+				m.recalculateTable()
+			}
+		case "up":
+			if m.calculateHeight() > minHeight {
+				m.verticalMargin++
+				m.recalculateTable()
+			}
+		case "down":
+			if m.verticalMargin > 0 {
+				m.verticalMargin--
+				m.recalculateTable()
+			}
 		}
+	case tea.WindowSizeMsg:
+		m.totalWidth = msg.Width
+		m.totalHeight = msg.Height
+
+		m.recalculateTable()
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m *NotesModel) recalculateTable() {
+	m.tableModel = m.tableModel.
+		WithTargetWidth(m.calculateWidth()).
+		WithMinimumHeight(m.calculateHeight())
+}
+
+func (m NotesModel) calculateWidth() int {
+	return m.totalWidth - m.horizontalMargin
+}
+
+func (m NotesModel) calculateHeight() int {
+	return m.totalHeight - m.verticalMargin - fixedVerticalMargin
 }
 
 func (m *NotesModel) View() string {
@@ -86,9 +129,9 @@ func NotesView() NotesModel {
 				Faint(true).
 				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).
 				Align(lipgloss.Center)),
-		table.NewColumn(NoteColumnKey, "Title", 10),
-		table.NewColumn(NoteColumnPath, "Path", 10),
-		table.NewColumn(NoteColumnLink, "Task", 10),
+		table.NewFlexColumn(NoteColumnKey, "Title", 1),
+		table.NewFlexColumn(NoteColumnPath, "Path", 3),
+		table.NewFlexColumn(NoteColumnLink, "Task", 1),
 	}
 
 	model := NotesModel{}
