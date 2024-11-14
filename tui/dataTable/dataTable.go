@@ -53,7 +53,7 @@ var customBorder = table.Border{
 }
 
 // This is the task table "screen" model
-type Model struct {
+type TaskModel struct {
 	tableModel       table.Model
 	totalWidth       int
 	totalHeight      int
@@ -64,9 +64,9 @@ type Model struct {
 }
 
 // Init initializes the model (can use this to run commands upon model initialization)
-func (m *Model) Init() tea.Cmd { return nil }
+func (m *TaskModel) Init() tea.Cmd { return nil }
 
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmd  tea.Cmd
 		cmds []tea.Cmd
@@ -88,9 +88,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.filterArchives())
 		case "A":
 			cmds = append(cmds, m.addTask())
-		case "ctrl+n":
-			notesModel := NotesView()
-			return notesModel.Update(msg)
 		case "left":
 			if m.calculateWidth() > minWidth {
 				m.horizontalMargin++
@@ -122,21 +119,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *Model) recalculateTable() {
+func (m *TaskModel) recalculateTable() {
 	m.tableModel = m.tableModel.
 		WithTargetWidth(m.calculateWidth()).
 		WithMinimumHeight(m.calculateHeight())
 }
 
-func (m Model) calculateWidth() int {
+func (m TaskModel) calculateWidth() int {
 	return m.totalWidth - m.horizontalMargin
 }
 
-func (m Model) calculateHeight() int {
+func (m TaskModel) calculateHeight() int {
 	return m.totalHeight - m.verticalMargin - fixedVerticalMargin
 }
 
-func (m *Model) loadRowsFromDatabase() ([]table.Row, error) {
+func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 	conn, err := db.ConnectDB()
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
@@ -166,7 +163,7 @@ func (m *Model) loadRowsFromDatabase() ([]table.Row, error) {
 	return rows, nil
 }
 
-func (m *Model) filterArchives() tea.Cmd {
+func (m *TaskModel) filterArchives() tea.Cmd {
 	var filteredRows []table.Row
 	// toggle m.archiveFilter from current status
 	m.archiveFilter = !m.archiveFilter
@@ -223,7 +220,13 @@ func (m *Model) filterArchives() tea.Cmd {
 	}
 }
 
-func (m *Model) addTask() tea.Cmd {
+func (m *TaskModel) addNote() tea.Cmd {
+	form := &formInput.NewNoteForm{}
+	err := form.NewForm()
+	if err != nil {
+		log.Fatalf("Error creating form: %v", err)
+	}
+func (m *TaskModel) addTask() tea.Cmd {
 	form := &formInput.NewTaskForm{}
 
 	err := form.NewForm()
@@ -264,7 +267,7 @@ func (m *Model) addTask() tea.Cmd {
 	return nil
 }
 
-func (m *Model) deleteTask() tea.Cmd {
+func (m *TaskModel) deleteTask() tea.Cmd {
 	selectedIDs := []string{}
 
 	for _, row := range m.tableModel.SelectedRows() {
@@ -325,7 +328,7 @@ func (m *Model) deleteTask() tea.Cmd {
 }
 
 // View This is where we define the UI for the task table
-func (m Model) View() string {
+func (m TaskModel) View() string {
 	body := strings.Builder{}
 
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).Render("-Add new task by pressing 'A'") + "\n")
@@ -362,7 +365,7 @@ func (m Model) View() string {
 	return body.String()
 }
 
-func TaskViewModel() Model {
+func TaskViewModel() TaskModel {
 	columns := []table.Column{
 		table.NewColumn(columnKeyID, "ID", 5).WithStyle(
 			lipgloss.NewStyle().
@@ -377,7 +380,7 @@ func TaskViewModel() Model {
 		table.NewFlexColumn(columnKeyNotes, "Notes", 3),
 	}
 
-	model := Model{archiveFilter: true}
+	model := TaskModel{archiveFilter: true}
 	var filteredRows []table.Row
 	rows, err := model.loadRowsFromDatabase()
 	if err != nil {
@@ -424,7 +427,7 @@ func TaskViewModel() Model {
 	return model
 }
 
-func (m *Model) updateFooter() {
+func (m *TaskModel) updateFooter() {
 	highlightedRow := m.tableModel.HighlightedRow()
 	rowID, ok := highlightedRow.Data[columnKeyID]
 	if !ok {
@@ -441,7 +444,7 @@ func (m *Model) updateFooter() {
 	m.tableModel = m.tableModel.WithStaticFooter(footerText)
 }
 
-func RunModel(m *Model) {
+func RunModel(m *TaskModel) {
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)

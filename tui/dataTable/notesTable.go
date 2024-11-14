@@ -52,9 +52,6 @@ func (m *NotesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tea.Quit)
 		case "A":
 			cmds = append(cmds, m.addNote())
-		case "ctrl+t":
-			taskView := TaskViewModel()
-			return taskView.Update(msg)
 		case "left":
 			if m.calculateWidth() > minWidth {
 				m.horizontalMargin++
