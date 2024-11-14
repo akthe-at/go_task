@@ -25,6 +25,9 @@ const (
 	columnKeyArchived  = "archived"
 	columnKeyCreatedAt = "created_at"
 	columnKeyDueDate   = "due_date"
+	minWidth            = 150
+	minHeight           = 5
+	fixedVerticalMargin = 60
 )
 
 var customBorder = table.Border{
@@ -51,6 +54,10 @@ type Model struct {
 	tableModel    table.Model
 	deleteMessage string
 	archiveFilter bool
+	totalWidth       int
+	totalHeight      int
+	horizontalMargin int
+	verticalMargin   int
 }
 
 func (m *Model) Init() tea.Cmd { return nil }
@@ -77,10 +84,52 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.filterArchives())
 		case "A":
 			cmds = append(cmds, m.addTask())
+		case "ctrl+n":
+			notesModel := NotesView()
+			return notesModel.Update(msg)
+		case "left":
+			if m.calculateWidth() > minWidth {
+				m.horizontalMargin++
+				m.recalculateTable()
+			}
+		case "right":
+			if m.horizontalMargin > 0 {
+				m.horizontalMargin--
+				m.recalculateTable()
+			}
+		case "up":
+			if m.calculateHeight() > minHeight {
+				m.verticalMargin++
+				m.recalculateTable()
+			}
+		case "down":
+			if m.verticalMargin > 0 {
+				m.verticalMargin--
+				m.recalculateTable()
+			}
 		}
+	case tea.WindowSizeMsg:
+		m.totalWidth = msg.Width
+		m.totalHeight = msg.Height
+
+		m.recalculateTable()
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m *Model) recalculateTable() {
+	m.tableModel = m.tableModel.
+		WithTargetWidth(m.calculateWidth()).
+		WithMinimumHeight(m.calculateHeight())
+}
+
+func (m Model) calculateWidth() int {
+	return m.totalWidth - m.horizontalMargin
+}
+
+func (m Model) calculateHeight() int {
+	return m.totalHeight - m.verticalMargin - fixedVerticalMargin
 }
 
 func (m *Model) loadRowsFromDatabase() ([]table.Row, error) {
@@ -317,12 +366,12 @@ func NewModel() Model {
 				Faint(true).
 				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).
 				Align(lipgloss.Center)),
-		table.NewColumn(columnKeyTask, "Task", 10),
-		table.NewColumn(columnKeyPriority, "Priority", 10),
-		table.NewColumn(columnKeyStatus, "Status", 10),
-		table.NewColumn(columnKeyArchived, "Archived", 10),
-		table.NewColumn(columnKeyCreatedAt, "Created At", 20),
-		table.NewColumn(columnKeyDueDate, "Due Date", 20),
+		table.NewFlexColumn(columnKeyTask, "Task", 3),
+		table.NewFlexColumn(columnKeyPriority, "Priority", 1),
+		table.NewFlexColumn(columnKeyStatus, "Status", 1),
+		table.NewFlexColumn(columnKeyArchived, "Archived", 1),
+		table.NewFlexColumn(columnKeyTaskAge, "Task Age (Days)", 1),
+		table.NewFlexColumn(columnKeyNotes, "Notes", 3),
 	}
 
 	model := Model{archiveFilter: true}
