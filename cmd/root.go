@@ -41,7 +41,7 @@ var rootCmd = &cobra.Command{
 	To launch the TUI version, simpy run go_task with no arguments. All other subcommands
 	interact with the CLI version of the application`,
 	Run: func(cmd *cobra.Command, args []string) {
-		model := dataTable.NewModel()
+		model := dataTable.TaskViewModel()
 		p := tea.NewProgram(&model)
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Alas, there's been an error: %v", err)
