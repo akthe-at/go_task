@@ -44,6 +44,7 @@ type Task struct {
 	CreatedAt      time.Time
 	LastModified   time.Time
 	DueDate        time.Time
+	TaskAge        float32
 	Notes          []Note
 	NoteTitles     string
 	Area           *Area
@@ -71,9 +72,9 @@ func (t *Task) Read(db *sql.DB) error {
 		return fmt.Errorf("invalid task ID: %d", t.ID)
 	}
 
-	query := `SELECT id, title, priority, status, archived, created_at, last_mod, due_date FROM tasks WHERE id = ?`
+	query := `SELECT id, title, priority, status, archived, created_at, last_mod, ROUND((julianday('now') - julianday(tasks.created_at)),2) AS age_in_days, due_date, FROM tasks WHERE id = ?`
 	row := db.QueryRow(query, t.ID)
-	err := row.Scan(&t.ID, &t.Title, &t.Priority, &t.Status, &t.Archived, &t.CreatedAt, &t.LastModified, &t.DueDate)
+	err := row.Scan(&t.ID, &t.Title, &t.Priority, &t.Status, &t.Archived, &t.CreatedAt, &t.LastModified, &t.TaskAge, &t.DueDate)
 	if err != nil {
 		return fmt.Errorf("failed to read task: %w", err)
 	}
@@ -105,7 +106,8 @@ AND bridge_notes.parent_cat = 1
 func (t *Task) ReadAll(db *sql.DB) ([]Task, error) {
 	var tasks []Task
 	query := `
-	SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived, tasks.created_at, tasks.last_mod, tasks.due_date,
+	SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived,
+    ROUND((julianday('now') - julianday(tasks.created_at)),2) AS age_in_days,
 		IFNULL(GROUP_CONCAT(notes.title, ', '), '') as note_titles
 	FROM tasks
 	LEFT OUTER JOIN bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
@@ -122,7 +124,7 @@ func (t *Task) ReadAll(db *sql.DB) ([]Task, error) {
 	for rows.Next() {
 		var task Task
 
-		err := rows.Scan(&task.ID, &task.Title, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate, &task.NoteTitles)
+		err := rows.Scan(&task.ID, &task.Title, &task.Priority, &task.Status, &task.Archived, &task.TaskAge, &task.NoteTitles)
 		if err != nil {
 			return nil, err
 		}
