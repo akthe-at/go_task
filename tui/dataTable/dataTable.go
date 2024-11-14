@@ -18,13 +18,15 @@ import (
 )
 
 const (
-	columnKeyID        = "id"
-	columnKeyTask      = "title"
-	columnKeyPriority  = "priority"
-	columnKeyStatus    = "status"
-	columnKeyArchived  = "archived"
-	columnKeyCreatedAt = "created_at"
-	columnKeyDueDate   = "due_date"
+	columnKeyID         = "id"
+	columnKeyTask       = "title"
+	columnKeyPriority   = "priority"
+	columnKeyStatus     = "status"
+	columnKeyArchived   = "archived"
+	columnKeyCreatedAt  = "created_at"
+	columnKeyTaskAge    = "age_in_days"
+	columnKeyDueDate    = "due_date"
+	columnKeyNotes      = "notes"
 	minWidth            = 150
 	minHeight           = 5
 	fixedVerticalMargin = 60
@@ -50,16 +52,18 @@ var customBorder = table.Border{
 	InnerDivider: "│",
 }
 
+// This is the task table "screen" model
 type Model struct {
-	tableModel    table.Model
-	deleteMessage string
-	archiveFilter bool
+	tableModel       table.Model
 	totalWidth       int
 	totalHeight      int
 	horizontalMargin int
 	verticalMargin   int
+	deleteMessage    string
+	archiveFilter    bool
 }
 
+// Init initializes the model (can use this to run commands upon model initialization)
 func (m *Model) Init() tea.Cmd { return nil }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -139,8 +143,8 @@ func (m *Model) loadRowsFromDatabase() ([]table.Row, error) {
 	}
 	defer conn.Close()
 
-	taskTable := data.TaskTable{}
-	tasks, err := taskTable.ReadAll(conn)
+	task := data.Task{}
+	tasks, err := task.ReadAll(conn)
 	if err != nil {
 		return nil, fmt.Errorf("error reading tasks: %w", err)
 	}
@@ -148,13 +152,13 @@ func (m *Model) loadRowsFromDatabase() ([]table.Row, error) {
 	var rows []table.Row
 	for _, task := range tasks {
 		row := table.NewRow(table.RowData{
-			columnKeyID:        fmt.Sprintf("%d", task.ID),
-			columnKeyTask:      task.Title,
-			columnKeyPriority:  task.Priority,
-			columnKeyStatus:    task.Status,
-			columnKeyArchived:  fmt.Sprintf("%t", task.Archived),
-			columnKeyCreatedAt: task.CreatedAt.Format("2006-01-02 15:04:05"),
-			columnKeyDueDate:   task.DueDate.Format("2006-01-02 15:04:05"),
+			columnKeyID:       fmt.Sprintf("%d", task.ID),
+			columnKeyTask:     task.Title,
+			columnKeyPriority: task.Priority,
+			columnKeyStatus:   task.Status,
+			columnKeyArchived: fmt.Sprintf("%t", task.Archived),
+			columnKeyTaskAge:  task.TaskAge,
+			columnKeyNotes:    task.NoteTitles, // extractNoteTitles(task.Notes),
 		})
 		rows = append(rows, row)
 	}
@@ -228,6 +232,11 @@ func (m *Model) addTask() tea.Cmd {
 	}
 
 	if form.Submit {
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+		defer conn.Close()
 
 		newTask := data.Task{
 			Title:    form.TaskTitle,
@@ -236,15 +245,7 @@ func (m *Model) addTask() tea.Cmd {
 			Archived: form.Archived,
 		}
 
-		conn, err := db.ConnectDB()
-		if err != nil {
-			log.Fatalf("Error connecting to database: %v", err)
-		}
-		defer conn.Close()
-		theTask := data.TaskTable{
-			Task: newTask,
-		}
-		err = theTask.Create(conn)
+		err = newTask.Create(conn)
 		if err != nil {
 			log.Fatalf("Error creating task: %v", err)
 		}
@@ -323,14 +324,16 @@ func (m *Model) deleteTask() tea.Cmd {
 	return nil
 }
 
+// View This is where we define the UI for the task table
 func (m Model) View() string {
 	body := strings.Builder{}
 
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Add new task by pressing 'A'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Press left/right or page up/down to move between pages") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Overlay)).Render("-Press D/dd to delete row(s) after selecting them.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).Render("-Add new task by pressing 'A'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Rose)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).Render("-Press left/right or page up/down to move between pages") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Rose)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).Render("-Press D to delete row(s) after selecting them.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Rose)).Render("-Press ctrl+n to switch to a Notes View.") + "\n")
 
 	selectedIDs := []string{}
 
@@ -359,7 +362,7 @@ func (m Model) View() string {
 	return body.String()
 }
 
-func NewModel() Model {
+func TaskViewModel() Model {
 	columns := []table.Column{
 		table.NewColumn(columnKeyID, "ID", 5).WithStyle(
 			lipgloss.NewStyle().
@@ -443,4 +446,12 @@ func RunModel(m *Model) {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
+}
+
+func extractNoteTitles(notes []data.Note) string {
+	var titles []string
+	for _, note := range notes {
+		titles = append(titles, note.Title)
+	}
+	return strings.Join(titles, ", ")
 }
