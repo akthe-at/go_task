@@ -180,10 +180,10 @@ func init() {
 func styleTaskTable(tasks []data.Task) *table.Table {
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary))
 	)
 	//
 
@@ -212,7 +212,7 @@ func styleTaskTable(tasks []data.Task) *table.Table {
 	}
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Gold))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
@@ -244,13 +244,13 @@ func styleTaskTable(tasks []data.Task) *table.Table {
 	return &t
 }
 
-func styleAreaTable(areas []data.Area) *table.Table {
+func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary))
 	)
 
 	var rows [][]string
@@ -264,7 +264,7 @@ func styleAreaTable(areas []data.Area) *table.Table {
 	}
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Gold))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
@@ -293,10 +293,10 @@ func styleAreaTable(areas []data.Area) *table.Table {
 func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary))
 	)
 
 	var rows [][]string
@@ -310,7 +310,7 @@ func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 	}
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Gold))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
@@ -333,5 +333,53 @@ func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 		}).
 		Headers("ID", "Title", "Path").
 		Rows(rows...)
+	return &t
+}
+
+func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
+	re := lipgloss.NewRenderer(os.Stdout)
+	var (
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).Bold(true).Align(lipgloss.Center)
+		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary))
+	)
+
+	row := []string{
+		fmt.Sprintf("%d", task.TaskID),
+		task.TaskTitle,
+		fmt.Sprintf("%f", task.AgeInDays),
+		fmt.Sprintf("%v", task.NoteTitle),
+	}
+
+	t := *table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			var style lipgloss.Style
+			switch {
+			case row == table.HeaderRow:
+				style = HeaderStyle
+			case row%2 == 0:
+				style = EvenRowStyle
+			default:
+				style = OddRowStyle
+			}
+
+			if col == 0 {
+				style = style.Width(5)
+			}
+
+			if col == 1 {
+				style = style.Width(15)
+			}
+
+			if col == 4 {
+				style = style.Width(45)
+			}
+			return style
+		}).
+		Headers("ID", "Task", "Age of Task", "Notes").
+		Rows([][]string{row}...)
 	return &t
 }
