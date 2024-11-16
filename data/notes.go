@@ -112,8 +112,9 @@ func (n *Note) Read(db *sql.DB, id int) ([]Note, error) {
 // ReadByID retrieves a singular note by its ID
 func (n *Note) ReadByID(db *sql.DB, noteID int) error {
 	query := `
-SELECT id, title, path, type
+SELECT id, title, path, coalesce(bridge_notes.parent_task_id, bridge_notes.parent_area_id) as type
 FROM notes
+JOIN bridge_notes on notes.id = bridge_notes.note_id
 WHERE id = ?
 `
 	row := db.QueryRow(query, noteID)

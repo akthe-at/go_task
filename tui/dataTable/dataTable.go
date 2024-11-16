@@ -1,6 +1,8 @@
 package datatable
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -9,10 +11,12 @@ import (
 
 	data "github.com/akthe-at/go_task/data"
 	db "github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/akthe-at/go_task/tui/formInput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/evertras/bubble-table/table"
 )
@@ -135,14 +139,15 @@ func (m TaskModel) calculateHeight() int {
 }
 
 func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
+	ctx := context.Background()
 	conn, err := db.ConnectDB()
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
+	queries := sqlc.New(conn)
 	defer conn.Close()
 
-	task := data.Task{}
-	tasks, err := task.ReadAll(conn)
+	tasks, err := queries.ReadTasks(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error reading tasks: %w", err)
 	}
@@ -152,15 +157,14 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 		row := table.NewRow(table.RowData{
 			columnKeyID:       fmt.Sprintf("%d", task.ID),
 			columnKeyTask:     task.Title,
-			columnKeyPriority: task.Priority,
-			columnKeyStatus:   task.Status,
-			columnKeyArchived: fmt.Sprintf("%t", task.Archived),
-			columnKeyTaskAge:  task.TaskAge,
-			columnKeyNotes:    task.NoteTitles, // extractNoteTitles(task.Notes),
+			columnKeyPriority: task.Priority.String,
+			columnKeyStatus:   task.Status.String,
+			columnKeyArchived: fmt.Sprintf("%t", task.Archived.Bool),
+			columnKeyTaskAge:  task.AgeInDays,
+			columnKeyNotes:    task.NoteTitles,
 		})
 		rows = append(rows, row)
 	}
-
 	return rows, nil
 }
 
@@ -227,6 +231,67 @@ func (m *TaskModel) addNote() tea.Cmd {
 	if err != nil {
 		log.Fatalf("Error creating form: %v", err)
 	}
+
+	if form.Submit {
+		selectedIDs := []string{}
+
+		// FIXME: HERE
+		for _, row := range m.tableModel.SelectedRows() {
+			selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
+		}
+		highlightedInfo := fmt.Sprintf("%v", m.tableModel.HighlightedRow().Data[NoteColumnKeyID])
+		taskID, err := strconv.Atoi(highlightedInfo)
+		if err != nil {
+			log.Printf("Error converting ID to int: %s", err)
+			return nil
+		}
+		fmt.Println(taskID)
+
+		newNote := sqlc.CreateNoteParams{
+			Title: form.Title,
+			Path:  form.Path,
+		}
+
+		ctx := context.Background()
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+
+		queries := sqlc.New(conn)
+		defer conn.Close()
+		noteID, err := queries.CreateNote(ctx, newNote)
+		if err != nil {
+			log.Fatalf("Error creating note: %v", err)
+		}
+		id, err := queries.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
+			NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+			ParentCat:    sql.NullInt64{Int64: int64(form.Type), Valid: true},
+			ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
+		},
+		)
+		if err != nil {
+			log.Fatal("AddNote - TaskModel: ", err)
+		}
+		if noteID != id {
+			log.Fatal("AddNote - TaskModel: ", "Note ID and Bridge Note ID do not match")
+		}
+
+		// Requery the database and update the table model
+		rows, err := m.loadRowsFromDatabase()
+		if err != nil {
+			log.Printf("Error loading rows from database: %s", err)
+			return nil
+		}
+		m.tableModel = m.tableModel.WithRows(rows)
+
+		// Update the footer
+		m.updateFooter()
+	}
+
+	return nil
+}
+
 func (m *TaskModel) addTask() tea.Cmd {
 	form := &formInput.NewTaskForm{}
 
@@ -264,6 +329,7 @@ func (m *TaskModel) addTask() tea.Cmd {
 		m.updateFooter()
 		return func() tea.Msg {
 			return SwitchToTasksTableViewMsg{}
+		}
 	}
 
 	return nil
@@ -387,15 +453,16 @@ func TaskViewModel() TaskModel {
 	model := TaskModel{archiveFilter: true}
 	var filteredRows []table.Row
 	rows, err := model.loadRowsFromDatabase()
+	fmt.Println(rows)
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, row := range rows {
-		archived, ok := row.Data[columnKeyArchived]
+		archived, ok := row.Data[columnKeyArchived].(sql.NullBool)
 		if !ok {
 			log.Printf("Error getting archived status from row: %s", err)
 		}
-		if archived == "false" {
+		if !archived.Bool {
 			filteredRows = append(filteredRows, row)
 		}
 	}
@@ -403,6 +470,7 @@ func TaskViewModel() TaskModel {
 	keys := table.DefaultKeyMap()
 	keys.RowDown.SetKeys("j", "down", "s")
 	keys.RowUp.SetKeys("k", "up", "w")
+	fmt.Println(filteredRows)
 
 	model.tableModel = table.New(columns).
 		WithRows(filteredRows).

@@ -22,12 +22,15 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/charmbracelet/lipgloss"
 	_ "github.com/charmbracelet/lipgloss/list"
@@ -63,23 +66,30 @@ var taskCmd = &cobra.Command{
 	Long:  `This command is used for viewing information about a singular task.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var taskID int
+		if len(args) == 0 {
+			log.Fatal("You must supply a task ID!")
+		}
+
 		taskID, err := strconv.Atoi(args[0])
 		if err != nil {
 			log.Errorf("There was an error converting the task ID to an integer: %v", err)
 		}
+
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
 
+		queries := sqlc.New(conn)
 		defer conn.Close()
-		task := &data.Task{ID: taskID}
-		err = task.Read(conn)
+
+		task, err := queries.ReadTask(ctx, int64(taskID))
 		if err != nil {
 			log.Errorf("There was an error reading the tasks from the database: %v", err)
 		}
-		tasks := []data.Task{*task}
-		table := styleTaskTable(tasks)
+
+		table := styleTaskTable(task)
 		fmt.Println(table)
 	},
 }
@@ -91,17 +101,20 @@ var tasksCmd = &cobra.Command{
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
+		queries := sqlc.New(conn)
 		defer conn.Close()
-		task := data.Task{}
-		tasks, err := task.ReadAll(conn)
+
+		tasks, err := queries.ReadTasks(ctx)
 		if err != nil {
 			log.Errorf("There was an error reading the tasks from the database: %v", err)
 		}
-		table := styleTaskTable(tasks)
+		table := styleTasksTable(tasks)
+		// FIXME: Does this need to be a special renderer?
 		fmt.Println(table)
 	},
 }
@@ -143,14 +156,16 @@ var projectsCmd = &cobra.Command{
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
+
+		queries := sqlc.New(conn)
 		defer conn.Close()
 
-		area := data.Area{}
-		areas, err := area.ReadAll(conn)
+		areas, err := queries.ReadAreas(ctx)
 		if err != nil {
 			log.Errorf("There was an error reading the areas/projects from the database: %v", err)
 		}
@@ -177,7 +192,7 @@ func init() {
 	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func styleTaskTable(tasks []data.Task) *table.Table {
+func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
 		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).Bold(true).Align(lipgloss.Center)
@@ -189,24 +204,23 @@ func styleTaskTable(tasks []data.Task) *table.Table {
 
 	var rows [][]string
 	for _, task := range tasks {
-		formattedDate := task.DueDate.Format("January 2, 2006")
+		formattedDate := task.AgeInDays
 		row := []string{
 			fmt.Sprintf("%d", task.ID),
 			task.Title,
-			formattedDate,
+			fmt.Sprintf("%f", formattedDate),
 		}
-
-		for _, note := range task.Notes {
-			// NOTE: Perhaps I will need to break out of the range and truncate the notes entry
-			// if more than ?3? Notes?
-			var formattedEntry string
-			if len(task.Notes) > 1 {
-				formattedEntry = fmt.Sprintf("%d: %s, ", note.ID, note.Title)
+		var formattedNotes string
+		if task.NoteTitles != nil {
+			note := task.NoteTitles.(string)
+			notes := strings.Split(note, ",")
+			if len(notes) > 2 {
+				formattedNotes = strings.Join(notes[:2], ", ") + ", ..."
 			} else {
-				formattedEntry = fmt.Sprintf("%d: %s", note.ID, note.Title)
+				formattedNotes = note
 			}
-			row = append(row, formattedEntry)
 		}
+		row = append(row, formattedNotes)
 
 		rows = append(rows, row)
 	}
@@ -239,7 +253,7 @@ func styleTaskTable(tasks []data.Task) *table.Table {
 			}
 			return style
 		}).
-		Headers("ID", "Task", "Due Date", "Notes").
+		Headers("ID", "Task", "Age of Task", "Notes").
 		Rows(rows...)
 	return &t
 }

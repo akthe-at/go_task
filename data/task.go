@@ -129,13 +129,6 @@ func (t *Task) ReadAll(db *sql.DB) ([]Task, error) {
 			return nil, err
 		}
 
-		// if task.NoteTitles != "" {
-		// 	noteTitles := strings.Split(task.NoteTitles, ", ")
-		// 	for _, title := range noteTitles {
-		// 		task.Notes = append(task.Notes, Note{Title: title})
-		// 	}
-		// }
-
 		tasks = append(tasks, task)
 	}
 
