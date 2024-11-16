@@ -223,14 +223,14 @@ func (m *TaskModel) filterArchives() tea.Cmd {
 
 func (m *TaskModel) addNote() tea.Cmd {
 	form := &formInput.NewNoteForm{}
-	err := form.NewForm()
+	err := form.NewNoteForm()
 	if err != nil {
 		log.Fatalf("Error creating form: %v", err)
 	}
 func (m *TaskModel) addTask() tea.Cmd {
 	form := &formInput.NewTaskForm{}
 
-	err := form.NewForm()
+	err := form.NewTaskForm()
 	if err != nil {
 		log.Fatalf("Error creating form: %v", err)
 	}
@@ -261,8 +261,9 @@ func (m *TaskModel) addTask() tea.Cmd {
 		}
 		m.tableModel = m.tableModel.WithRows(rows)
 
-		// Update the footer
 		m.updateFooter()
+		return func() tea.Msg {
+			return SwitchToTasksTableViewMsg{}
 	}
 
 	return nil

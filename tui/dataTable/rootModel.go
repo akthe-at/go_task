@@ -18,6 +18,8 @@ var (
 	special   = lipgloss.AdaptiveColor{Light: "#43bf6d", Dark: "#73f59f"}
 )
 
+type SwitchToTasksTableViewMsg struct{}
+
 type RootModel struct {
 	Height int
 	Width  int
@@ -68,6 +70,9 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg.Height -= 2
 		msg.Width -= 4
 		return m.propagate(msg), nil
+
+	case SwitchToTasksTableViewMsg:
+		m.CurrentView = TasksTableView
 	}
 
 	return m.propagate(msg), nil
