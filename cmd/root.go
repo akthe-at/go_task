@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/akthe-at/go_task/tui"
 	dataTable "github.com/akthe-at/go_task/tui/dataTable"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -94,5 +95,28 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	}
+
+	var userThemes tui.ColorThemes
+	if err := viper.Unmarshal(&userThemes); err != nil {
+		fmt.Printf("Unable to decode into struct, %v", err)
+		return
+	}
+
+	// Merge user themes with default themes
+	if userThemes.RosePine != (tui.Theme{}) {
+		tui.Themes.RosePine = userThemes.RosePine
+	}
+	if userThemes.RosePineMoon != (tui.Theme{}) {
+		tui.Themes.RosePineMoon = userThemes.RosePineMoon
+	}
+	if userThemes.RosePineDawn != (tui.Theme{}) {
+		tui.Themes.RosePineDawn = userThemes.RosePineDawn
+	}
+	for name, theme := range userThemes.Additional {
+		tui.Themes.Additional[name] = theme
+	}
+	if userThemes.Selected.Theme != "" {
+		tui.Themes.Selected = userThemes.Selected
 	}
 }

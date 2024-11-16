@@ -109,7 +109,7 @@ func (m *NotesModel) View() string {
 	body.WriteString(
 		lipgloss.NewStyle().
 			Foreground(lipgloss.Color(
-				tui.Themes.RosePineMoon.Love)).
+				tui.Themes.RosePineMoon.Primary)).
 			Render(
 				fmt.Sprintf("Selected IDs: %s", strings.Join(selectedIDs, ", "))) + "\n")
 
@@ -124,7 +124,7 @@ func NotesView() NotesModel {
 		table.NewColumn(NoteColumnKeyID, "ID", 5).WithStyle(
 			lipgloss.NewStyle().
 				Faint(true).
-				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).
+				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).
 				Align(lipgloss.Center)),
 		table.NewFlexColumn(NoteColumnKey, "Title", 1),
 		table.NewFlexColumn(NoteColumnPath, "Path", 3),
@@ -161,7 +161,7 @@ func NotesView() NotesModel {
 
 	model.tableModel = table.New(columns).
 		WithRows(filteredRows).
-		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Foam)).Bold(true)).
+		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Accent)).Bold(true)).
 		SelectableRows(true).
 		Focused(true).
 		Border(customBorder).
@@ -171,13 +171,13 @@ func NotesView() NotesModel {
 		WithSelectedText(" ", " 󰄲  ").
 		WithBaseStyle(
 			lipgloss.NewStyle().
-				BorderForeground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).
-				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Gold)).
+				BorderForeground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)).
+				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success)).
 				Align(lipgloss.Left),
 		).
 		SortByAsc(NoteColumnKeyID).
 		WithMissingDataIndicatorStyled(table.StyledCell{
-			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)),
+			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)),
 			Data:  "<Missing Data>",
 		})
 

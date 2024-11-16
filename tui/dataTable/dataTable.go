@@ -61,6 +61,7 @@ type TaskModel struct {
 	verticalMargin   int
 	deleteMessage    string
 	archiveFilter    bool
+	Theme            tui.Theme
 }
 
 // Init initializes the model (can use this to run commands upon model initialization)
@@ -331,12 +332,12 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 func (m TaskModel) View() string {
 	body := strings.Builder{}
 
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).Render("-Add new task by pressing 'A'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Rose)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).Render("-Press left/right or page up/down to move between pages") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Rose)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).Render("-Press D to delete row(s) after selecting them.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Rose)).Render("-Press ctrl+n to switch to a Notes View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)).Render("-Add new task by pressing 'A'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Warning)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Warning)).Render("-Press ctrl+n to switch to a Notes View.") + "\n")
 
 	selectedIDs := []string{}
 
@@ -347,7 +348,7 @@ func (m TaskModel) View() string {
 	body.WriteString(
 		lipgloss.NewStyle().
 			Foreground(lipgloss.Color(
-				tui.Themes.RosePineMoon.Love)).
+				tui.Themes.RosePineMoon.Primary)).
 			Render(
 				fmt.Sprintf("Selected IDs: %s", strings.Join(selectedIDs, ", "))) + "\n")
 
@@ -355,7 +356,7 @@ func (m TaskModel) View() string {
 		body.WriteString(
 			lipgloss.NewStyle().
 				Foreground(lipgloss.Color(
-					tui.Themes.RosePineMoon.Love)).
+					tui.Themes.RosePineMoon.Primary)).
 				Render(m.deleteMessage) + "\n")
 	}
 
@@ -366,11 +367,13 @@ func (m TaskModel) View() string {
 }
 
 func TaskViewModel() TaskModel {
+	theme := tui.GetSelectedTheme()
+
 	columns := []table.Column{
 		table.NewColumn(columnKeyID, "ID", 5).WithStyle(
 			lipgloss.NewStyle().
 				Faint(true).
-				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).
+				Foreground(lipgloss.Color(theme.Secondary)).
 				Align(lipgloss.Center)),
 		table.NewFlexColumn(columnKeyTask, "Task", 3),
 		table.NewFlexColumn(columnKeyPriority, "Priority", 1),
@@ -402,7 +405,7 @@ func TaskViewModel() TaskModel {
 
 	model.tableModel = table.New(columns).
 		WithRows(filteredRows).
-		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Foam)).Bold(true)).
+		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Accent)).Bold(true)).
 		SelectableRows(true).
 		Focused(true).
 		Border(customBorder).
@@ -412,13 +415,13 @@ func TaskViewModel() TaskModel {
 		WithSelectedText(" ", " 󰄲  ").
 		WithBaseStyle(
 			lipgloss.NewStyle().
-				BorderForeground(lipgloss.Color(tui.Themes.RosePineMoon.Love)).
-				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Gold)).
+				BorderForeground(lipgloss.Color(theme.Primary)).
+				Foreground(lipgloss.Color(theme.Success)).
 				Align(lipgloss.Left),
 		).
 		SortByAsc(columnKeyID).
 		WithMissingDataIndicatorStyled(table.StyledCell{
-			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love)),
+			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)),
 			Data:  "<Missing Data>",
 		})
 

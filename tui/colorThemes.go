@@ -1,67 +1,71 @@
 package tui
 
-type rosepine struct {
-	Overlay string
-	Love    string
-	Gold    string
-	Rose    string
-	Pine    string
-	Foam    string
-	Iris    string
+func GetSelectedTheme() Theme {
+	switch Themes.Selected.Theme {
+	case "rose-pine":
+		return Themes.RosePine
+	case "rose-pine-moon":
+		return Themes.RosePineMoon
+	case "rose-pine-dawn":
+		return Themes.RosePineDawn
+	default:
+		if theme, exists := Themes.Additional[Themes.Selected.Theme]; exists {
+			return theme
+		}
+		return Themes.RosePine // default theme
+	}
 }
 
-type rosepinemoon struct {
-	Overlay string
-	Love    string
-	Gold    string
-	Rose    string
-	Pine    string
-	Foam    string
-	Iris    string
+type Theme struct {
+	Primary    string `toml:"primary"`
+	Secondary  string `toml:"secondary"`
+	Background string `toml:"background"`
+	Foreground string `toml:"foreground"`
+	Success    string `toml:"success"`
+	Warning    string `toml:"warning"`
+	Accent     string `toml:"accent"`
 }
 
-type rosepinedawn struct {
-	Overlay string
-	Love    string
-	Gold    string
-	Rose    string
-	Pine    string
-	Foam    string
-	Iris    string
+type SelectedTheme struct {
+	Theme string `toml:"theme"`
 }
 
-type colorThemes struct {
-	RosePine     rosepine
-	RosePineMoon rosepinemoon
-	RosePineDawn rosepinedawn
+type ColorThemes struct {
+	RosePine     Theme            `toml:"rose_pine"`
+	RosePineMoon Theme            `toml:"rose_pine_moon"`
+	RosePineDawn Theme            `toml:"rose_pine_dawn"`
+	Additional   map[string]Theme `toml:"additional"`
+	Selected     SelectedTheme    `toml:"selected"`
 }
 
-var Themes = colorThemes{
-	RosePine: rosepine{
-		Overlay: "#26233a",
-		Love:    "#eb6f92",
-		Gold:    "#f6c177",
-		Rose:    "#ebbcba",
-		Pine:    "#31748f",
-		Foam:    "#9ccfd8",
-		Iris:    "#c4a7e7",
+var Themes = ColorThemes{
+	RosePine: Theme{
+		Primary:    "#eb6f92",
+		Secondary:  "#31748f",
+		Background: "#26233a",
+		Foreground: "#9ccfd8",
+		Success:    "#f6c177",
+		Warning:    "#ebbcba",
+		Accent:     "#c4a7e7",
 	},
-	RosePineMoon: rosepinemoon{
-		Overlay: "#393552",
-		Love:    "#eb6f92",
-		Gold:    "#f6c177",
-		Rose:    "#ea9a97",
-		Pine:    "#3e8fb0",
-		Foam:    "#9ccfd8",
-		Iris:    "#c4a7e7",
+	RosePineMoon: Theme{
+		Primary:    "#eb6f92",
+		Secondary:  "#3e8fb0",
+		Background: "#393552",
+		Foreground: "#9ccfd8",
+		Success:    "#f6c177",
+		Warning:    "#ea9a97",
+		Accent:     "#c4a7e7",
 	},
-	RosePineDawn: rosepinedawn{
-		Overlay: "#f2e9e1",
-		Love:    "#b4637a",
-		Gold:    "#ea9d34",
-		Rose:    "#d7827e",
-		Pine:    "#286983",
-		Foam:    "#56949f",
-		Iris:    "#907aa9",
+	RosePineDawn: Theme{
+		Primary:    "#ea9d34",
+		Accent:     "#b4637a",
+		Background: "#56949f",
+		Foreground: "#286983",
+		Success:    "#d7827e",
+		Secondary:  "#907aa9",
+		Warning:    "#f2e9e1",
 	},
+	Additional: make(map[string]Theme),
+	Selected:   SelectedTheme{Theme: "RosePine"},
 }
