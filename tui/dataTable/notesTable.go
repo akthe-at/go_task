@@ -219,7 +219,7 @@ func (m *NotesModel) addNote() tea.Cmd {
 	}
 
 	form := &formInput.NewNoteForm{}
-	err = form.NewForm()
+	err = form.NewNoteForm()
 	if err != nil {
 		log.Fatalf("Error creating form: %v", err)
 	}
@@ -287,42 +287,3 @@ func (m *NotesModel) loadRowsFromDatabase() ([]table.Row, error) {
 
 	return filteredRows, nil
 }
-
-// func RunModel(m *Model) {
-// 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
-// 		fmt.Println("Error running program:", err)
-// 		os.Exit(1)
-// 	}
-// }
-
-//
-// // func (m *Model) loadRowsFromDatabase() ([]table.Row, error) {
-// // 	conn, err := db.ConnectDB()
-// // 	if err != nil {
-// // 		return nil, fmt.Errorf("error connecting to database: %w", err)
-// // 	}
-// // 	defer conn.Close()
-// //
-// // 	task := data.Task{}
-// // 	tasks, err := task.ReadAll(conn)
-// // 	if err != nil {
-// // 		return nil, fmt.Errorf("error reading tasks: %w", err)
-// // 	}
-// //
-// // 	var rows []table.Row
-// // 	for _, task := range tasks {
-// // 		row := table.NewRow(table.RowData{
-// // 			columnKeyID:        fmt.Sprintf("%d", task.ID),
-// // 			columnKeyTask:      task.Title,
-// // 			columnKeyPriority:  task.Priority,
-// // 			columnKeyStatus:    task.Status,
-// // 			columnKeyArchived:  fmt.Sprintf("%t", task.Archived),
-// // 			columnKeyCreatedAt: task.CreatedAt.Format("2006-01-02 15:04:05"),
-// // 			columnKeyDueDate:   task.DueDate.Format("2006-01-02 15:04:05"),
-// // 			columnKeyNotes:     task.NoteTitles, // extractNoteTitles(task.Notes),
-// // 		})
-// // 		rows = append(rows, row)
-// // 	}
-// //
-// // 	return rows, nil
-// // }
