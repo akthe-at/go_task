@@ -1,10 +1,8 @@
 package formInput
 
 import (
-	"os"
-	"os/exec"
-
 	"github.com/akthe-at/go_task/data"
+	"github.com/akthe-at/go_task/tui"
 	"github.com/charmbracelet/huh"
 )
 
@@ -18,14 +16,10 @@ type NewTaskForm struct {
 	Submit    bool
 }
 
-func (n *NewTaskForm) NewForm() error {
-	// Clear the terminal before showing form
+func (n *NewTaskForm) NewTaskForm() error {
+	tui.ClearTerminalScreen()
 
-	cmd := exec.Command("clear")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
-
-	groups := []*huh.Group{
+	taskGroups := []*huh.Group{
 		huh.NewGroup(
 			huh.NewInput().
 				Title("What is the task?").
@@ -65,7 +59,7 @@ func (n *NewTaskForm) NewForm() error {
 				Value(&n.Submit),
 		),
 	}
-	n.TaskForm = huh.NewForm(groups...)
+	n.TaskForm = huh.NewForm(taskGroups...)
 
 	return n.TaskForm.Run()
 }

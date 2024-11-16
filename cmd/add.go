@@ -36,7 +36,7 @@ and usage of using your command. For example:
 	Run: func(cmd *cobra.Command, args []string) {
 		form := &formInput.NewTaskForm{}
 
-		err := form.NewForm()
+		err := form.NewTaskForm()
 		if err != nil {
 			log.Fatalf("Error creating form: %v", err)
 		}

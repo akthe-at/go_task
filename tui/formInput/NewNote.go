@@ -1,10 +1,8 @@
 package formInput
 
 import (
-	"os"
-	"os/exec"
-
 	"github.com/akthe-at/go_task/data"
+	"github.com/akthe-at/go_task/tui"
 	"github.com/charmbracelet/huh"
 )
 
@@ -16,13 +14,10 @@ type NewNoteForm struct {
 	Submit   bool
 }
 
-func (n *NewNoteForm) NewForm() error {
-	// Clear the terminal before showing form
-	cmd := exec.Command("clear")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+func (n *NewNoteForm) NewNoteForm() error {
+	tui.ClearTerminalScreen()
 
-	groups := []*huh.Group{
+	noteGroups := []*huh.Group{
 		huh.NewGroup(
 			huh.NewInput().
 				Title("What note do you want to add?").
@@ -38,13 +33,13 @@ func (n *NewNoteForm) NewForm() error {
 				Description("Choose a type").
 				Value(&n.Type),
 			huh.NewConfirm().
-				Title("Are you ready to save your task?").
+				Title("Are you ready to save your note?").
 				Affirmative("Yes").
 				Negative("No").
 				Value(&n.Submit),
 		),
 	}
-	n.NoteForm = huh.NewForm(groups...)
+	n.NoteForm = huh.NewForm(noteGroups...)
 
 	return n.NoteForm.Run()
 }
