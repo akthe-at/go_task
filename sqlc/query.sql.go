@@ -11,29 +11,19 @@ import (
 )
 
 const createArea = `-- name: CreateArea :execlastid
-INSERT INTO areas (title, status, archived, created_at, last_mod, due_date)
-VALUES (?, ?, ?, ?, ?, ?)
-returning id, title, status, archived, created_at, last_mod, due_date
+INSERT INTO areas (title, status, archived)
+VALUES (?, ?, ?)
+returning id, title, status, archived
 `
 
 type CreateAreaParams struct {
-	Title     string
-	Status    sql.NullString
-	Archived  sql.NullBool
-	CreatedAt sql.NullTime
-	LastMod   sql.NullTime
-	DueDate   sql.NullTime
+	Title    string
+	Status   sql.NullString
+	Archived sql.NullBool
 }
 
 func (q *Queries) CreateArea(ctx context.Context, arg CreateAreaParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createArea,
-		arg.Title,
-		arg.Status,
-		arg.Archived,
-		arg.CreatedAt,
-		arg.LastMod,
-		arg.DueDate,
-	)
+	result, err := q.db.ExecContext(ctx, createArea, arg.Title, arg.Status, arg.Archived)
 	if err != nil {
 		return 0, err
 	}
@@ -164,7 +154,7 @@ const deleteMultipleAreas = `-- name: DeleteMultipleAreas :execresult
 ;
 
 DELETE FROM areas WHERE id IN (?)
-returning id, title, status, archived, created_at, last_mod, due_date
+returning id, title, status, archived
 `
 
 func (q *Queries) DeleteMultipleAreas(ctx context.Context, id int64) (sql.Result, error) {
@@ -379,7 +369,7 @@ func (q *Queries) ReadAllTasks(ctx context.Context) ([]ReadAllTasksRow, error) {
 
 const readArea = `-- name: ReadArea :one
 SELECT 
-    areas.id, areas.title, areas.status, areas.archived, areas.due_date,
+    areas.id, areas.title, areas.status, areas.archived,
     notes.id, notes.title, notes.path
 FROM 
     areas
@@ -396,7 +386,6 @@ type ReadAreaRow struct {
 	Title    string
 	Status   sql.NullString
 	Archived sql.NullBool
-	DueDate  sql.NullTime
 	ID_2     sql.NullInt64
 	Title_2  sql.NullString
 	Path     sql.NullString
@@ -410,7 +399,6 @@ func (q *Queries) ReadArea(ctx context.Context, id int64) (ReadAreaRow, error) {
 		&i.Title,
 		&i.Status,
 		&i.Archived,
-		&i.DueDate,
 		&i.ID_2,
 		&i.Title_2,
 		&i.Path,
@@ -420,8 +408,7 @@ func (q *Queries) ReadArea(ctx context.Context, id int64) (ReadAreaRow, error) {
 
 const readAreas = `-- name: ReadAreas :many
 SELECT 
-    areas.id, areas.title, areas.status, areas.archived, areas.due_date,
-    ROUND((julianday('now') - julianday(areas.due_date)), 2) AS days_remaining,
+    areas.id, areas.title, areas.status, areas.archived,
     IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles
 FROM 
     areas
@@ -434,13 +421,11 @@ GROUP BY
 `
 
 type ReadAreasRow struct {
-	ID            int64
-	Title         string
-	Status        sql.NullString
-	Archived      sql.NullBool
-	DueDate       sql.NullTime
-	DaysRemaining float64
-	NoteTitles    interface{}
+	ID         int64
+	Title      string
+	Status     sql.NullString
+	Archived   sql.NullBool
+	NoteTitles interface{}
 }
 
 func (q *Queries) ReadAreas(ctx context.Context) ([]ReadAreasRow, error) {
@@ -457,8 +442,6 @@ func (q *Queries) ReadAreas(ctx context.Context) ([]ReadAreasRow, error) {
 			&i.Title,
 			&i.Status,
 			&i.Archived,
-			&i.DueDate,
-			&i.DaysRemaining,
 			&i.NoteTitles,
 		); err != nil {
 			return nil, err

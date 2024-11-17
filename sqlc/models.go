@@ -9,13 +9,10 @@ import (
 )
 
 type Area struct {
-	ID        int64
-	Title     string
-	Status    sql.NullString
-	Archived  sql.NullBool
-	CreatedAt sql.NullTime
-	LastMod   sql.NullTime
-	DueDate   sql.NullTime
+	ID       int64
+	Title    string
+	Status   sql.NullString
+	Archived sql.NullBool
 }
 
 type BridgeNote struct {
