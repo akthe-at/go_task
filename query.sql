@@ -5,7 +5,6 @@ returning id;
 -- name: CreateTaskBridgeNote :execlastid
 INSERT INTO bridge_notes (note_id, parent_cat, parent_task_id) VALUES (?, ?, ?);
 
-
 -- name: CreateAreaBridgeNote :execlastid
 INSERT INTO bridge_notes (note_id, parent_cat, parent_area_id) VALUES (?, ?, ?);
 
@@ -74,13 +73,13 @@ DELETE FROM notes WHERE id IN (?)
 returning *;
 
 -- name: CreateArea :execlastid
-INSERT INTO areas (title, status, archived, created_at, last_mod, due_date)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO areas (title, status, archived)
+VALUES (?, ?, ?)
 returning *;
 
 -- name: ReadArea :one
 SELECT 
-    areas.id, areas.title, areas.status, areas.archived, areas.due_date,
+    areas.id, areas.title, areas.status, areas.archived,
     notes.id, notes.title, notes.path
 FROM 
     areas
@@ -173,8 +172,7 @@ RETURNING *;
 
 -- name: ReadAreas :many
 SELECT 
-    areas.id, areas.title, areas.status, areas.archived, areas.due_date,
-    ROUND((julianday('now') - julianday(areas.due_date)), 2) AS days_remaining,
+    areas.id, areas.title, areas.status, areas.archived,
     IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles
 FROM 
     areas
