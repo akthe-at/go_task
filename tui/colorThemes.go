@@ -9,8 +9,8 @@ func GetSelectedTheme() Theme {
 	case "rose-pine-dawn":
 		return Themes.RosePineDawn
 	default:
-		if theme, exists := Themes.Additional[Themes.Selected.Theme]; exists {
-			return theme
+		if Theme, exists := Themes.Additional[Themes.Selected.Theme]; exists {
+			return Theme
 		}
 		return Themes.RosePine // default theme
 	}

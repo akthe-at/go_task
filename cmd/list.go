@@ -39,14 +39,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	purple    = lipgloss.Color("99")
-	gray      = lipgloss.Color("245")
-	lightGray = lipgloss.Color("241")
-)
-
-var theme = tui.GetSelectedTheme()
-
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
@@ -195,6 +187,7 @@ func init() {
 }
 
 func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
+	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
 		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
@@ -261,6 +254,7 @@ func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 }
 
 func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
+	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
 		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
@@ -307,6 +301,7 @@ func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
 }
 
 func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
+	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
 		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
@@ -353,6 +348,7 @@ func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 }
 
 func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
+	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
 		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
