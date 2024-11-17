@@ -27,7 +27,7 @@ func (n *NewAreaForm) NewAreaForm() error {
 	groups := []*huh.Group{
 		huh.NewGroup(
 			huh.NewInput().
-				Title("What is the the name of the Area/Task?").
+				Title("What is the the name of the Project/Area?").
 				Prompt(">").
 				Value(&n.AreaTitle),
 
