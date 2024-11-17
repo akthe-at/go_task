@@ -56,6 +56,8 @@ var customBorder = table.Border{
 	InnerDivider: "│",
 }
 
+var theme = tui.GetSelectedTheme()
+
 // This is the task table "screen" model
 type TaskModel struct {
 	tableModel       table.Model
@@ -399,12 +401,12 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 func (m TaskModel) View() string {
 	body := strings.Builder{}
 
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)).Render("-Add new task by pressing 'A'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Warning)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Warning)).Render("-Press ctrl+n to switch to a Notes View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add new task by pressing 'A'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+n to switch to a Notes View.") + "\n")
 
 	selectedIDs := []string{}
 
@@ -415,7 +417,7 @@ func (m TaskModel) View() string {
 	body.WriteString(
 		lipgloss.NewStyle().
 			Foreground(lipgloss.Color(
-				tui.Themes.RosePineMoon.Primary)).
+				theme.Primary)).
 			Render(
 				fmt.Sprintf("Selected IDs: %s", strings.Join(selectedIDs, ", "))) + "\n")
 
@@ -423,7 +425,7 @@ func (m TaskModel) View() string {
 		body.WriteString(
 			lipgloss.NewStyle().
 				Foreground(lipgloss.Color(
-					tui.Themes.RosePineMoon.Primary)).
+					theme.Primary)).
 				Render(m.deleteMessage) + "\n")
 	}
 
