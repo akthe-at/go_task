@@ -45,6 +45,8 @@ const (
 	lightGray = lipgloss.Color("241")
 )
 
+var theme = tui.GetSelectedTheme()
+
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
@@ -195,10 +197,10 @@ func init() {
 func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
 	//
 
@@ -226,7 +228,7 @@ func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 	}
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
@@ -261,10 +263,10 @@ func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
 
 	var rows [][]string
@@ -272,13 +274,13 @@ func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
 		row := []string{
 			fmt.Sprintf("%d", area.ID),
 			area.Title,
-			fmt.Sprintf("%v", area.Status),
+			fmt.Sprintf("%v", area.Status.String),
 		}
 		rows = append(rows, row)
 	}
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
@@ -307,10 +309,10 @@ func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
 func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
 
 	var rows [][]string
@@ -324,7 +326,7 @@ func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 	}
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
@@ -353,10 +355,10 @@ func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
 
 	row := []string{
@@ -368,7 +370,7 @@ func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
 
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
