@@ -1,6 +1,7 @@
 package datatable
 
 import (
+	"github.com/akthe-at/go_task/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -10,6 +11,7 @@ const (
 	TasksTableView
 )
 
+var theme = tui.GetSelectedTheme()
 
 type (
 	View                      int
