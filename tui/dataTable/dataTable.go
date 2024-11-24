@@ -56,8 +56,6 @@ var customBorder = table.Border{
 	InnerDivider: "│",
 }
 
-var theme = tui.GetSelectedTheme()
-
 // This is the task table "screen" model
 type TaskModel struct {
 	tableModel       table.Model
@@ -67,7 +65,6 @@ type TaskModel struct {
 	verticalMargin   int
 	deleteMessage    string
 	archiveFilter    bool
-	Theme            tui.Theme
 }
 
 // Init initializes the model (can use this to run commands upon model initialization)
@@ -237,7 +234,6 @@ func (m *TaskModel) addNote() tea.Cmd {
 	if form.Submit {
 		selectedIDs := []string{}
 
-		// FIXME: HERE
 		for _, row := range m.tableModel.SelectedRows() {
 			selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
 		}
@@ -247,7 +243,6 @@ func (m *TaskModel) addNote() tea.Cmd {
 			log.Printf("Error converting ID to int: %s", err)
 			return nil
 		}
-		fmt.Println(taskID)
 
 		newNote := sqlc.CreateNoteParams{
 			Title: form.Title,
@@ -406,7 +401,7 @@ func (m TaskModel) View() string {
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+n to switch to a Notes View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+n to switch to the Notes View.") + "\n")
 
 	selectedIDs := []string{}
 
@@ -455,7 +450,6 @@ func TaskViewModel() TaskModel {
 	model := TaskModel{archiveFilter: true}
 	var filteredRows []table.Row
 	rows, err := model.loadRowsFromDatabase()
-	fmt.Println(rows)
 	if err != nil {
 		log.Fatal(err)
 	}
