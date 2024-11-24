@@ -22,24 +22,21 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/charmbracelet/lipgloss"
 	_ "github.com/charmbracelet/lipgloss/list"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
-)
-
-const (
-	purple    = lipgloss.Color("99")
-	gray      = lipgloss.Color("245")
-	lightGray = lipgloss.Color("241")
 )
 
 // listCmd represents the list command
@@ -63,23 +60,30 @@ var taskCmd = &cobra.Command{
 	Long:  `This command is used for viewing information about a singular task.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var taskID int
+		if len(args) == 0 {
+			log.Fatal("You must supply a task ID!")
+		}
+
 		taskID, err := strconv.Atoi(args[0])
 		if err != nil {
 			log.Errorf("There was an error converting the task ID to an integer: %v", err)
 		}
+
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
 
+		queries := sqlc.New(conn)
 		defer conn.Close()
-		task := &data.Task{ID: taskID}
-		err = task.Read(conn)
+
+		task, err := queries.ReadTask(ctx, int64(taskID))
 		if err != nil {
 			log.Errorf("There was an error reading the tasks from the database: %v", err)
 		}
-		tasks := []data.Task{*task}
-		table := styleTaskTable(tasks)
+
+		table := styleTaskTable(task)
 		fmt.Println(table)
 	},
 }
@@ -91,17 +95,20 @@ var tasksCmd = &cobra.Command{
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
+		queries := sqlc.New(conn)
 		defer conn.Close()
-		task := data.Task{}
-		tasks, err := task.ReadAll(conn)
+
+		tasks, err := queries.ReadTasks(ctx)
 		if err != nil {
 			log.Errorf("There was an error reading the tasks from the database: %v", err)
 		}
-		table := styleTaskTable(tasks)
+		table := styleTasksTable(tasks)
+		// FIXME: Does this need to be a special renderer?
 		fmt.Println(table)
 	},
 }
@@ -136,6 +143,31 @@ var taskNotesCmd = &cobra.Command{
 	},
 }
 
+var allNotesCmd = &cobra.Command{
+	Use:   "notes",
+	Short: "List All Notes",
+	Long: `Use this command to get a list of all notes, regardless of note type.
+	To use this command just type list notes`,
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
+
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Errorf("There was an error connecting to the database: %v", err)
+		}
+		defer conn.Close()
+
+		queries := sqlc.New(conn)
+		allNotes, err := queries.ReadAllNotes(ctx)
+		if err != nil {
+			log.Errorf("There was an error reading the notes the database: %v", err)
+		}
+
+		table := styleAllNotesTable(allNotes)
+		fmt.Println(table)
+	},
+}
+
 var projectsCmd = &cobra.Command{
 	Use:   "projects",
 	Short: "List your projects/areas",
@@ -143,14 +175,16 @@ var projectsCmd = &cobra.Command{
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
+
+		queries := sqlc.New(conn)
 		defer conn.Close()
 
-		area := data.Area{}
-		areas, err := area.ReadAll(conn)
+		areas, err := queries.ReadAreas(ctx)
 		if err != nil {
 			log.Errorf("There was an error reading the areas/projects from the database: %v", err)
 		}
@@ -164,6 +198,7 @@ func init() {
 	listCmd.AddCommand(tasksCmd)
 	listCmd.AddCommand(projectsCmd)
 	listCmd.AddCommand(taskCmd)
+	listCmd.AddCommand(allNotesCmd)
 	taskCmd.AddCommand(taskNotesCmd)
 
 	// Here you will define your flags and configuration settings.
@@ -177,42 +212,42 @@ func init() {
 	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func styleTaskTable(tasks []data.Task) *table.Table {
+func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
+	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
 	//
 
 	var rows [][]string
 	for _, task := range tasks {
-		formattedDate := task.DueDate.Format("January 2, 2006")
+		formattedDate := task.AgeInDays
 		row := []string{
 			fmt.Sprintf("%d", task.ID),
 			task.Title,
-			formattedDate,
+			fmt.Sprintf("%f", formattedDate),
 		}
-
-		for _, note := range task.Notes {
-			// NOTE: Perhaps I will need to break out of the range and truncate the notes entry
-			// if more than ?3? Notes?
-			var formattedEntry string
-			if len(task.Notes) > 1 {
-				formattedEntry = fmt.Sprintf("%d: %s, ", note.ID, note.Title)
+		var formattedNotes string
+		if task.NoteTitles != nil {
+			note := task.NoteTitles.(string)
+			notes := strings.Split(note, ",")
+			if len(notes) > 2 {
+				formattedNotes = strings.Join(notes[:2], ", ") + ", ..."
 			} else {
-				formattedEntry = fmt.Sprintf("%d: %s", note.ID, note.Title)
+				formattedNotes = note
 			}
-			row = append(row, formattedEntry)
 		}
+		row = append(row, formattedNotes)
 
 		rows = append(rows, row)
 	}
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Gold))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
@@ -239,18 +274,19 @@ func styleTaskTable(tasks []data.Task) *table.Table {
 			}
 			return style
 		}).
-		Headers("ID", "Task", "Due Date", "Notes").
+		Headers("ID", "Task", "Age of Task", "Notes").
 		Rows(rows...)
 	return &t
 }
 
-func styleAreaTable(areas []data.Area) *table.Table {
+func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
+	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
 
 	var rows [][]string
@@ -258,13 +294,13 @@ func styleAreaTable(areas []data.Area) *table.Table {
 		row := []string{
 			fmt.Sprintf("%d", area.ID),
 			area.Title,
-			fmt.Sprintf("%v", area.Status),
+			fmt.Sprintf("%v", area.Status.String),
 		}
 		rows = append(rows, row)
 	}
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Gold))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
@@ -291,12 +327,13 @@ func styleAreaTable(areas []data.Area) *table.Table {
 }
 
 func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
+	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine)).Bold(true).Align(lipgloss.Center)
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
 		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Pine))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Love))
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
 
 	var rows [][]string
@@ -310,7 +347,7 @@ func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 	}
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Gold))).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			var style lipgloss.Style
 			switch {
@@ -332,6 +369,104 @@ func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 			return style
 		}).
 		Headers("ID", "Title", "Path").
+		Rows(rows...)
+	return &t
+}
+
+func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
+	theme := tui.GetSelectedTheme()
+	re := lipgloss.NewRenderer(os.Stdout)
+	var (
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
+		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
+	)
+
+	row := []string{
+		fmt.Sprintf("%d", task.TaskID),
+		task.TaskTitle,
+		fmt.Sprintf("%f", task.AgeInDays),
+		fmt.Sprintf("%v", task.NoteTitle),
+	}
+
+	t := *table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			var style lipgloss.Style
+			switch {
+			case row == table.HeaderRow:
+				style = HeaderStyle
+			case row%2 == 0:
+				style = EvenRowStyle
+			default:
+				style = OddRowStyle
+			}
+
+			if col == 0 {
+				style = style.Width(5)
+			}
+
+			if col == 1 {
+				style = style.Width(15)
+			}
+
+			if col == 4 {
+				style = style.Width(45)
+			}
+			return style
+		}).
+		Headers("ID", "Task", "Age of Task", "Notes").
+		Rows([][]string{row}...)
+	return &t
+}
+
+func styleAllNotesTable(notes []sqlc.ReadAllNotesRow) *table.Table {
+	theme := tui.GetSelectedTheme()
+	re := lipgloss.NewRenderer(os.Stdout)
+	var (
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
+		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
+	)
+
+	var rows [][]string
+	for _, note := range notes {
+		row := []string{
+			fmt.Sprintf("%d", note.ID),
+			note.Title,
+			note.Path,
+			note.AreaOrTaskTitle,
+			note.ParentType,
+		}
+		rows = append(rows, row)
+	}
+	t := *table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			var style lipgloss.Style
+			switch {
+			case row == table.HeaderRow:
+				style = HeaderStyle
+			case row%2 == 0:
+				style = EvenRowStyle
+			default:
+				style = OddRowStyle
+			}
+
+			if col == 0 {
+				style = style.Width(5)
+			}
+
+			if col == 1 {
+				style = style.Width(15)
+			}
+			return style
+		}).
+		Headers("ID", "Title", "Path", "Area/Task", "Parent ID").
 		Rows(rows...)
 	return &t
 }

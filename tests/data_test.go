@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	"github.com/akthe-at/go_task/data"
-	_ "github.com/ncruces/go-sqlite3/driver"
-	_ "github.com/ncruces/go-sqlite3/embed"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var dbConn *sql.DB
@@ -25,7 +24,7 @@ func TestMain(m *testing.M) {
 PRAGMA foreign_keys = ON;
 CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT, priority TEXT, status TEXT, archived BOOLEAN, created_at DATETIME, last_mod DATETIME, due_date DATETIME);
 CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT, path TEXT);
-CREATE TABLE areas (id INTEGER PRIMARY KEY, title TEXT, type TEXT, deadline DATETIME, status TEXT, archived BOOLEAN);
+CREATE TABLE areas (id INTEGER PRIMARY KEY, title TEXT, status TEXT, archived BOOLEAN, created_at DATETIME, last_mod DATETIME, due_date DATETIME);
 CREATE TABLE bridge_notes (
   note_id INTEGER,
   parent_cat INTEGER,
@@ -39,9 +38,9 @@ CREATE TABLE bridge_notes (
 INSERT INTO tasks (id, title, priority, status, archived, created_at, last_mod, due_date) VALUES 
   (1, 'Test Task', 'High', 'Open', 0, '2023-01-01', '2023-01-01', '2023-01-01'),
   (2, 'Test Task 2', 'Medium', 'Open', 0, '2023-01-01', '2023-01-01', '2023-01-01');
-INSERT INTO areas (id, title, type, deadline, status, archived) VALUES 
-  (1, 'Test Area', 'Type', '2023-01-01', 'Open', 0),
-  (2, 'Test Area 2', 'Type 2', '2023-01-01', 'Open', 0);
+INSERT INTO areas (id, title, status, archived, created_at, last_mod, due_date) VALUES 
+  (1, 'Test Area', 'todo', 0, '2023-01-01', '2023-01-01', '2023-01-01'),
+  (2, 'Test Area 2', 'todo', 0, '2023-01-01', '2023-01-01', '2023-01-01');
 INSERT INTO notes (id, title, path) VALUES 
   (1, 'Note 1', '/path/to/note1'), 
   (2, 'Note 2', '/path/to/note2'),
@@ -223,9 +222,10 @@ func TestArea_DeleteWithNullValues(t *testing.T) {
 func TestArea_DeleteMultiple(t *testing.T) {
 	// Insert multiple areas for testing
 	_, err := dbConn.Exec(`
-	INSERT INTO areas (id, title, type, deadline, status, archived) VALUES 
-	(3, 'Test Area 3', 'Type 3', '2023-01-01', 'Open', 0),
-	(4, 'Test Area 4', 'Type 4', '2023-01-01', 'Open', 0);
+
+INSERT INTO areas (id, title, status, archived, created_at, last_mod, due_date) VALUES 
+	(3, 'Test Area 3','done',0, '2023-01-01', '2023-01-01', '2023-01-01'),
+	(4, 'Test Area 4','done',0, '2023-01-01', '2023-01-01', '2023-01-01');
 	`)
 	if err != nil {
 		t.Fatalf("failed to insert test areas: %v", err)

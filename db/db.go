@@ -6,8 +6,7 @@ import (
 	"log"
 	"os"
 
-	_ "github.com/ncruces/go-sqlite3/driver"
-	_ "github.com/ncruces/go-sqlite3/embed"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // ConnectDB opens a connection to a SQLite database.
@@ -17,6 +16,7 @@ func ConnectDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid sql.Open() arguments: %w", err)
 	}
+
 	err = db.Ping()
 	if err != nil {
 		log.Fatal("failed to ping database: ", err)
@@ -64,10 +64,11 @@ PRAGMA foreign_keys = ON;
 		CREATE TABLE IF NOT EXISTS areas (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
-			type TEXT,
-			deadline DATETIME,
 			status TEXT,
-			archived BOOLEAN
+			archived BOOLEAN,
+			created_at DATETIME,
+			last_mod DATETIME,
+			due_date DATETIME
 	);
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,15 +79,15 @@ PRAGMA foreign_keys = ON;
 			created_at DATETIME,
 			last_mod DATETIME,
 			due_date DATETIME
-	area_id INTEGER,
-	FOREIGN KEY(area_id) REFERENCES areas(id) ON DELETE SET NULL ON UPDATE CASCADE
+			area_id INTEGER,
+			FOREIGN KEY(area_id) REFERENCES areas(id) ON DELETE SET NULL ON UPDATE CASCADE
 	);
 		CREATE TABLE IF NOT EXISTS notes (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title TEXT NOT NULL,
 			path TEXT NOT NULL
 		);
-		CREATE TABLE bridge_notes (
+		CREATE TABLE IF NOT EXISTS bridge_notes (
 			note_id INTEGER,
 			parent_cat INTEGER,
 			parent_task_id INTEGER,
@@ -95,7 +96,7 @@ PRAGMA foreign_keys = ON;
 			CHECK (parent_cat IN (1, 2)),
 			FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE,
 			FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE
-		);
+);
 `
 	tx, err := db.Begin()
 	if err != nil {
