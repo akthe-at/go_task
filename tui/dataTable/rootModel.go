@@ -25,7 +25,8 @@ type RootModel struct {
 	Tasks TaskModel
 	Notes NotesModel
 
-	CurrentView View
+	CurrentView  View
+	PreviousView View
 }
 
 func NewRootModel() RootModel {
@@ -56,9 +57,17 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+		case "D":
+			if m.CurrentView == TasksTableView {
+				m.Tasks.deleteTask()
+			} else {
+				m.Notes.deleteNote()
+			}
 		case "ctrl+t":
+			m.PreviousView = m.CurrentView
 			m.CurrentView = TasksTableView
 		case "ctrl+n":
+			m.PreviousView = m.CurrentView
 			m.CurrentView = NotesTableView
 		}
 
@@ -68,9 +77,16 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg.Height -= 2
 		msg.Width -= 4
 		return m.propagate(msg), nil
-
 	case SwitchToTasksTableViewMsg:
 		m.CurrentView = TasksTableView
+	case SwitchToPreviousViewMsg:
+		m.CurrentView = m.PreviousView
+	case AddNoteMsg:
+		updatedNotes, _ := m.Notes.Update(msg)
+		m.Notes = *updatedNotes.(*NotesModel)
+	case AddTaskMsg:
+		updatedTasks, _ := m.Tasks.Update(msg)
+		m.Tasks = *updatedTasks.(*TaskModel)
 	}
 
 	return m.propagate(msg), nil
