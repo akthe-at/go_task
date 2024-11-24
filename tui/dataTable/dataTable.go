@@ -90,7 +90,7 @@ func (m *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.deleteTask())
 		case "F":
 			cmds = append(cmds, m.filterArchives())
-		case "A":
+		case "T":
 			cmds = append(cmds, m.addTask())
 		case "left":
 			if m.calculateWidth() > minWidth {
@@ -117,6 +117,8 @@ func (m *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.totalWidth = msg.Width
 		m.totalHeight = msg.Height
 
+		m.recalculateTable()
+	case SwitchToPreviousViewMsg:
 		m.recalculateTable()
 	}
 
@@ -286,7 +288,9 @@ func (m *TaskModel) addNote() tea.Cmd {
 		m.updateFooter()
 	}
 
-	return nil
+	return func() tea.Msg {
+		return SwitchToPreviousViewMsg{}
+	}
 }
 
 func (m *TaskModel) addTask() tea.Cmd {
@@ -334,7 +338,6 @@ func (m *TaskModel) addTask() tea.Cmd {
 
 func (m *TaskModel) deleteTask() tea.Cmd {
 	selectedIDs := []string{}
-
 	for _, row := range m.tableModel.SelectedRows() {
 		selectedIDs = append(selectedIDs, row.Data[columnKeyID].(string))
 	}
