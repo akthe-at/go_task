@@ -88,8 +88,6 @@ func (m *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tea.Quit)
 		case "F":
 			cmds = append(cmds, m.filterArchives())
-		case "T":
-			cmds = append(cmds, m.addTask())
 		case "left":
 			if m.calculateWidth() > minWidth {
 				m.horizontalMargin++

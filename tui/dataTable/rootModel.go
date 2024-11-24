@@ -65,6 +65,12 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.Notes.deleteNote()
 			}
+		case "A":
+			if m.CurrentView == TasksTableView {
+				m.Tasks.addTask()
+			} else {
+				m.Notes.addNote()
+			}
 		case "ctrl+t":
 			m.PreviousView = m.CurrentView
 			m.CurrentView = TasksTableView

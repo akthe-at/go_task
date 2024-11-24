@@ -54,8 +54,6 @@ func (m *NotesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "esc", "q":
 			cmds = append(cmds, tea.Quit)
-		case "N":
-			cmds = append(cmds, m.addNote())
 		case "left":
 			if m.calculateWidth() > minWidth {
 				m.horizontalMargin++
