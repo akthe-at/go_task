@@ -5,15 +5,18 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type View int
-
 const (
 	NotesTableView View = iota
 	TasksTableView
 )
 
 
-type SwitchToTasksTableViewMsg struct{}
+type (
+	View                      int
+	AddNoteMsg                struct{}
+	AddTaskMsg                struct{}
+	SwitchToTasksTableViewMsg struct{}
+)
 
 type RootModel struct {
 	Height int
