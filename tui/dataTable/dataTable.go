@@ -86,8 +86,6 @@ func (m *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "esc", "q":
 			cmds = append(cmds, tea.Quit)
-		case "D", "dd":
-			cmds = append(cmds, m.deleteTask())
 		case "F":
 			cmds = append(cmds, m.filterArchives())
 		case "T":
@@ -338,13 +336,15 @@ func (m *TaskModel) addTask() tea.Cmd {
 
 func (m *TaskModel) deleteTask() tea.Cmd {
 	selectedIDs := []string{}
+	ctx := context.Background()
 	for _, row := range m.tableModel.SelectedRows() {
 		selectedIDs = append(selectedIDs, row.Data[columnKeyID].(string))
 	}
 	highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
-	taskID, err := strconv.Atoi(highlightedInfo)
+	highlightedNote := m.tableModel.HighlightedRow().Data[columnKeyNotes].(string)
+	taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
 	if err != nil {
-		log.Printf("Error converting ID to int: %s", err)
+		log.Printf("Error converting ID to int64: %s", err)
 		return nil
 	}
 
@@ -355,30 +355,75 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 	}
 	defer conn.Close()
 
-	if len(selectedIDs) == 1 {
-		task := data.Task{ID: taskID}
-		err = task.Delete(conn)
+	if len(selectedIDs) <= 1 {
+		queries := sqlc.New(conn)
+		// query the notes associated with the task
+		taskNoteIDs := []int64{}
+		taskNotes, err := queries.ReadTaskNote(ctx, sql.NullInt64{Int64: taskID, Valid: true})
+		if err != nil {
+			log.Printf("Error reading notes: %s", err)
+			return nil
+		}
+		for _, note := range taskNotes {
+			taskNoteIDs = append(taskNoteIDs, note.ID)
+		}
+		// delete those notes
+		if highlightedNote != "" {
+			_, err := queries.DeleteNotes(ctx, taskNoteIDs)
+			if err != nil {
+				log.Printf("Error deleting notes: %s", err)
+				return nil
+			}
+		}
+		// delete the task
+		deletedID, err := queries.DeleteTask(ctx, taskID)
 		if err != nil {
 			log.Printf("Error deleting task: %s", err)
 			return nil
 		}
-		m.deleteMessage = fmt.Sprintf("You deleted this task:  IDs: %s", highlightedInfo)
+		if deletedID != taskID {
+			log.Fatalf("Error deleting task: %s", err)
+		} else {
+			m.deleteMessage = fmt.Sprintf("You deleted this task:  IDs: %s", highlightedInfo)
+		}
+
 	} else if len(selectedIDs) > 1 {
-		deletedTasks := make([]string, len(selectedIDs))
+		queries := sqlc.New(conn)
+		// query the notes associated with the task
+		taskNoteIDs := []int64{}
+		taskNotes, err := queries.ReadTaskNote(ctx, sql.NullInt64{Int64: taskID, Valid: true})
+		if err != nil {
+			log.Printf("Error reading notes: %s", err)
+			return nil
+		}
+		for _, note := range taskNotes {
+			taskNoteIDs = append(taskNoteIDs, note.ID)
+		}
+		// delete those notes
+		if highlightedNote != "" {
+			_, err := queries.DeleteNotes(ctx, taskNoteIDs)
+			if err != nil {
+				log.Printf("Error deleting notes: %s", err)
+				return nil
+			}
+		}
+		toDeleteTasks := make([]int64, len(selectedIDs))
 		for idx, id := range selectedIDs {
-			converted_id, err := strconv.Atoi(id)
+			converted_id, err := strconv.ParseInt(id, 10, 64)
 			if err != nil {
 				log.Printf("Error converting ID to int: %s", err)
 			}
-			task := data.Task{ID: converted_id}
-			err = task.Delete(conn)
-			if err != nil {
-				log.Printf("Error deleting task: %s", err)
-				return nil
-			}
-			deletedTasks[idx] = id
+			toDeleteTasks[idx] = converted_id
 		}
-		m.deleteMessage = fmt.Sprintf("You deleted these tasks:  IDs: %s", strings.Join(deletedTasks, ", "))
+		result, err := queries.DeleteTasks(ctx, toDeleteTasks)
+		if err != nil {
+			log.Printf("Error deleting tasks: %s", err)
+			return nil
+		}
+		if result != int64(len(selectedIDs)) {
+			log.Printf("Error deleting tasks - Mismatch between selectedIDs and numDeleted: %s", err)
+		}
+		m.deleteMessage = fmt.Sprintf("You deleted these tasks:  IDs: %s", strings.Join(selectedIDs, ", "))
 	}
 
 	// Requery the database and update the table model
