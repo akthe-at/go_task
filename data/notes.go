@@ -12,11 +12,11 @@ const (
 )
 
 type NoteTable struct {
-	NoteID    int
-	NoteTitle string
-	NotePath  string
-	LinkTitle string
-	ParentID  int
+	NoteID     int
+	NoteTitle  string
+	NotePath   string
+	LinkTitle  string
+	ParentType string
 }
 
 type NoteBridge struct {
@@ -165,7 +165,7 @@ func (n *Note) ReadAll(db *sql.DB, noteType NoteType) ([]NoteTable, error) {
 	var notes []NoteTable
 	for rows.Next() {
 		var note NoteTable
-		if err := rows.Scan(&note.NoteID, &note.NoteTitle, &note.NotePath, &note.LinkTitle, &note.ParentID); err != nil {
+		if err := rows.Scan(&note.NoteID, &note.NoteTitle, &note.NotePath, &note.LinkTitle, &note.ParentType); err != nil {
 			return nil, err
 		}
 		notes = append(notes, note)
