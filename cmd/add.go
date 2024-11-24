@@ -202,7 +202,7 @@ and usage of using your command. For example:
 
 		_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
 			NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
-			ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+			ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
 			ParentAreaID: sql.NullInt64{Int64: int64(projectID), Valid: true},
 		})
 		if err != nil {
