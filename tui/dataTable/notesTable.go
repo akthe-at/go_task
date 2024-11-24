@@ -1,6 +1,7 @@
 package datatable
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 
 	data "github.com/akthe-at/go_task/data"
 	db "github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/akthe-at/go_task/tui/formInput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,11 +18,11 @@ import (
 )
 
 const (
-	NoteColumnKeyID    = "id"
-	NoteColumnKey      = "title"
-	NoteColumnPath     = "path"
-	NoteColumnLink     = "task_title"
-	NoteColumnParentID = "parent_id"
+	NoteColumnKeyID      = "id"
+	NoteColumnKey        = "title"
+	NoteColumnPath       = "path"
+	NoteColumnLink       = "task_title"
+	NoteColumnParentType = "parent_type"
 )
 
 type NotesModel struct {
@@ -108,8 +110,16 @@ func (m *NotesModel) View() string {
 
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+t to switch to the Tasks View.") + "\n")
 
+	selectedIDs := []int64{}
+
 	for _, row := range m.tableModel.SelectedRows() {
-		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
+		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(int64))
+	}
+
+	// Convert selectedIDs to a slice of strings
+	selectedIDStrings := make([]string, len(selectedIDs))
+	for i, id := range selectedIDs {
+		selectedIDStrings[i] = strconv.FormatInt(id, 10)
 	}
 
 	body.WriteString(
@@ -136,6 +146,7 @@ func NotesView() NotesModel {
 		table.NewFlexColumn(NoteColumnKey, "Title", 1),
 		table.NewFlexColumn(NoteColumnPath, "Path", 3),
 		table.NewFlexColumn(NoteColumnLink, "Task", 1),
+		table.NewFlexColumn(NoteColumnParentType, "Note Type", 1),
 	}
 
 	model := NotesModel{}
