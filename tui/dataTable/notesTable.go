@@ -151,11 +151,11 @@ func NotesView() NotesModel {
 	}
 	for _, note := range notes {
 		newRow := table.NewRow(table.RowData{
-			NoteColumnKeyID:    note.NoteID,
-			NoteColumnKey:      note.NoteTitle,
-			NoteColumnPath:     note.NotePath,
-			NoteColumnLink:     note.LinkTitle,
-			NoteColumnParentID: note.ParentID,
+			NoteColumnKeyID:      note.ID,
+			NoteColumnKey:        note.Title,
+			NoteColumnPath:       note.Path,
+			NoteColumnLink:       note.AreaOrTaskTitle,
+			NoteColumnParentType: note.ParentType,
 		})
 		filteredRows = append(filteredRows, newRow)
 	}
@@ -279,11 +279,11 @@ func (m *NotesModel) loadRowsFromDatabase() ([]table.Row, error) {
 	}
 	for _, note := range notes {
 		newRow := table.NewRow(table.RowData{
-			NoteColumnKeyID:    note.NoteID,
-			NoteColumnKey:      note.NoteTitle,
-			NoteColumnPath:     note.NotePath,
-			NoteColumnLink:     note.LinkTitle,
-			NoteColumnParentID: note.ParentID,
+			NoteColumnKeyID:      note.NoteID,
+			NoteColumnKey:        note.NoteTitle,
+			NoteColumnPath:       note.NotePath,
+			NoteColumnLink:       note.LinkTitle,
+			NoteColumnParentType: note.ParentType,
 		})
 		filteredRows = append(filteredRows, newRow)
 	}

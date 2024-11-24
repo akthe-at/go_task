@@ -262,7 +262,7 @@ func (m *TaskModel) addNote() tea.Cmd {
 			log.Fatalf("Error creating note: %v", err)
 		}
 		id, err := queries.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
-			NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+			NoteID:       sql.NullInt64{Int64: int64(noteID), Valid: true},
 			ParentCat:    sql.NullInt64{Int64: int64(form.Type), Valid: true},
 			ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
 		},
@@ -502,11 +502,11 @@ func TaskViewModel() TaskModel {
 		log.Fatal(err)
 	}
 	for _, row := range rows {
-		archived, ok := row.Data[columnKeyArchived].(sql.NullBool)
+		archived, ok := row.Data[columnKeyArchived]
 		if !ok {
 			log.Printf("Error getting archived status from row: %s", err)
 		}
-		if !archived.Bool {
+		if archived == "false" {
 			filteredRows = append(filteredRows, row)
 		}
 	}
@@ -514,7 +514,6 @@ func TaskViewModel() TaskModel {
 	keys := table.DefaultKeyMap()
 	keys.RowDown.SetKeys("j", "down", "s")
 	keys.RowUp.SetKeys("k", "up", "w")
-	fmt.Println(filteredRows)
 
 	model.tableModel = table.New(columns).
 		WithRows(filteredRows).
