@@ -100,7 +100,7 @@ func (m NotesModel) calculateHeight() int {
 func (m *NotesModel) View() string {
 	body := strings.Builder{}
 
-	selectedIDs := []string{}
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+t to switch to the Tasks View.") + "\n")
 
 	for _, row := range m.tableModel.SelectedRows() {
 		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
@@ -120,11 +120,12 @@ func (m *NotesModel) View() string {
 }
 
 func NotesView() NotesModel {
+	theme := tui.GetSelectedTheme()
 	columns := []table.Column{
 		table.NewColumn(NoteColumnKeyID, "ID", 5).WithStyle(
 			lipgloss.NewStyle().
 				Faint(true).
-				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Secondary)).
+				Foreground(lipgloss.Color(theme.Secondary)).
 				Align(lipgloss.Center)),
 		table.NewFlexColumn(NoteColumnKey, "Title", 1),
 		table.NewFlexColumn(NoteColumnPath, "Path", 3),
@@ -161,7 +162,7 @@ func NotesView() NotesModel {
 
 	model.tableModel = table.New(columns).
 		WithRows(filteredRows).
-		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Accent)).Bold(true)).
+		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Accent)).Bold(true)).
 		SelectableRows(true).
 		Focused(true).
 		Border(customBorder).
@@ -171,13 +172,13 @@ func NotesView() NotesModel {
 		WithSelectedText(" ", " 󰄲  ").
 		WithBaseStyle(
 			lipgloss.NewStyle().
-				BorderForeground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)).
-				Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Success)).
+				BorderForeground(lipgloss.Color(theme.Primary)).
+				Foreground(lipgloss.Color(theme.Success)).
 				Align(lipgloss.Left),
 		).
 		SortByAsc(NoteColumnKeyID).
 		WithMissingDataIndicatorStyled(table.StyledCell{
-			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(tui.Themes.RosePineMoon.Primary)),
+			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)),
 			Data:  "<Missing Data>",
 		})
 
@@ -206,8 +207,6 @@ func (m *NotesModel) updateFooter() {
 func (m *NotesModel) addNote() tea.Cmd {
 	selectedIDs := []string{}
 
-	// FIXME: HERE
-	//
 	for _, row := range m.tableModel.SelectedRows() {
 		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
 	}
