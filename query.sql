@@ -64,12 +64,20 @@ INNER JOIN bridge_notes ON bridge_notes.note_id = notes.id
 INNER JOIN areas ON areas.ID = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2;
 
 
+-- name: ReadAllNotes :many
+SELECT notes.id, notes.title, notes.path, coalesce(tasks.title, areas.title) [area_or_task_title], case when bridge_notes.parent_cat = 1 then 'Task' else 'Area' end as [parent_type]
+FROM notes
+INNER JOIN bridge_notes ON bridge_notes.note_id = notes.id
+LEFT JOIN tasks ON tasks.ID = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
+LEFT JOIN areas ON areas.ID = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2;
+
+
 -- name: DeleteNote :one
 DELETE FROM notes WHERE id = ?
 returning *;
 
--- name: DeleteNotes :many
-DELETE FROM notes WHERE id IN (?)
+-- name: DeleteNotes :execresult
+DELETE FROM notes WHERE id in (sqlc.slice(ids))
 returning *;
 
 -- name: CreateArea :execlastid
@@ -142,33 +150,16 @@ AND bridge_notes.parent_cat = 1;
 	GROUP BY tasks.id;
 
 
--- name: DeleteTask :execresult
-DELETE FROM notes
-WHERE id IN (
-    SELECT note_id
-    FROM bridge_notes
-    WHERE parent_task_id = ? AND parent_cat = 1
-);
+-- name: DeleteTask :one
 DELETE FROM tasks
 WHERE id = ?
-AND NOT EXISTS (
-    SELECT 1
-    FROM bridge_notes
-    WHERE parent_task_id = ? AND parent_cat = 1
-);
+returning id;
 
--- name: DeleteTaskAndNotes :execresult
-DELETE FROM notes
-WHERE id IN (
-    SELECT note_id
-    FROM bridge_notes
-    WHERE parent_cat = 1 AND parent_task_id = ?
-)
-RETURNING *;
 
+-- name: DeleteTasks :execrows
 DELETE FROM tasks
-WHERE id = ?
-RETURNING *;
+WHERE id in (sqlc.slice(ids))
+;
 
 -- name: ReadAreas :many
 SELECT 

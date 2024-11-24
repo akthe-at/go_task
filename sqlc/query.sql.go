@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
 
 const createArea = `-- name: CreateArea :execlastid
@@ -173,59 +174,58 @@ func (q *Queries) DeleteNote(ctx context.Context, id int64) (Note, error) {
 	return i, err
 }
 
-const deleteNotes = `-- name: DeleteNotes :many
-DELETE FROM notes WHERE id IN (?)
+const deleteNotes = `-- name: DeleteNotes :execresult
+DELETE FROM notes WHERE id in (/*SLICE:ids*/?)
 returning id, title, path
 `
 
-func (q *Queries) DeleteNotes(ctx context.Context, id int64) ([]Note, error) {
-	rows, err := q.db.QueryContext(ctx, deleteNotes, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Note
-	for rows.Next() {
-		var i Note
-		if err := rows.Scan(&i.ID, &i.Title, &i.Path); err != nil {
-			return nil, err
+func (q *Queries) DeleteNotes(ctx context.Context, ids []int64) (sql.Result, error) {
+	query := deleteNotes
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
 		}
-		items = append(items, i)
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return q.db.ExecContext(ctx, query, queryParams...)
 }
 
-const deleteTask = `-- name: DeleteTask :execresult
-DELETE FROM notes
-WHERE id IN (
-    SELECT note_id
-    FROM bridge_notes
-    WHERE parent_task_id = ? AND parent_cat = 1
-)
+const deleteTask = `-- name: DeleteTask :one
+DELETE FROM tasks
+WHERE id = ?
+returning id
 `
 
-func (q *Queries) DeleteTask(ctx context.Context, parentTaskID sql.NullInt64) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteTask, parentTaskID)
+func (q *Queries) DeleteTask(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, deleteTask, id)
+	err := row.Scan(&id)
+	return id, err
 }
 
-const deleteTaskAndNotes = `-- name: DeleteTaskAndNotes :execresult
-DELETE FROM notes
-WHERE id IN (
-    SELECT note_id
-    FROM bridge_notes
-    WHERE parent_cat = 1 AND parent_task_id = ?
-)
-RETURNING id, title, path
+const deleteTasks = `-- name: DeleteTasks :execrows
+DELETE FROM tasks
+WHERE id in (/*SLICE:ids*/?)
 `
 
-func (q *Queries) DeleteTaskAndNotes(ctx context.Context, parentTaskID sql.NullInt64) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteTaskAndNotes, parentTaskID)
+func (q *Queries) DeleteTasks(ctx context.Context, ids []int64) (int64, error) {
+	query := deleteTasks
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const readAllAreaNotes = `-- name: ReadAllAreaNotes :many
@@ -258,6 +258,51 @@ func (q *Queries) ReadAllAreaNotes(ctx context.Context) ([]ReadAllAreaNotesRow, 
 			&i.Path,
 			&i.AreaTitle,
 			&i.ParentID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const readAllNotes = `-- name: ReadAllNotes :many
+SELECT notes.id, notes.title, notes.path, coalesce(tasks.title, areas.title) [area_or_task_title], case when bridge_notes.parent_cat = 1 then 'Task' else 'Area' end as [parent_type]
+FROM notes
+INNER JOIN bridge_notes ON bridge_notes.note_id = notes.id
+LEFT JOIN tasks ON tasks.ID = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
+LEFT JOIN areas ON areas.ID = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2
+`
+
+type ReadAllNotesRow struct {
+	ID              int64
+	Title           string
+	Path            string
+	AreaOrTaskTitle string
+	ParentType      string
+}
+
+func (q *Queries) ReadAllNotes(ctx context.Context) ([]ReadAllNotesRow, error) {
+	rows, err := q.db.QueryContext(ctx, readAllNotes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadAllNotesRow
+	for rows.Next() {
+		var i ReadAllNotesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Path,
+			&i.AreaOrTaskTitle,
+			&i.ParentType,
 		); err != nil {
 			return nil, err
 		}
@@ -407,6 +452,8 @@ func (q *Queries) ReadArea(ctx context.Context, id int64) (ReadAreaRow, error) {
 }
 
 const readAreas = `-- name: ReadAreas :many
+;
+
 SELECT 
     areas.id, areas.title, areas.status, areas.archived,
     IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles
