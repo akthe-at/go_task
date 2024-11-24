@@ -32,6 +32,8 @@ type NotesModel struct {
 	verticalMargin   int
 }
 
+type SwitchToPreviousViewMsg struct{}
+
 func (m *NotesModel) Init() tea.Cmd { return nil }
 
 func (m *NotesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -78,6 +80,10 @@ func (m *NotesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.totalHeight = msg.Height
 
 		m.recalculateTable()
+	case SwitchToPreviousViewMsg:
+		m.recalculateTable()
+	default:
+		return m, nil
 	}
 
 	return m, tea.Batch(cmds...)
@@ -109,9 +115,9 @@ func (m *NotesModel) View() string {
 	body.WriteString(
 		lipgloss.NewStyle().
 			Foreground(lipgloss.Color(
-				tui.Themes.RosePineMoon.Primary)).
+				theme.Primary)).
 			Render(
-				fmt.Sprintf("Selected IDs: %s", strings.Join(selectedIDs, ", "))) + "\n")
+				fmt.Sprintf("Selected IDs: %s", strings.Join(selectedIDStrings, ", "))) + "\n")
 
 	body.WriteString(m.tableModel.View())
 	body.WriteString("\n")
@@ -134,8 +140,6 @@ func NotesView() NotesModel {
 
 	model := NotesModel{}
 	var filteredRows []table.Row
-	// I think I could embed a Notes struct into the NotesModel struct, then use that to query some data?
-
 	conn, err := db.ConnectDB()
 	if err != nil {
 		panic("")
