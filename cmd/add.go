@@ -167,7 +167,7 @@ and usage of using your command. For example:
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 3 {
-			log.Fatalf("You must provide at least 3 arguments! Usage: add project note <note_id> <note_title> <note_path>")
+			log.Fatalf("You must provide at least 3 arguments! Usage: add project note <project_id> <note_title> <note_path>")
 		}
 
 		projectID, err := strconv.Atoi(args[0])
