@@ -12,11 +12,6 @@ const (
 	TasksTableView
 )
 
-var (
-	subtle    = lipgloss.AdaptiveColor{Light: "#d9dccf", Dark: "#383838"}
-	highlight = lipgloss.AdaptiveColor{Light: "#874bfd", Dark: "#7d56f4"}
-	special   = lipgloss.AdaptiveColor{Light: "#43bf6d", Dark: "#73f59f"}
-)
 
 type SwitchToTasksTableViewMsg struct{}
 
