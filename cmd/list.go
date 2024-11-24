@@ -421,3 +421,52 @@ func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
 		Rows([][]string{row}...)
 	return &t
 }
+
+func styleAllNotesTable(notes []sqlc.ReadAllNotesRow) *table.Table {
+	theme := tui.GetSelectedTheme()
+	re := lipgloss.NewRenderer(os.Stdout)
+	var (
+		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
+		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
+		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
+		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
+	)
+
+	var rows [][]string
+	for _, note := range notes {
+		row := []string{
+			fmt.Sprintf("%d", note.ID),
+			note.Title,
+			note.Path,
+			note.AreaOrTaskTitle,
+			note.ParentType,
+		}
+		rows = append(rows, row)
+	}
+	t := *table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			var style lipgloss.Style
+			switch {
+			case row == table.HeaderRow:
+				style = HeaderStyle
+			case row%2 == 0:
+				style = EvenRowStyle
+			default:
+				style = OddRowStyle
+			}
+
+			if col == 0 {
+				style = style.Width(5)
+			}
+
+			if col == 1 {
+				style = style.Width(15)
+			}
+			return style
+		}).
+		Headers("ID", "Title", "Path", "Area/Task", "Parent ID").
+		Rows(rows...)
+	return &t
+}
