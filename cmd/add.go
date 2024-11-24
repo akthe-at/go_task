@@ -208,9 +208,12 @@ and usage of using your command. For example:
 		if err != nil {
 			log.Fatalf("addProjectNoteCmd: Error creating task bridge note: %v", err)
 		}
-		tx.Commit()
-
-		fmt.Println("Note added to task successfully")
+		err = tx.Commit()
+		if err != nil {
+			fmt.Printf("addProjectNoteCmd: Error committing transaction: %v", err)
+		} else {
+			fmt.Println("Note added to Area/Project successfully")
+		}
 	},
 }
 
