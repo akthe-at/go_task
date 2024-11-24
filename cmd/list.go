@@ -143,6 +143,31 @@ var taskNotesCmd = &cobra.Command{
 	},
 }
 
+var allNotesCmd = &cobra.Command{
+	Use:   "notes",
+	Short: "List All Notes",
+	Long: `Use this command to get a list of all notes, regardless of note type.
+	To use this command just type list notes`,
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
+
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Errorf("There was an error connecting to the database: %v", err)
+		}
+		defer conn.Close()
+
+		queries := sqlc.New(conn)
+		allNotes, err := queries.ReadAllNotes(ctx)
+		if err != nil {
+			log.Errorf("There was an error reading the notes the database: %v", err)
+		}
+
+		table := styleAllNotesTable(allNotes)
+		fmt.Println(table)
+	},
+}
+
 var projectsCmd = &cobra.Command{
 	Use:   "projects",
 	Short: "List your projects/areas",
@@ -173,6 +198,7 @@ func init() {
 	listCmd.AddCommand(tasksCmd)
 	listCmd.AddCommand(projectsCmd)
 	listCmd.AddCommand(taskCmd)
+	listCmd.AddCommand(allNotesCmd)
 	taskCmd.AddCommand(taskNotesCmd)
 
 	// Here you will define your flags and configuration settings.
