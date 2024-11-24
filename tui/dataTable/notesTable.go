@@ -172,7 +172,7 @@ func NotesView() NotesModel {
 		Border(customBorder).
 		WithKeyMap(keys).
 		WithStaticFooter("Footer!").
-		WithPageSize(10).
+		WithPageSize(50).
 		WithSelectedText(" ", " 󰄲  ").
 		WithBaseStyle(
 			lipgloss.NewStyle().
