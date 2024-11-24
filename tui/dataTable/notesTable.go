@@ -54,7 +54,7 @@ func (m *NotesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "esc", "q":
 			cmds = append(cmds, tea.Quit)
-		case "A":
+		case "N":
 			cmds = append(cmds, m.addNote())
 		case "left":
 			if m.calculateWidth() > minWidth {
@@ -151,16 +151,19 @@ func NotesView() NotesModel {
 
 	model := NotesModel{}
 	var filteredRows []table.Row
+	ctx := context.Background()
 	conn, err := db.ConnectDB()
 	if err != nil {
-		panic("")
+		log.Panic(fmt.Sprintf("Notes View: There was an error connecting to the database: %v", err))
 	}
 	defer conn.Close()
-	notes, err := model.Note.ReadAll(conn, data.TaskNoteType)
+
+	queries := sqlc.New(conn)
+	allNotes, err := queries.ReadAllNotes(ctx)
 	if err != nil {
 		log.Fatalf("NewNotesModel: Error connecting to database: %v", err)
 	}
-	for _, note := range notes {
+	for _, note := range allNotes {
 		newRow := table.NewRow(table.RowData{
 			NoteColumnKeyID:      note.ID,
 			NoteColumnKey:        note.Title,
@@ -300,4 +303,49 @@ func (m *NotesModel) loadRowsFromDatabase() ([]table.Row, error) {
 	}
 
 	return filteredRows, nil
+}
+
+func (m *NotesModel) deleteNote() tea.Cmd {
+	ctx := context.Background()
+	selectedIDs := []int64{}
+
+	for _, row := range m.tableModel.SelectedRows() {
+		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(int64))
+	}
+	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int)
+
+	conn, err := db.ConnectDB()
+	if err != nil {
+		log.Printf("Error connecting to database: %s", err)
+		return nil
+	}
+	defer conn.Close()
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) == 1 {
+		_, err := queries.DeleteNote(ctx, int64(taskID))
+		if err != nil {
+			log.Printf("Error deleting task: %s", err)
+			return nil
+		}
+		// m.deleteMessage = fmt.Sprintf("You deleted this task:  IDs: %s", deletedNote.ID)
+	} else if len(selectedIDs) > 1 {
+		_, err := queries.DeleteNotes(ctx, selectedIDs)
+		if err != nil {
+			log.Printf("Error deleting tasks: %s", err)
+			return nil
+		}
+
+	}
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		log.Printf("Error loading rows from database: %s", err)
+		return nil
+	}
+	m.tableModel = m.tableModel.WithRows(rows)
+
+	// Update the footer
+	m.updateFooter()
+
+	return nil
 }
