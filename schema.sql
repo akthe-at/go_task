@@ -4,7 +4,9 @@ CREATE TABLE IF NOT EXISTS areas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     status TEXT,
-    archived BOOLEAN
+    archived BOOLEAN NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
+    last_mod TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -12,13 +14,27 @@ CREATE TABLE IF NOT EXISTS tasks (
     title TEXT NOT NULL,
     priority TEXT,
     status TEXT,
-    archived BOOLEAN,
-    created_at DATETIME,
-    last_mod DATETIME,
-    due_date DATETIME,
+    archived BOOLEAN NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
+    last_mod TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
+    due_date TEXT,
     area_id INTEGER,
     FOREIGN KEY(area_id) REFERENCES areas(id) ON DELETE SET NULL ON UPDATE CASCADE
 );
+
+CREATE TRIGGER update_last_mod_tasks
+BEFORE UPDATE ON tasks
+FOR EACH ROW
+BEGIN
+    UPDATE tasks SET last_mod = (datetime(current_timestamp, 'localtime')) WHERE id = OLD.id;
+END;
+
+CREATE TRIGGER update_last_mod_areas
+BEFORE UPDATE ON areas
+FOR EACH ROW
+BEGIN
+    UPDATE areas SET last_mod = (datetime(current_timestamp, 'localtime')) WHERE id = OLD.id;
+END;
 
 CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

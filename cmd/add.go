@@ -37,6 +37,7 @@ var addTaskCmd = &cobra.Command{
 and usage of using your command. For example:
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		form := &formInput.NewTaskForm{}
 
 		err := form.NewTaskForm()
@@ -52,16 +53,16 @@ and usage of using your command. For example:
 			}
 			defer conn.Close()
 
-			newTask := data.Task{
+			queries := sqlc.New(conn)
+			result, err := queries.CreateTask(ctx, sqlc.CreateTaskParams{
 				Title:    form.TaskTitle,
-				Priority: form.Priority,
-				Status:   form.Status,
-				Archived: form.Archived,
-			}
-			err = newTask.Create(conn)
+				Priority: sql.NullString{String: string(form.Priority)},
+				Status:   sql.NullString{String: string(form.Status)},
+			})
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
 			}
+			fmt.Println("The Result was: ", result)
 		}
 	},
 }
@@ -93,7 +94,7 @@ and usage of using your command. For example:
 			_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
 				Title:    form.AreaTitle,
 				Status:   sql.NullString{String: string(form.Status), Valid: true},
-				Archived: sql.NullBool{Bool: form.Archived, Valid: true},
+				Archived: form.Archived,
 			})
 			if err != nil {
 				log.Fatalf("AddProjectCmd: Error creating task: %v", err)

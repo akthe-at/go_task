@@ -9,18 +9,19 @@ import (
 	"context"
 	"database/sql"
 	"strings"
+	"time"
 )
 
 const createArea = `-- name: CreateArea :execlastid
 INSERT INTO areas (title, status, archived)
 VALUES (?, ?, ?)
-returning id, title, status, archived
+returning id, title, status, archived, created_at, last_mod
 `
 
 type CreateAreaParams struct {
-	Title    string
-	Status   sql.NullString
-	Archived sql.NullBool
+	Title    string         `json:"title"`
+	Status   sql.NullString `json:"status"`
+	Archived bool           `json:"archived"`
 }
 
 func (q *Queries) CreateArea(ctx context.Context, arg CreateAreaParams) (int64, error) {
@@ -36,9 +37,9 @@ INSERT INTO bridge_notes (note_id, parent_cat, parent_area_id) VALUES (?, ?, ?)
 `
 
 type CreateAreaBridgeNoteParams struct {
-	NoteID       sql.NullInt64
-	ParentCat    sql.NullInt64
-	ParentAreaID sql.NullInt64
+	NoteID       sql.NullInt64 `json:"note_id"`
+	ParentCat    sql.NullInt64 `json:"parent_cat"`
+	ParentAreaID sql.NullInt64 `json:"parent_area_id"`
 }
 
 func (q *Queries) CreateAreaBridgeNote(ctx context.Context, arg CreateAreaBridgeNoteParams) (int64, error) {
@@ -55,8 +56,8 @@ returning id
 `
 
 type CreateNoteParams struct {
-	Title string
-	Path  string
+	Title string `json:"title"`
+	Path  string `json:"path"`
 }
 
 func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (int64, error) {
@@ -68,19 +69,24 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (int64, 
 }
 
 const createTask = `-- name: CreateTask :execlastid
-INSERT INTO tasks (title, priority, status, archived, created_at, last_mod, due_date)
-VALUES (?, ?, ?, ?, ?, ?, ?)
-returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id
+INSERT INTO tasks (
+    title, priority, status, archived, due_date,
+    created_at, last_mod
+)
+VALUES (
+    ?, ?, ?, ?, ?,
+    datetime(current_timestamp, 'localtime'),
+    datetime(current_timestamp, 'localtime')
+)
+returning id
 `
 
 type CreateTaskParams struct {
-	Title     string
-	Priority  sql.NullString
-	Status    sql.NullString
-	Archived  sql.NullBool
-	CreatedAt sql.NullTime
-	LastMod   sql.NullTime
-	DueDate   sql.NullTime
+	Title    string         `json:"title"`
+	Priority sql.NullString `json:"priority"`
+	Status   sql.NullString `json:"status"`
+	Archived bool           `json:"archived"`
+	DueDate  sql.NullTime   `json:"due_date"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error) {
@@ -89,8 +95,6 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.Priority,
 		arg.Status,
 		arg.Archived,
-		arg.CreatedAt,
-		arg.LastMod,
 		arg.DueDate,
 	)
 	if err != nil {
@@ -104,9 +108,9 @@ INSERT INTO bridge_notes (note_id, parent_cat, parent_task_id) VALUES (?, ?, ?)
 `
 
 type CreateTaskBridgeNoteParams struct {
-	NoteID       sql.NullInt64
-	ParentCat    sql.NullInt64
-	ParentTaskID sql.NullInt64
+	NoteID       sql.NullInt64 `json:"note_id"`
+	ParentCat    sql.NullInt64 `json:"parent_cat"`
+	ParentTaskID sql.NullInt64 `json:"parent_task_id"`
 }
 
 func (q *Queries) CreateTaskBridgeNote(ctx context.Context, arg CreateTaskBridgeNoteParams) (int64, error) {
@@ -155,7 +159,7 @@ const deleteMultipleAreas = `-- name: DeleteMultipleAreas :execresult
 ;
 
 DELETE FROM areas WHERE id IN (?)
-returning id, title, status, archived
+returning id, title, status, archived, created_at, last_mod
 `
 
 func (q *Queries) DeleteMultipleAreas(ctx context.Context, id int64) (sql.Result, error) {
@@ -236,11 +240,11 @@ INNER JOIN areas ON areas.ID = bridge_notes.parent_area_id AND bridge_notes.pare
 `
 
 type ReadAllAreaNotesRow struct {
-	ID        int64
-	Title     string
-	Path      string
-	AreaTitle string
-	ParentID  int64
+	ID        int64  `json:"id"`
+	Title     string `json:"title"`
+	Path      string `json:"path"`
+	AreaTitle string `json:"area_title"`
+	ParentID  int64  `json:"parent_id"`
 }
 
 func (q *Queries) ReadAllAreaNotes(ctx context.Context) ([]ReadAllAreaNotesRow, error) {
@@ -281,11 +285,11 @@ LEFT JOIN areas ON areas.ID = bridge_notes.parent_area_id AND bridge_notes.paren
 `
 
 type ReadAllNotesRow struct {
-	ID              int64
-	Title           string
-	Path            string
-	AreaOrTaskTitle string
-	ParentType      string
+	ID              int64  `json:"id"`
+	Title           string `json:"title"`
+	Path            string `json:"path"`
+	AreaOrTaskTitle string `json:"[area_or_task_title]"`
+	ParentType      string `json:"[parent_type]"`
 }
 
 func (q *Queries) ReadAllNotes(ctx context.Context) ([]ReadAllNotesRow, error) {
@@ -325,11 +329,11 @@ INNER JOIN tasks ON tasks.ID = bridge_notes.parent_task_id AND bridge_notes.pare
 `
 
 type ReadAllTaskNotesRow struct {
-	ID        int64
-	Title     string
-	Path      string
-	TaskTitle string
-	ParentID  int64
+	ID        int64  `json:"id"`
+	Title     string `json:"title"`
+	Path      string `json:"path"`
+	TaskTitle string `json:"task_title"`
+	ParentID  int64  `json:"parent_id"`
 }
 
 func (q *Queries) ReadAllTaskNotes(ctx context.Context) ([]ReadAllTaskNotesRow, error) {
@@ -372,13 +376,13 @@ const readAllTasks = `-- name: ReadAllTasks :many
 `
 
 type ReadAllTasksRow struct {
-	ID         int64
-	Title      string
-	Priority   sql.NullString
-	Status     sql.NullString
-	Archived   sql.NullBool
-	AgeInDays  float64
-	NoteTitles interface{}
+	ID         int64          `json:"id"`
+	Title      string         `json:"title"`
+	Priority   sql.NullString `json:"priority"`
+	Status     sql.NullString `json:"status"`
+	Archived   bool           `json:"archived"`
+	AgeInDays  float64        `json:"age_in_days"`
+	NoteTitles interface{}    `json:"note_titles"`
 }
 
 func (q *Queries) ReadAllTasks(ctx context.Context) ([]ReadAllTasksRow, error) {
@@ -427,13 +431,13 @@ WHERE
 `
 
 type ReadAreaRow struct {
-	ID       int64
-	Title    string
-	Status   sql.NullString
-	Archived sql.NullBool
-	ID_2     sql.NullInt64
-	Title_2  sql.NullString
-	Path     sql.NullString
+	ID       int64          `json:"id"`
+	Title    string         `json:"title"`
+	Status   sql.NullString `json:"status"`
+	Archived bool           `json:"archived"`
+	ID_2     sql.NullInt64  `json:"id_2"`
+	Title_2  sql.NullString `json:"title_2"`
+	Path     sql.NullString `json:"path"`
 }
 
 func (q *Queries) ReadArea(ctx context.Context, id int64) (ReadAreaRow, error) {
@@ -468,11 +472,11 @@ GROUP BY
 `
 
 type ReadAreasRow struct {
-	ID         int64
-	Title      string
-	Status     sql.NullString
-	Archived   sql.NullBool
-	NoteTitles interface{}
+	ID         int64          `json:"id"`
+	Title      string         `json:"title"`
+	Status     sql.NullString `json:"status"`
+	Archived   bool           `json:"archived"`
+	NoteTitles interface{}    `json:"note_titles"`
 }
 
 func (q *Queries) ReadAreas(ctx context.Context) ([]ReadAreasRow, error) {
@@ -512,9 +516,9 @@ WHERE bridge_notes.note_id = ?
 `
 
 type ReadNoteRow struct {
-	ID    int64
-	Title string
-	Type  sql.NullInt64
+	ID    int64         `json:"id"`
+	Title string        `json:"title"`
+	Type  sql.NullInt64 `json:"type"`
 }
 
 func (q *Queries) ReadNote(ctx context.Context, noteID sql.NullInt64) ([]ReadNoteRow, error) {
@@ -548,10 +552,10 @@ WHERE notes.id = ?
 `
 
 type ReadNoteByIDRow struct {
-	ID    int64
-	Title string
-	Path  string
-	Type  sql.NullInt64
+	ID    int64         `json:"id"`
+	Title string        `json:"title"`
+	Path  string        `json:"path"`
+	Type  sql.NullInt64 `json:"type"`
 }
 
 func (q *Queries) ReadNoteByID(ctx context.Context, id int64) (ReadNoteByIDRow, error) {
@@ -589,16 +593,16 @@ WHERE
 `
 
 type ReadTaskRow struct {
-	TaskID    int64
-	TaskTitle string
-	Priority  sql.NullString
-	Status    sql.NullString
-	Archived  sql.NullBool
-	CreatedAt sql.NullTime
-	LastMod   sql.NullTime
-	AgeInDays float64
-	DueDate   sql.NullTime
-	NoteTitle interface{}
+	TaskID    int64          `json:"task_id"`
+	TaskTitle string         `json:"task_title"`
+	Priority  sql.NullString `json:"priority"`
+	Status    sql.NullString `json:"status"`
+	Archived  bool           `json:"archived"`
+	CreatedAt time.Time      `json:"created_at"`
+	LastMod   time.Time      `json:"last_mod"`
+	AgeInDays float64        `json:"age_in_days"`
+	DueDate   sql.NullTime   `json:"due_date"`
+	NoteTitle interface{}    `json:"note_title"`
 }
 
 func (q *Queries) ReadTask(ctx context.Context, id int64) (ReadTaskRow, error) {
@@ -628,10 +632,10 @@ AND bridge_notes.parent_cat = 1
 `
 
 type ReadTaskNoteRow struct {
-	ID    int64
-	Title string
-	Path  string
-	Type  sql.NullInt64
+	ID    int64         `json:"id"`
+	Title string        `json:"title"`
+	Path  string        `json:"path"`
+	Type  sql.NullInt64 `json:"type"`
 }
 
 func (q *Queries) ReadTaskNote(ctx context.Context, parentTaskID sql.NullInt64) ([]ReadTaskNoteRow, error) {
@@ -673,13 +677,13 @@ GROUP BY tasks.id
 `
 
 type ReadTasksRow struct {
-	ID         int64
-	Title      string
-	Priority   sql.NullString
-	Status     sql.NullString
-	Archived   sql.NullBool
-	AgeInDays  float64
-	NoteTitles interface{}
+	ID         int64          `json:"id"`
+	Title      string         `json:"title"`
+	Priority   sql.NullString `json:"priority"`
+	Status     sql.NullString `json:"status"`
+	Archived   bool           `json:"archived"`
+	AgeInDays  float64        `json:"age_in_days"`
+	NoteTitles interface{}    `json:"note_titles"`
 }
 
 func (q *Queries) ReadTasks(ctx context.Context) ([]ReadTasksRow, error) {

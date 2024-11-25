@@ -129,9 +129,16 @@ DELETE FROM areas WHERE id IN (?)
 returning *;
 
 -- name: CreateTask :execlastid
-INSERT INTO tasks (title, priority, status, archived, created_at, last_mod, due_date)
-VALUES (?, ?, ?, ?, ?, ?, ?)
-returning *;
+INSERT INTO tasks (
+    title, priority, status, archived, due_date,
+    created_at, last_mod
+)
+VALUES (
+    ?, ?, ?, ?, ?,
+    datetime(current_timestamp, 'localtime'),
+    datetime(current_timestamp, 'localtime')
+)
+returning id;
 
 -- name: ReadTaskNote :many
 SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type

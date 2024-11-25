@@ -7,3 +7,15 @@ sql:
       go:
         package: "sqlc"
         out: "sqlc"
+        emit_json_tags: true
+        overrides:
+          - column: "tasks.created_at"
+            go_type: "time.Time"
+          - column: "tasks.last_mod"
+            go_type: "time.Time"
+          - column: "tasks.due_date"
+            go_type: "database/sql.NullTime"
+          - column: "areas.created_at"
+            go_type: "time.Time"
+          - column: "areas.last_mod"
+            go_type: "time.Time"
