@@ -15,7 +15,7 @@ import (
 const createArea = `-- name: CreateArea :execlastid
 INSERT INTO areas (title, status, archived)
 VALUES (?, ?, ?)
-returning id, title, status, archived, created_at, last_mod
+returning id
 `
 
 type CreateAreaParams struct {
