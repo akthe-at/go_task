@@ -147,6 +147,14 @@ INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
 WHERE bridge_notes.parent_task_id = ? 
 AND bridge_notes.parent_cat = 1;
 
+
+-- name: ReadTaskNotes :execrows
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_task_id in (sqlc.slice(ids))
+AND bridge_notes.parent_cat = 1;
+
 -- name: ReadAllTasks :many
 	SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived,
     ROUND((julianday('now') - julianday(tasks.created_at)),2) AS age_in_days,

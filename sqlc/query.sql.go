@@ -666,6 +666,32 @@ func (q *Queries) ReadTaskNote(ctx context.Context, parentTaskID sql.NullInt64) 
 	return items, nil
 }
 
+const readTaskNotes = `-- name: ReadTaskNotes :execrows
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_task_id in (/*SLICE:ids*/?)
+AND bridge_notes.parent_cat = 1
+`
+
+func (q *Queries) ReadTaskNotes(ctx context.Context, ids []sql.NullInt64) (int64, error) {
+	query := readTaskNotes
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const readTasks = `-- name: ReadTasks :many
 SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
