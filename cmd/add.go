@@ -15,7 +15,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var rawFlag bool
+var (
+	rawFlag  bool
+	Archived bool
+)
 
 // addCmd Used for adding new tasks, projects, notes, etc.
 var addCmd = &cobra.Command{
@@ -35,9 +38,14 @@ to quickly create a Cobra application.`,
 // addTaskCmd represents the new command
 var addTaskCmd = &cobra.Command{
 	Use:   "task",
-	Short: "Creates a new task with a form",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Creates a new task with a form (or optionally raw string input)",
+	Long: `
+	Form Example: 'go_task add task' and follow the prompts.
+	Raw Example: 'go_task add task <task_title> <task_priority> <task_status>'
+	Valid task priorities: low, medium, high, urgent
+	Valid task statuses: todo, planning, doing, done
+	You can also optionally provided an archived status for the task using the --archived flag.
+
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
@@ -58,12 +66,15 @@ and usage of using your command. For example:
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
-			queries := sqlc.New(conn)
-			result, err := queries.CreateTask(ctx, sqlc.CreateTaskParams{
+			theTask := sqlc.CreateTaskParams{
 				Title:    args[0],
 				Priority: sql.NullString{String: string(priority), Valid: true},
 				Status:   sql.NullString{String: string(status), Valid: true},
-			})
+				Archived: Archived,
+			}
+
+			queries := sqlc.New(conn)
+			result, err := queries.CreateTask(ctx, theTask)
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
 			}
@@ -88,8 +99,8 @@ and usage of using your command. For example:
 				queries := sqlc.New(conn)
 				result, err := queries.CreateTask(ctx, sqlc.CreateTaskParams{
 					Title:    form.TaskTitle,
-					Priority: sql.NullString{String: string(form.Priority)},
-					Status:   sql.NullString{String: string(form.Status)},
+					Priority: sql.NullString{String: string(form.Priority), Valid: true},
+					Status:   sql.NullString{String: string(form.Status), Valid: true},
 				})
 				if err != nil {
 					log.Fatalf("Error creating task: %v", err)
@@ -262,6 +273,7 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.
 	addCmd.PersistentFlags().BoolVarP(&rawFlag, "raw", "r", false, "Bypass using the form and use raw input instead")
+	addCmd.PersistentFlags().BoolVar(&Archived, "archived", false, "Archive the task or project upon creation")
 	// newCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
