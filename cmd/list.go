@@ -23,12 +23,12 @@ package cmd
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
@@ -119,6 +119,7 @@ var taskNotesCmd = &cobra.Command{
 	Long: `Use this command to get a list of associated task notes.
 	Simply supply the ID listed next to the task in "list tasks"`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		var taskID int
 
 		conn, err := db.ConnectDB()
@@ -127,18 +128,20 @@ var taskNotesCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
+		queries := sqlc.New(conn)
 		taskID, err = strconv.Atoi(args[0])
 		if err != nil {
 			log.Errorf("There was an error converting the task ID to an integer: %v", err)
 		}
 
-		note := data.Note{ID: taskID}
-		notes, err := note.ReadAll(conn, data.TaskNoteType)
+		results, err := queries.ReadTaskNote(ctx,
+			sql.NullInt64{Int64: int64(taskID)},
+		)
 		if err != nil {
 			log.Errorf("There was an error reading the areas/projects from the database: %v", err)
 		}
 
-		table := styleTaskNotesTable(notes)
+		table := styleTaskNotesTable(results)
 		fmt.Println(table)
 	},
 }
@@ -326,7 +329,7 @@ func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
 	return &t
 }
 
-func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
+func styleTaskNotesTable(notesList []sqlc.ReadTaskNoteRow) *table.Table {
 	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
@@ -339,9 +342,9 @@ func styleTaskNotesTable(notesList []data.NoteTable) *table.Table {
 	var rows [][]string
 	for _, note := range notesList {
 		row := []string{
-			fmt.Sprintf("%d", note.NoteID),
-			note.NoteTitle,
-			note.NotePath,
+			fmt.Sprintf("%d", note.ID),
+			note.Title,
+			note.Path,
 		}
 		rows = append(rows, row)
 	}
