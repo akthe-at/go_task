@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -13,6 +14,8 @@ import (
 	"github.com/akthe-at/go_task/tui/formInput"
 	"github.com/spf13/cobra"
 )
+
+var rawFlag bool
 
 // addCmd Used for adding new tasks, projects, notes, etc.
 var addCmd = &cobra.Command{
@@ -38,31 +41,61 @@ and usage of using your command. For example:
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		form := &formInput.NewTaskForm{}
-
-		err := form.NewTaskForm()
-		if err != nil {
-			log.Fatalf("Error creating form: %v", err)
-		}
-
-		if form.Submit {
-
+		if rawFlag {
 			conn, err := db.ConnectDB()
 			if err != nil {
 				log.Fatalf("Error connecting to database: %v", err)
 			}
 			defer conn.Close()
 
+			priority, err := mapToPriorityType(args[1])
+			if err != nil {
+				log.Fatalf("Invalid priority type: %v", err)
+			}
+
+			status, err := mapToStatusType(args[2])
+			if err != nil {
+				log.Fatalf("Invalid status type: %v", err)
+			}
+
 			queries := sqlc.New(conn)
 			result, err := queries.CreateTask(ctx, sqlc.CreateTaskParams{
-				Title:    form.TaskTitle,
-				Priority: sql.NullString{String: string(form.Priority)},
-				Status:   sql.NullString{String: string(form.Status)},
+				Title:    args[0],
+				Priority: sql.NullString{String: string(priority), Valid: true},
+				Status:   sql.NullString{String: string(status), Valid: true},
 			})
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
 			}
 			fmt.Println("The Result was: ", result)
+
+		} else {
+			form := &formInput.NewTaskForm{}
+
+			err := form.NewTaskForm()
+			if err != nil {
+				log.Fatalf("Error creating form: %v", err)
+			}
+
+			if form.Submit {
+
+				conn, err := db.ConnectDB()
+				if err != nil {
+					log.Fatalf("Error connecting to database: %v", err)
+				}
+				defer conn.Close()
+
+				queries := sqlc.New(conn)
+				result, err := queries.CreateTask(ctx, sqlc.CreateTaskParams{
+					Title:    form.TaskTitle,
+					Priority: sql.NullString{String: string(form.Priority)},
+					Status:   sql.NullString{String: string(form.Status)},
+				})
+				if err != nil {
+					log.Fatalf("Error creating task: %v", err)
+				}
+				fmt.Println("The Result was: ", result)
+			}
 		}
 	},
 }
@@ -227,10 +260,41 @@ func init() {
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
+	// and all subcommands, e.g.
+	addCmd.PersistentFlags().BoolVarP(&rawFlag, "raw", "r", false, "Bypass using the form and use raw input instead")
 	// newCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// newCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func mapToPriorityType(input string) (data.PriorityType, error) {
+	switch input {
+	case "low":
+		return data.PriorityTypeLow, nil
+	case "medium":
+		return data.PriorityTypeMedium, nil
+	case "high":
+		return data.PriorityTypeHigh, nil
+	case "urgent":
+		return data.PriorityTypeUrgent, nil
+	default:
+		return "", errors.New("invalid priority type")
+	}
+}
+
+func mapToStatusType(input string) (data.StatusType, error) {
+	switch input {
+	case "todo":
+		return data.StatusToDo, nil
+	case "planning":
+		return data.StatusPlanning, nil
+	case "doing":
+		return data.StatusDoing, nil
+	case "done":
+		return data.StatusDone, nil
+	default:
+		return "", errors.New("invalid status type")
+	}
 }
