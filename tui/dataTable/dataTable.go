@@ -156,7 +156,7 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 			columnKeyTask:     task.Title,
 			columnKeyPriority: task.Priority.String,
 			columnKeyStatus:   task.Status.String,
-			columnKeyArchived: task.Archived,
+			columnKeyArchived: fmt.Sprintf("%t", task.Archived),
 			columnKeyTaskAge:  task.AgeInDays,
 			columnKeyNotes:    task.NoteTitles,
 		})
@@ -168,11 +168,7 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 func (m *TaskModel) filterArchives() tea.Cmd {
 	var filteredRows []table.Row
 	// toggle m.archiveFilter from current status
-	if m.archiveFilter {
-		m.archiveFilter = false
-	} else {
-		m.archiveFilter = true
-	}
+	m.archiveFilter = !m.archiveFilter
 
 	if m.archiveFilter {
 
@@ -497,10 +493,20 @@ func TaskViewModel() TaskModel {
 		table.NewFlexColumn(columnKeyNotes, "Notes", 3),
 	}
 
-	model := TaskModel{archiveFilter: false}
+	model := TaskModel{archiveFilter: true}
+	var filteredRows []table.Row
 	rows, err := model.loadRowsFromDatabase()
 	if err != nil {
 		log.Fatal(err)
+	}
+	for _, row := range rows {
+		archived, ok := row.Data[columnKeyArchived]
+		if !ok {
+			log.Printf("Error getting archived status from row: %s", err)
+		}
+		if archived == "false" {
+			filteredRows = append(filteredRows, row)
+		}
 	}
 
 	keys := table.DefaultKeyMap()
@@ -508,7 +514,7 @@ func TaskViewModel() TaskModel {
 	keys.RowUp.SetKeys("k", "up", "w")
 
 	model.tableModel = table.New(columns).
-		WithRows(rows).
+		WithRows(filteredRows).
 		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Accent)).Bold(true)).
 		SelectableRows(true).
 		Focused(true).
