@@ -83,7 +83,7 @@ returning *;
 -- name: CreateArea :execlastid
 INSERT INTO areas (title, status, archived)
 VALUES (?, ?, ?)
-returning *;
+returning id;
 
 -- name: ReadArea :one
 SELECT 
