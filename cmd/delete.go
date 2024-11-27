@@ -22,11 +22,13 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
 	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +44,7 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("delete called")
+		fmt.Println("Delete called")
 	},
 }
 
@@ -59,14 +61,14 @@ var deleteTaskCmd = &cobra.Command{
 	You can find the task ID by using the 'go_task list tasks' command.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var taskIDs []int
+		var taskIDs []int64
 		for _, task := range args {
 			taskID, err := strconv.Atoi(task)
 			if err != nil {
 				log.Errorf("Error converting task ID to integer: %v", err)
 				return
 			}
-			taskIDs = append(taskIDs, taskID)
+			taskIDs = append(taskIDs, int64(taskID))
 		}
 
 		fmt.Println("delete called for task(s):", taskIDs)
@@ -74,18 +76,19 @@ var deleteTaskCmd = &cobra.Command{
 			log.Errorf("No task IDs provided - delete command requires at least one task ID")
 			return
 		}
-
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
 
-		task := data.Task{}
-		err = task.DeleteMultiple(conn, taskIDs)
+		queries := sqlc.New(conn)
+		_, err = queries.DeleteTasks(ctx, taskIDs)
 		if err != nil {
 			log.Errorf("Error deleting task(s): %v", err)
-			return
+		} else {
+			log.Printf("Succesfully Deleted!")
 		}
 	},
 }
