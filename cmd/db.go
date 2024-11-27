@@ -70,8 +70,8 @@ var dbInitCmd = &cobra.Command{
 		// // Create and Insert a new Task
 		test := sqlc.CreateTaskParams{
 			Title:    "do some laundry",
-			Priority: sql.NullString{String: string(data.PriorityTypeHigh)},
-			Status:   sql.NullString{String: string(data.StatusToDo)},
+			Priority: sql.NullString{String: string(data.PriorityTypeHigh), Valid: true},
+			Status:   sql.NullString{String: string(data.StatusToDo), Valid: true},
 		}
 		queries := sqlc.New(conn)
 		result, err := queries.CreateTask(ctx, test)
