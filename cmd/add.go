@@ -24,15 +24,10 @@ var (
 // addCmd Used for adding new tasks, projects, notes, etc.
 var addCmd = &cobra.Command{
 	Use:   "add",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Parent command for adding tasks/projects/notes/etc.",
+	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("add called")
+		fmt.Println("add cmd called without any further arguments...please complete the command.")
 	},
 }
 
@@ -51,12 +46,6 @@ var addTaskCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		if rawFlag {
-			conn, err := db.ConnectDB()
-			if err != nil {
-				log.Fatalf("Error connecting to database: %v", err)
-			}
-			defer conn.Close()
-
 			priority, err := mapToPriorityType(args[1])
 			if err != nil {
 				log.Fatalf("Invalid priority type: %v", err)
@@ -66,6 +55,12 @@ var addTaskCmd = &cobra.Command{
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
+
+			conn, err := db.ConnectDB()
+			if err != nil {
+				log.Fatalf("Error connecting to database: %v", err)
+			}
+			defer conn.Close()
 
 			theTask := sqlc.CreateTaskParams{
 				Title:    args[0],
@@ -79,7 +74,7 @@ var addTaskCmd = &cobra.Command{
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
 			}
-			fmt.Println("The Result was: ", result)
+			fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
 
 		} else {
 			theme := tui.GetSelectedTheme()
@@ -91,7 +86,6 @@ var addTaskCmd = &cobra.Command{
 			}
 
 			if form.Submit {
-
 				conn, err := db.ConnectDB()
 				if err != nil {
 					log.Fatalf("Error connecting to database: %v", err)
@@ -107,7 +101,7 @@ var addTaskCmd = &cobra.Command{
 				if err != nil {
 					log.Fatalf("Error creating task: %v", err)
 				}
-				fmt.Println("The Result was: ", result)
+				fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
 			}
 		}
 	},
@@ -116,20 +110,33 @@ var addTaskCmd = &cobra.Command{
 // addProjectCmd represents the new command
 var addProjectCmd = &cobra.Command{
 	Use:   "project",
-	Short: "Creates a new project with a form",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-`,
+	Short: "Creates a new project with a form or optionally raw string input",
+	Long: `
+	The command is used for creating new projects.
+
+	New projects can be created using a form or straight from the command line by passing
+	the --raw or -r flag.
+
+	You can also optionally provided an archived status for the task using the --archived flag.
+	Valid area/project statuses: todo, planning, doing, done
+
+	Raw Example: 'go_task add project <project_title> <project_status>'
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		form := &formInput.NewAreaForm{}
+		ctx := context.Background()
+		if rawFlag {
 
-		err := form.NewAreaForm()
-		if err != nil {
-			log.Fatalf("Error creating form: %v", err)
-		}
+			if len(args) != 1 {
+				log.Fatalf(`
+You must provide at least 2 arguments!
+Usage: add project <project_title> <project_status>, 
+if one of your arguments has white space, please wrap it in "" marks.`)
+			}
+			status, err := mapToStatusType(args[1])
+			if err != nil {
+				log.Fatalf("Invalid status type: %v", err)
+			}
 
-		if form.Submit {
-			ctx := context.Background()
 			conn, err := db.ConnectDB()
 			if err != nil {
 				log.Fatalf("Error connecting to database: %v", err)
@@ -138,12 +145,39 @@ and usage of using your command. For example:
 
 			queries := sqlc.New(conn)
 			_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
-				Title:    form.AreaTitle,
-				Status:   sql.NullString{String: string(form.Status), Valid: true},
-				Archived: form.Archived,
-			})
+				Title:    args[0],
+				Status:   sql.NullString{String: string(status), Valid: true},
+				Archived: Archived,
+			},
+			)
 			if err != nil {
-				log.Fatalf("AddProjectCmd: Error creating task: %v", err)
+				log.Fatalf("Error creating project: %v", err)
+			}
+
+		} else {
+
+			form := &formInput.NewAreaForm{}
+			err := form.NewAreaForm()
+			if err != nil {
+				log.Fatalf("Error creating form: %v", err)
+			}
+
+			if form.Submit {
+				conn, err := db.ConnectDB()
+				if err != nil {
+					log.Fatalf("Error connecting to database: %v", err)
+				}
+				defer conn.Close()
+
+				queries := sqlc.New(conn)
+				_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+					Title:    form.AreaTitle,
+					Status:   sql.NullString{String: string(form.Status), Valid: true},
+					Archived: form.Archived,
+				})
+				if err != nil {
+					log.Fatalf("AddProjectCmd: Error creating task: %v", err)
+				}
 			}
 		}
 	},
