@@ -11,6 +11,7 @@ import (
 	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
+	"github.com/akthe-at/go_task/tui"
 	"github.com/akthe-at/go_task/tui/formInput"
 	"github.com/spf13/cobra"
 )
@@ -81,9 +82,10 @@ var addTaskCmd = &cobra.Command{
 			fmt.Println("The Result was: ", result)
 
 		} else {
+			theme := tui.GetSelectedTheme()
 			form := &formInput.NewTaskForm{}
 
-			err := form.NewTaskForm()
+			err := form.NewTaskForm(*tui.ThemeGoTask(theme))
 			if err != nil {
 				log.Fatalf("Error creating form: %v", err)
 			}

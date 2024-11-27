@@ -16,7 +16,7 @@ type NewTaskForm struct {
 	Submit    bool
 }
 
-func (n *NewTaskForm) NewTaskForm() error {
+func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 	tui.ClearTerminalScreen()
 
 	taskGroups := []*huh.Group{
@@ -61,5 +61,5 @@ func (n *NewTaskForm) NewTaskForm() error {
 	}
 	n.TaskForm = huh.NewForm(taskGroups...)
 
-	return n.TaskForm.Run()
+	return n.TaskForm.WithTheme(&theme).Run()
 }

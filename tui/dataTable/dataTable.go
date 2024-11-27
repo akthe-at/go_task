@@ -291,8 +291,9 @@ func (m *TaskModel) addNote() tea.Cmd {
 
 func (m *TaskModel) addTask() tea.Cmd {
 	form := &formInput.NewTaskForm{}
+	theme := tui.GetSelectedTheme()
 
-	err := form.NewTaskForm()
+	err := form.NewTaskForm(*tui.ThemeGoTask(theme))
 	if err != nil {
 		log.Fatalf("Error creating form: %v", err)
 	}
