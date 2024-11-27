@@ -11,7 +11,6 @@ import (
 type NewAreaForm struct {
 	AreaForm  *huh.Form
 	AreaTitle string
-	Priority  data.PriorityType
 	Status    data.StatusType
 	Notes     []data.Note
 	Archived  bool
@@ -30,16 +29,6 @@ func (n *NewAreaForm) NewAreaForm() error {
 				Title("What is the the name of the Project/Area?").
 				Prompt(">").
 				Value(&n.AreaTitle),
-
-			huh.NewSelect[data.PriorityType]().
-				Title("Priority Level").
-				Options(
-					huh.NewOption("Low", data.PriorityTypeLow).Selected(true),
-					huh.NewOption("Medium", data.PriorityTypeMedium),
-					huh.NewOption("High", data.PriorityTypeHigh),
-					huh.NewOption("Urgent", data.PriorityTypeUrgent),
-				).
-				Value(&n.Priority),
 
 			huh.NewSelect[data.StatusType]().
 				Title("Current Status?").
