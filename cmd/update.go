@@ -22,8 +22,14 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
+	"log"
+	"strconv"
 
+	"github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/spf13/cobra"
 )
 
@@ -42,8 +48,67 @@ to quickly create a Cobra application.`,
 	},
 }
 
+// TODO: This is going to require good helper text!!!
+//
+// updateTaskCmd represents the task update command
+var updateTaskCmd = &cobra.Command{
+	Use:   "task",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		id, _ := strconv.ParseInt(args[1], 10, 64)
+
+		ctx := context.Background()
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+		defer conn.Close()
+		queries := sqlc.New(conn)
+
+		switch args[0] {
+		case "title":
+			queries.UpdateTaskTitle(ctx, sqlc.UpdateTaskTitleParams{
+				Title: args[2],
+				ID:    id,
+			})
+
+		case "priority":
+			priority, err := mapToPriorityType(args[2])
+			if err != nil {
+				log.Fatalf("Invalid status type: %v", err)
+			}
+
+			queries.UpdateTaskPriority(ctx, sqlc.UpdateTaskPriorityParams{
+				Priority: sql.NullString{String: string(priority), Valid: true},
+				ID:       id,
+			})
+
+		case "status":
+			status, err := mapToStatusType(args[2])
+			if err != nil {
+				log.Fatalf("Invalid status type: %v", err)
+			}
+
+			queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
+				Status: sql.NullString{String: string(status), Valid: true},
+				ID:     id,
+			})
+
+		default:
+			fmt.Println("default arg")
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(updateCmd)
+	updateCmd.AddCommand(updateTaskCmd)
 
 	// Here you will define your flags and configuration settings.
 

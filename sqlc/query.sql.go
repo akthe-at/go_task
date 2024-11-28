@@ -742,3 +742,45 @@ func (q *Queries) ReadTasks(ctx context.Context) ([]ReadTasksRow, error) {
 	}
 	return items, nil
 }
+
+const updateTaskPriority = `-- name: UpdateTaskPriority :execresult
+UPDATE tasks SET priority = ?  where id = ?
+returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id
+`
+
+type UpdateTaskPriorityParams struct {
+	Priority sql.NullString `json:"priority"`
+	ID       int64          `json:"id"`
+}
+
+func (q *Queries) UpdateTaskPriority(ctx context.Context, arg UpdateTaskPriorityParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateTaskPriority, arg.Priority, arg.ID)
+}
+
+const updateTaskStatus = `-- name: UpdateTaskStatus :execresult
+UPDATE tasks SET status = ?  where id = ?
+returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id
+`
+
+type UpdateTaskStatusParams struct {
+	Status sql.NullString `json:"status"`
+	ID     int64          `json:"id"`
+}
+
+func (q *Queries) UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateTaskStatus, arg.Status, arg.ID)
+}
+
+const updateTaskTitle = `-- name: UpdateTaskTitle :execresult
+UPDATE tasks set title = ? where id = ?
+returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id
+`
+
+type UpdateTaskTitleParams struct {
+	Title string `json:"title"`
+	ID    int64  `json:"id"`
+}
+
+func (q *Queries) UpdateTaskTitle(ctx context.Context, arg UpdateTaskTitleParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateTaskTitle, arg.Title, arg.ID)
+}

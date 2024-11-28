@@ -71,6 +71,18 @@ INNER JOIN bridge_notes ON bridge_notes.note_id = notes.id
 LEFT JOIN tasks ON tasks.ID = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
 LEFT JOIN areas ON areas.ID = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2;
 
+-- name: UpdateTaskStatus :execresult
+UPDATE tasks SET status = ?  where id = ?
+returning *;
+
+-- name: UpdateTaskPriority :execresult
+UPDATE tasks SET priority = ?  where id = ?
+returning *;
+
+-- name: UpdateTaskTitle :execresult
+UPDATE tasks set title = ? where id = ?
+returning *;
+
 
 -- name: DeleteNote :one
 DELETE FROM notes WHERE id = ?
