@@ -310,6 +310,7 @@ func init() {
 	// and all subcommands, e.g.
 	addCmd.PersistentFlags().BoolVarP(&rawFlag, "raw", "r", false, "Bypass using the form and use raw input instead")
 	addCmd.PersistentFlags().BoolVar(&Archived, "archived", false, "Archive the task or project upon creation")
+	addCmd.PersistentFlags().BoolVar(&NewNote, "new", false, "Archive the task or project upon creation")
 	// newCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
