@@ -128,16 +128,19 @@ WHERE id IN (
     WHERE parent_cat = 2 AND parent_area_id IN (?)
 )
 ;
-DELETE FROM areas 
-WHERE id IN (?)
+DELETE FROM areas
+WHERE id IN (sqlc.slice(ids))
+
 RETURNING *;
 
--- name: DeleteArea :execresult
+-- name: DeleteArea :one
 DELETE FROM areas WHERE id = ?
+returning id
 ;
 
+
 -- name: DeleteMultipleAreas :execresult
-DELETE FROM areas WHERE id IN (?)
+DELETE FROM areas WHERE id IN (sqlc.slice(ids))
 returning *;
 
 -- name: CreateTask :execlastid
@@ -186,6 +189,22 @@ returning id;
 -- name: DeleteTasks :execrows
 DELETE FROM tasks
 WHERE id in (sqlc.slice(ids))
+;
+
+
+-- name: ReadAreaNote :many
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_task_id = ?
+AND bridge_notes.parent_cat = 2;
+
+-- name: ReadAreaNotes :execrows
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_area_id in (sqlc.slice(ids))
+AND bridge_notes.parent_cat = 2
 ;
 
 -- name: ReadAreas :many
