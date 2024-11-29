@@ -121,12 +121,15 @@ func (q *Queries) CreateTaskBridgeNote(ctx context.Context, arg CreateTaskBridge
 	return result.LastInsertId()
 }
 
-const deleteArea = `-- name: DeleteArea :execresult
+const deleteArea = `-- name: DeleteArea :one
 DELETE FROM areas WHERE id = ?
+returning id
 `
 
-func (q *Queries) DeleteArea(ctx context.Context, id int64) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteArea, id)
+func (q *Queries) DeleteArea(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, deleteArea, id)
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteAreaAndNotes = `-- name: DeleteAreaAndNotes :execresult
@@ -158,12 +161,23 @@ func (q *Queries) DeleteAreasAndNotesMultiple(ctx context.Context, parentAreaID 
 const deleteMultipleAreas = `-- name: DeleteMultipleAreas :execresult
 ;
 
-DELETE FROM areas WHERE id IN (?)
+
+DELETE FROM areas WHERE id IN (/*SLICE:ids*/?)
 returning id, title, status, archived, created_at, last_mod
 `
 
-func (q *Queries) DeleteMultipleAreas(ctx context.Context, id int64) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteMultipleAreas, id)
+func (q *Queries) DeleteMultipleAreas(ctx context.Context, ids []int64) (sql.Result, error) {
+	query := deleteMultipleAreas
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	return q.db.ExecContext(ctx, query, queryParams...)
 }
 
 const deleteNote = `-- name: DeleteNote :one
@@ -453,6 +467,78 @@ func (q *Queries) ReadArea(ctx context.Context, id int64) (ReadAreaRow, error) {
 		&i.Path,
 	)
 	return i, err
+}
+
+const readAreaNote = `-- name: ReadAreaNote :many
+;
+
+
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_task_id = ?
+AND bridge_notes.parent_cat = 2
+`
+
+type ReadAreaNoteRow struct {
+	ID    int64         `json:"id"`
+	Title string        `json:"title"`
+	Path  string        `json:"path"`
+	Type  sql.NullInt64 `json:"type"`
+}
+
+func (q *Queries) ReadAreaNote(ctx context.Context, parentTaskID sql.NullInt64) ([]ReadAreaNoteRow, error) {
+	rows, err := q.db.QueryContext(ctx, readAreaNote, parentTaskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadAreaNoteRow
+	for rows.Next() {
+		var i ReadAreaNoteRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Path,
+			&i.Type,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const readAreaNotes = `-- name: ReadAreaNotes :execrows
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_area_id in (/*SLICE:ids*/?)
+AND bridge_notes.parent_cat = 2
+`
+
+func (q *Queries) ReadAreaNotes(ctx context.Context, ids []sql.NullInt64) (int64, error) {
+	query := readAreaNotes
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const readAreas = `-- name: ReadAreas :many
