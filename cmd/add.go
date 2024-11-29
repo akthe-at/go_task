@@ -19,6 +19,7 @@ import (
 var (
 	rawFlag  bool
 	Archived bool
+	NewNote  bool
 )
 
 // addCmd Used for adding new tasks, projects, notes, etc.
@@ -191,51 +192,54 @@ var addTaskNoteCmd = &cobra.Command{
 and usage of using your command. For example:
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 3 {
-			log.Fatalf("You must provide at least 3 arguments! Usage: note <task_id> <note_title> <note_path>")
-		}
+		if NewNote {
+		} else {
+			if len(args) < 3 {
+				log.Fatalf("You must provide at least 3 arguments! Usage: note <task_id> <note_title> <note_path>")
+			}
 
-		taskID, err := strconv.Atoi(args[0])
-		if err != nil {
-			log.Fatalf("Invalid task ID: %v", err)
-		}
+			taskID, err := strconv.Atoi(args[0])
+			if err != nil {
+				log.Fatalf("Invalid task ID: %v", err)
+			}
 
-		noteTitle := args[1]
-		notePath := args[2]
+			noteTitle := args[1]
+			notePath := args[2]
 
-		ctx := context.Background()
-		conn, err := db.ConnectDB()
-		if err != nil {
-			log.Fatalf("Error connecting to database: %v", err)
-		}
-		tx, err := conn.Begin()
-		if err != nil {
-			log.Fatalf("addTaskNoteCmd: Error beginning transaction: %v", err)
-		}
-		defer tx.Rollback()
-		defer conn.Close()
+			ctx := context.Background()
+			conn, err := db.ConnectDB()
+			if err != nil {
+				log.Fatalf("Error connecting to database: %v", err)
+			}
+			tx, err := conn.Begin()
+			if err != nil {
+				log.Fatalf("addTaskNoteCmd: Error beginning transaction: %v", err)
+			}
+			defer tx.Rollback()
+			defer conn.Close()
 
-		queries := sqlc.New(conn)
-		qtx := queries.WithTx(tx)
-		noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
-			Title: noteTitle,
-			Path:  notePath,
-		})
-		if err != nil {
-			fmt.Printf("addTaskNoteCmd: There was an error creating the note: %v", err)
-		}
+			queries := sqlc.New(conn)
+			qtx := queries.WithTx(tx)
+			noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+				Title: noteTitle,
+				Path:  notePath,
+			})
+			if err != nil {
+				fmt.Printf("addTaskNoteCmd: There was an error creating the note: %v", err)
+			}
 
-		_, err = qtx.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
-			NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
-			ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
-			ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
-		})
-		if err != nil {
-			log.Fatalf("addTaskNoteCmd: Error creating task bridge note: %v", err)
-		}
-		tx.Commit()
+			_, err = qtx.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
+				NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+				ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+				ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
+			})
+			if err != nil {
+				log.Fatalf("addTaskNoteCmd: Error creating task bridge note: %v", err)
+			}
+			tx.Commit()
 
-		fmt.Println("Note added to task successfully")
+			fmt.Println("Note added to task successfully")
+		}
 	},
 }
 
