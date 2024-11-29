@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/akthe-at/go_task/config"
 	"github.com/akthe-at/go_task/tui"
 	dataTable "github.com/akthe-at/go_task/tui/dataTable"
 	tea "github.com/charmbracelet/bubbletea"
@@ -95,6 +96,11 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	}
+
+	if err := viper.Unmarshal(&config.UserSettings); err != nil {
+		fmt.Printf("Unable to decode into struct, %v", err)
+		return
 	}
 
 	var userThemes tui.ColorThemes
