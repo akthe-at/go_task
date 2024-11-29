@@ -9,23 +9,27 @@ import (
 const (
 	NotesTableView View = iota
 	TasksTableView
+	ProjectsTableView
 )
 
 var theme = tui.GetSelectedTheme()
 
 type (
-	View                      int
-	AddNoteMsg                struct{}
-	AddTaskMsg                struct{}
-	SwitchToTasksTableViewMsg struct{}
+	View                         int
+	AddNoteMsg                   struct{}
+	AddTaskMsg                   struct{}
+	AddProjectMsg                struct{}
+	SwitchToTasksTableViewMsg    struct{}
+	SwitchToProjectsTableViewMsg struct{}
 )
 
 type RootModel struct {
 	Height int
 	Width  int
 
-	Tasks TaskModel
-	Notes NotesModel
+	Tasks    TaskModel
+	Notes    NotesModel
+	Projects ProjectsModel
 
 	CurrentView  View
 	PreviousView View
@@ -77,6 +81,9 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+n":
 			m.PreviousView = m.CurrentView
 			m.CurrentView = NotesTableView
+		case "ctrl+p":
+			m.PreviousView = m.CurrentView
+			m.CurrentView = ProjectsTableView
 		}
 
 	case tea.WindowSizeMsg:
@@ -87,11 +94,16 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.propagate(msg), nil
 	case SwitchToTasksTableViewMsg:
 		m.CurrentView = TasksTableView
+	case SwitchToProjectsTableViewMsg:
+		m.CurrentView = ProjectsTableView
 	case SwitchToPreviousViewMsg:
 		m.CurrentView = m.PreviousView
 	case AddNoteMsg:
 		updatedNotes, _ := m.Notes.Update(msg)
 		m.Notes = *updatedNotes.(*NotesModel)
+	case AddProjectMsg:
+		updatedProjects, _ := m.Projects.Update(msg)
+		m.Projects = *updatedProjects.(*ProjectsModel)
 	case AddTaskMsg:
 		updatedTasks, _ := m.Tasks.Update(msg)
 		m.Tasks = *updatedTasks.(*TaskModel)
@@ -103,12 +115,16 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *RootModel) propagate(msg tea.Msg) tea.Model {
 	var updatedTasks tea.Model
 	var updatedNotes tea.Model
+	var updatedProjects tea.Model
 
 	updatedTasks, _ = m.Tasks.Update(msg)
 	m.Tasks = *updatedTasks.(*TaskModel)
 
 	updatedNotes, _ = m.Notes.Update(msg)
 	m.Notes = *updatedNotes.(*NotesModel)
+
+	updatedProjects, _ = m.Projects.Update(msg)
+	m.Projects = *updatedProjects.(*ProjectsModel)
 
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		msg.Height -= m.Notes.totalHeight
@@ -125,6 +141,8 @@ func (m RootModel) View() string {
 		return s.Render(m.Tasks.View())
 	case NotesTableView:
 		return s.Render(m.Notes.View())
+	case ProjectsTableView:
+		return s.Render(m.Projects.View())
 	default:
 		return s.Render("")
 	}
