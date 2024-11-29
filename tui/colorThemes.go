@@ -75,6 +75,8 @@ var Themes = ColorThemes{
 	Selected:   SelectedTheme{Theme: "RosePine"},
 }
 
+// ThemeGoTask Creates a theme for a huh form to be used when rendering the task creation form.
+// The theme is based on the theme selected by the user.
 func ThemeGoTask(theme Theme) *huh.Theme {
 	t := huh.ThemeBase()
 	var (
