@@ -164,6 +164,9 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 		} else {
 
 			form := &formInput.NewAreaForm{}
+
+			theTheme := tui.GetSelectedTheme()
+			err := form.NewAreaForm(*tui.ThemeGoTask(theTheme))
 			if err != nil {
 				log.Fatalf("Error creating form: %v", err)
 			}
