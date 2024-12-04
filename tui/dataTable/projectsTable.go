@@ -9,27 +9,23 @@ import (
 	"strconv"
 	"strings"
 
-	data "github.com/akthe-at/go_task/data"
 	db "github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/akthe-at/go_task/tui/formInput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/evertras/bubble-table/table"
 )
 
 const (
 	projectColumnKeyID        = "id"
-	projectColumnKeyTask      = "title"
+	projectColumnKeyProject   = "title"
 	projectColumnKeyStatus    = "status"
 	projectColumnKeyArchived  = "archived"
 	projectColumnKeyCreatedAt = "created_at"
-	// projectColumnKeyTaskAge   = "age_in_days"
-	projectColumnKeyDueDate = "due_date"
-	projectColumnKeyNotes   = "notes"
+	projectColumnKeyNotes     = "notes"
 )
 
 // This is the task table "screen" model
@@ -129,7 +125,7 @@ func (m *ProjectsModel) loadRowsFromDatabase() ([]table.Row, error) {
 	for _, project := range projects {
 		row := table.NewRow(table.RowData{
 			projectColumnKeyID:       fmt.Sprintf("%d", project.ID),
-			projectColumnKeyTask:     project.Title,
+			projectColumnKeyProject:  project.Title,
 			projectColumnKeyStatus:   project.Status.String,
 			projectColumnKeyArchived: fmt.Sprintf("%t", project.Archived),
 			projectColumnKeyNotes:    project.NoteTitles,
@@ -196,7 +192,6 @@ func (m *ProjectsModel) filterArchives() tea.Cmd {
 	}
 }
 
-// FIXME: Needs the correct Form here
 func (m *ProjectsModel) addNote() tea.Cmd {
 	form := &formInput.NewNoteForm{}
 	err := form.NewNoteForm()
@@ -265,33 +260,29 @@ func (m *ProjectsModel) addNote() tea.Cmd {
 }
 
 func (m *ProjectsModel) addProject() tea.Cmd {
-	// FIXME: Needs the correct form here
-	form := &formInput.NewTaskForm{}
+	form := &formInput.NewAreaForm{}
 	theme := tui.GetSelectedTheme()
 
-	err := form.NewTaskForm(*tui.ThemeGoTask(theme))
+	err := form.NewAreaForm(*tui.ThemeGoTask(theme))
 	if err != nil {
 		log.Fatalf("Error creating form: %v", err)
 	}
 
 	if form.Submit {
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
-
-		// TODO: Use SQLC to add, get rid of old version here
-		newTask := data.Task{
-			Title:    form.TaskTitle,
-			Priority: form.Priority,
-			Status:   form.Status,
+		queries := sqlc.New(conn)
+		_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+			Title:    form.AreaTitle,
+			Status:   sql.NullString{String: string(form.Status), Valid: true},
 			Archived: form.Archived,
-		}
-
-		err = newTask.Create(conn)
+		})
 		if err != nil {
-			log.Fatalf("Error creating task: %v", err)
+			log.Fatalf("Error creating new area: %v", err)
 		}
 		// Requery the database and update the table model
 		rows, err := m.loadRowsFromDatabase()
@@ -426,7 +417,7 @@ func (m ProjectsModel) View() string {
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+n to switch to the Notes View.") + "\n")
-
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("THIS IS A DAMN TEST") + "\n")
 	selectedIDs := []string{}
 
 	for _, row := range m.tableModel.SelectedRows() {
@@ -458,15 +449,14 @@ func ProjectViewModel() ProjectsModel {
 	theme := tui.GetSelectedTheme()
 
 	columns := []table.Column{
-		table.NewColumn(projectColumnKeyID, "ID", 5).WithStyle(
+		table.NewColumn(projectColumnKeyID, "ID", 10).WithStyle(
 			lipgloss.NewStyle().
 				Faint(true).
 				Foreground(lipgloss.Color(theme.Secondary)).
 				Align(lipgloss.Center)),
-		table.NewFlexColumn(projectColumnKeyTask, "Project", 3),
+		table.NewFlexColumn(projectColumnKeyProject, "Project", 3),
 		table.NewFlexColumn(projectColumnKeyStatus, "Status", 1),
 		table.NewFlexColumn(projectColumnKeyArchived, "Archived", 1),
-		// table.NewFlexColumn(columnKeyTaskAge, "Project Age (Days)", 1),
 		table.NewFlexColumn(projectColumnKeyNotes, "Notes", 3),
 	}
 
@@ -519,7 +509,7 @@ func ProjectViewModel() ProjectsModel {
 
 func (m *ProjectsModel) updateFooter() {
 	highlightedRow := m.tableModel.HighlightedRow()
-	rowID, ok := highlightedRow.Data[columnKeyID]
+	rowID, ok := highlightedRow.Data[projectColumnKeyID]
 	if !ok {
 		rowID = "No Rows Available"
 	}
