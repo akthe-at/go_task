@@ -3,17 +3,21 @@ package data
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"os"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/akthe-at/go_task/config"
 	"gopkg.in/yaml.v3"
 )
 
 type NoteMetadata struct {
-	Title   string   `yaml:"title"`
-	id      string   `yaml:"id"`
-	aliases []string `yaml:"aliases"`
-	tags    []string `yaml:"tags"`
+	Title   string   `yaml:"Title"`
+	ID      string   `yaml:"ID"`
+	Aliases []string `yaml:"Aliases"`
+	Tags    []string `yaml:"Tags"`
 }
 
 type NoteContent struct {
@@ -21,23 +25,12 @@ type NoteContent struct {
 	Body     string
 }
 
-func GenereateNoteID(title string) string {
-	// Create note IDs in a Zettelkasten format with a timestamp and a suffix.
-	// In this case a note with the title 'My new note'
-	// will be given an ID that looks like '1657296016-my-new-note',
-	// and therefore the file name '1657296016-my-new-note.md'
-	var suffix string
-	if title != "" {
-	}
-	return suffix
-}
-
-func GenerateMarkdownFile(note NoteContent, outputPath string) error {
+func GenerateMarkdownFile(note NoteContent, outputPath string) (string, error) {
 	var content bytes.Buffer
 
 	yamlFrontMatter, err := yaml.Marshal(note.Metadata)
 	if err != nil {
-		return fmt.Errorf("failed to marshal YAML front matter: %w", err)
+		return "", fmt.Errorf("failed to marshal YAML front matter: %w", err)
 	}
 
 	content.WriteString("---\n")
@@ -46,44 +39,47 @@ func GenerateMarkdownFile(note NoteContent, outputPath string) error {
 
 	content.WriteString(note.Body)
 
-	return os.WriteFile(outputPath, content.Bytes(), 0644)
+	outputPath = fmt.Sprintf("%s/%s.md", outputPath, note.Metadata.ID)
+
+	return outputPath, os.WriteFile(outputPath, content.Bytes(), 0644)
 }
 
-func templateMarkdownNote(Title string, ID string, aliases []string, tags []string) error {
+func TemplateMarkdownNote(Title string, ID string, aliases []string, tags []string) (string, error) {
 	note := NoteContent{
 		Metadata: NoteMetadata{
 			Title:   Title,
-			id:      ID,
-			aliases: aliases,
-			tags:    tags,
+			ID:      ID,
+			Aliases: aliases,
+			Tags:    tags,
 		},
-		Body: ``,
+		Body: `test`,
 	}
-	notesPath := config.UserSettings.NotesPath
-	err := GenerateMarkdownFile(note, notesPath)
+	notesPath := config.UserSettings.Selected.NotesPath
+	output, err := GenerateMarkdownFile(note, notesPath)
 	if err != nil {
-		return fmt.Errorf("failed to generate markdown file: %w", err)
+		return "", fmt.Errorf("failed to generate markdown file: %w", err)
 	} else {
 		fmt.Println("Markdown note generated successfully.")
 	}
 
-	return nil
+	return output, nil
 }
 
-// `
-//     note_id_func = function(title)
-//       -- Create note IDs in a Zettelkasten format with a timestamp and a suffix.
-//       -- In this case a note with the title 'My new note' will be given an ID that looks
-//       -- like '1657296016-my-new-note', and therefore the file name '1657296016-my-new-note.md'
-//       local suffix = ""
-//       if title ~= nil then
-//         -- If title is given, transform it into valid file name.
-//         suffix = title:gsub(" ", "-"):gsub("[^A-Za-z0-9-]", ""):lower()
-//       else
-//         -- If title is nil, just add 4 random uppercase letters to the suffix.
-//         for _ = 1, 4 do
-//           suffix = suffix .. string.char(math.random(65, 90))
-//         end
-//       end
-//       return tostring(os.time()) .. "-" .. suffix
-//     end,
+// GenereateNoteID
+// Create note IDs in a Zettelkasten format with a timestamp and a suffix.
+// In this case a note with the title 'My new note'
+// will be given an ID that looks like '1657296016-my-new-note',
+// and therefore the file name '1657296016-my-new-note.md'
+func GenerateNoteID(title string) string {
+	var suffix string
+	if title != "" {
+		suffix = strings.ToLower(strings.Replace(title, " ", "-", -1))
+		re := regexp.MustCompile("[^A-Za-z0-9-]")
+		suffix = re.ReplaceAllString(suffix, "$1")
+	} else {
+		for i := 0; i < 4; i++ {
+			suffix = suffix + string(rune(65+rand.Intn(25)))
+		}
+	}
+	return fmt.Sprintf("%d-%s", time.Now().Unix(), suffix)
+}
