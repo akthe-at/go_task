@@ -77,7 +77,7 @@ to quickly create a Cobra application.`,
 			log.Errorf("There was an error converting the noteID to an integer: %v", err)
 		}
 
-		editor := getEditorConfig()
+		editor := GetEditorConfig()
 		if editor == "" {
 			log.Warnf("No editor set in config file, falling back to $EDITOR.")
 			editor = os.Getenv("EDITOR")
@@ -115,7 +115,7 @@ func init() {
 	// openCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func getEditorConfig() string {
+func GetEditorConfig() string {
 	editor := viper.GetString("selected.editor")
 	return editor
 }
