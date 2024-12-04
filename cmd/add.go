@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
@@ -17,9 +20,12 @@ import (
 )
 
 var (
-	rawFlag  bool
-	Archived bool
-	NewNote  bool
+	rawFlag      bool
+	Archived     bool
+	NewNote      bool
+	noteAliases  string
+	noteTags     string
+	openInEditor bool
 )
 
 // addCmd Used for adding new tasks, projects, notes, etc.
@@ -158,7 +164,6 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 		} else {
 
 			form := &formInput.NewAreaForm{}
-			err := form.NewAreaForm()
 			if err != nil {
 				log.Fatalf("Error creating form: %v", err)
 			}
@@ -188,11 +193,57 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 var addTaskNoteCmd = &cobra.Command{
 	Use:   "note",
 	Short: "Add a note to a specific task",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `
+	To add a new note to an existing task, you can use the 'note' command.
+		This command will create a new note in the obsidian vault and create a bridge between the note and the task in the database.
+		To do this:
+			Type in: 'go_task add task note <task_id> <note_title> -t <note_tags> -a <note_aliases>'
+		OR
+		ty[e in: 'go_task add task note <task_id> <note_title> <note_path>'
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		if NewNote {
+			if len(args) < 2 {
+				log.Fatalf(" You must provide at least 2 arguments! Usage: note <task_id> <note_title> -t <note_tags> -a <note_aliases>")
+			}
+			// TODO: Need to fully flesh this out. Create a brand new note.
+			// 1. Create the actual note in the obsidian vault
+			// 	- Path is defined in user config or default of:
+			// 2. Create the note/bridge in the database
+			// 3. Will the note open in an editor after creation?
+			// Needs to correctly assign a new note id to the task id sqlc model. Also need to create the new note in the directory
+			// that is defined in the user config OR...some default?...This must properly create the markdown file, yaml header, etc.
+			// Figure out how we do or do not want to open this note in an editor after it is created.
+			// Do we want to be able to pass any body/text to the note upon creation?
+			// Do we want to be able to pipe into the note? that might not work so well?
+			// tui.ClearTerminalScreen()
+			fmt.Println("Creating a new note for task: ", args[1])
+			theTags := strings.Split(noteTags, " ")
+			theAliases := strings.Split(noteAliases, " ")
+
+			id := data.GenerateNoteID(args[1])
+			output, err := data.TemplateMarkdownNote(args[1], id, theAliases, theTags)
+			if err != nil {
+				log.Fatal("Error with generating Template!", err)
+			}
+			if openInEditor {
+				editor := GetEditorConfig()
+				cmdr := exec.Command(editor, output)
+				cmdr.Stdin = os.Stdin
+				cmdr.Stdout = os.Stdout
+				cmdr.Stderr = os.Stderr
+				err = cmdr.Run()
+				if err != nil {
+					log.Fatalf("There was an error running the command: %v", err)
+				}
+			}
+
+			// ctx := context.Background()
+			// conn, err := db.ConnectDB()
+			// if err != nil {
+			// 	log.Fatalf("Error connecting to database: %v", err)
+			// }
+
 		} else {
 			if len(args) < 3 {
 				log.Fatalf("You must provide at least 3 arguments! Usage: note <task_id> <note_title> <note_path>")
@@ -314,7 +365,10 @@ func init() {
 	// and all subcommands, e.g.
 	addCmd.PersistentFlags().BoolVarP(&rawFlag, "raw", "r", false, "Bypass using the form and use raw input instead")
 	addCmd.PersistentFlags().BoolVar(&Archived, "archived", false, "Archive the task or project upon creation")
-	addCmd.PersistentFlags().BoolVar(&NewNote, "new", false, "Archive the task or project upon creation")
+	addCmd.PersistentFlags().BoolVar(&NewNote, "new", false, "this flag is used to add a new note to an existing task or project")
+	addCmd.PersistentFlags().BoolVar(&openInEditor, "open", false, "this flag is used to open the note in an editor after creation")
+	addCmd.Flags().StringVarP(&noteTags, "tags", "t", "", "Tags for the note")
+	addCmd.Flags().StringVarP(&noteAliases, "aliases", "a", "", "Aliases for the note")
 	// newCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
