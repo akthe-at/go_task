@@ -85,23 +85,28 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
+		// TODO: This needs a better default location and name.
 		// Search config in home directory with name ".go_task" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("toml")
 		viper.SetConfigName(".go_task")
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.AutomaticEnv()
 
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading config file: %v\n", err)
+		return
+	} else {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
-	if err := viper.Unmarshal(&config.UserSettings); err != nil {
-		fmt.Printf("Unable to decode into struct, %v", err)
-		return
-	}
+	// FIXME: I wish this wasn't necessary but viper wouldn'tm unmarshal the data otherwise?
+	// Directly access the values from Viper and manually assign them to the struct
+	config.UserSettings.Selected.Editor = viper.GetString("selected.editor")
+	config.UserSettings.Selected.NotesPath = viper.GetString("selected.notes_path")
+	config.UserSettings.Selected.UseObsidian = viper.GetBool("selected.use_obsidian")
+	config.UserSettings.Selected.Theme = viper.GetString("selected.theme")
 
 	var userThemes tui.ColorThemes
 	if err := viper.Unmarshal(&userThemes); err != nil {
