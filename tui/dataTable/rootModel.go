@@ -39,6 +39,7 @@ func NewRootModel() RootModel {
 	return RootModel{
 		Tasks:       TaskViewModel(),
 		Notes:       NotesView(),
+		Projects:    ProjectViewModel(),
 		CurrentView: TasksTableView,
 	}
 }
