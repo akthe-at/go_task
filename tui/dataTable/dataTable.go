@@ -299,20 +299,22 @@ func (m *TaskModel) addTask() tea.Cmd {
 	}
 
 	if form.Submit {
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
 
-		newTask := data.Task{
+		queries := sqlc.New(conn)
+		newTask := sqlc.CreateTaskParams{
 			Title:    form.TaskTitle,
-			Priority: form.Priority,
-			Status:   form.Status,
+			Priority: sql.NullString{String: string(form.Priority), Valid: true},
+			Status:   sql.NullString{String: string(form.Status), Valid: true},
 			Archived: form.Archived,
 		}
 
-		err = newTask.Create(conn)
+		_, err = queries.CreateTask(ctx, newTask)
 		if err != nil {
 			log.Fatalf("Error creating task: %v", err)
 		}
