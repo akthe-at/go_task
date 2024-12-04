@@ -1,10 +1,8 @@
 package formInput
 
 import (
-	"os"
-	"os/exec"
-
 	"github.com/akthe-at/go_task/data"
+	"github.com/akthe-at/go_task/tui"
 	"github.com/charmbracelet/huh"
 )
 
@@ -17,11 +15,8 @@ type NewAreaForm struct {
 	Submit    bool
 }
 
-func (n *NewAreaForm) NewAreaForm() error {
-	// Clear the terminal before showing form
-	cmd := exec.Command("clear")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+func (n *NewAreaForm) NewAreaForm(theme huh.Theme) error {
+	tui.ClearTerminalScreen()
 
 	groups := []*huh.Group{
 		huh.NewGroup(
@@ -55,5 +50,5 @@ func (n *NewAreaForm) NewAreaForm() error {
 	}
 	n.AreaForm = huh.NewForm(groups...)
 
-	return n.AreaForm.Run()
+	return n.AreaForm.WithTheme(&theme).Run()
 }
