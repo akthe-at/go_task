@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -83,6 +84,30 @@ var addTaskCmd = &cobra.Command{
 			}
 			fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
 
+			ok, projectDir, err := checkIfProjDir()
+			if err != nil {
+				log.Fatalf("Error checking if project directory: %v", err)
+			}
+			if ok {
+				projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+				if err != nil {
+					log.Fatalf("Error checking if project exists: %v", err)
+				} else if projID == 0 {
+					project, err := queries.InsertProgProject(ctx, projectDir)
+					if err != nil {
+						log.Fatalf("Error inserting project: %v", err)
+					}
+					queries.InsertProjectLink(ctx,
+						sqlc.InsertProjectLinkParams{
+							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
+							ParentCat:    sql.NullInt64{Int64: 1, Valid: true},
+							ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
+						},
+					)
+				}
+
+			}
+
 		} else {
 			theme := tui.GetSelectedTheme()
 			form := &formInput.NewTaskForm{}
@@ -109,6 +134,35 @@ var addTaskCmd = &cobra.Command{
 					log.Fatalf("Error creating task: %v", err)
 				}
 				fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
+
+				ok, projectDir, err := checkIfProjDir()
+				if err != nil {
+					log.Fatalf("Error checking if project directory: %v", err)
+				}
+				if ok {
+					projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+					if err != nil {
+						log.Fatalf("Error checking if project exists: %v", err)
+					} else if projID == 0 {
+						project, err := queries.InsertProgProject(ctx, projectDir)
+						if err != nil {
+							log.Fatalf("Error inserting project: %v", err)
+						}
+						err = queries.InsertProjectLink(ctx,
+							sqlc.InsertProjectLinkParams{
+								ProjectID:    sql.NullInt64{Int64: project, Valid: true},
+								ParentCat:    sql.NullInt64{Int64: 1, Valid: true},
+								ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
+							},
+						)
+						if err != nil {
+							log.Fatalf("Error inserting project link: %v", err)
+						}
+					}
+
+				}
+
+				fmt.Println("Successfully assigned the new task a programming project ID: ", projectDir)
 			}
 		}
 	},
@@ -407,4 +461,34 @@ func mapToStatusType(input string) (data.StatusType, error) {
 	default:
 		return "", errors.New("invalid status type")
 	}
+}
+
+// checkIfProjDir checks if the current directory is a project directory
+// by checking for the presence of a .git directory in
+// the current directory or any of its parent directories.
+func checkIfProjDir() (bool, string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return false, "", fmt.Errorf("Error getting current directory: %v", err)
+	}
+
+	for {
+		files, err := os.ReadDir(dir)
+		if err != nil {
+			log.Fatalf("Error reading directory %v", err)
+		}
+		for _, file := range files {
+			if file.Name() == ".git" {
+				return true, dir, nil
+			}
+		}
+
+		parentDir := filepath.Dir(dir)
+		if parentDir == dir {
+			break
+		}
+		dir = parentDir
+	}
+
+	return false, "", nil
 }
