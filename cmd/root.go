@@ -23,7 +23,10 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	"github.com/akthe-at/go_task/config"
 	"github.com/akthe-at/go_task/tui"
@@ -68,7 +71,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.go_task.toml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/go_task/config.toml)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -77,20 +80,33 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("initConfig: Error getting user home directory: %v", err)
+	}
+
+	var configPath string
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		// TODO: This needs a better default location and name.
-		// Search config in home directory with name ".go_task" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigType("toml")
-		viper.SetConfigName(".go_task")
+		switch runtime.GOOS {
+		case "windows":
+			configPath = filepath.Join(home, ".config", "go_task")
+		case "linux":
+			if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+				configPath = filepath.Join(xdgConfig, "go_task")
+			} else {
+				configPath = filepath.Join(home, ".config", "go_task")
+			}
+		}
 	}
+
+	// TODO: This needs a better default location and name.
+	// Search config in home directory with name ".go_task" (without extension).
+	viper.AddConfigPath(configPath)
+	viper.SetConfigType("toml")
+	viper.SetConfigName("config")
 
 	viper.AutomaticEnv()
 
