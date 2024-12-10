@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/akthe-at/go_task/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -13,24 +14,26 @@ type Styles struct {
 	InputField  lipgloss.Style
 }
 
-// TODO: In the future make this pull from config/default color theme for app?
+type SwitchToPreviousViewMsg struct{}
+
 type ColorTheme struct {
 	BorderForeground string
 	BorderBackground string
 }
 
 func colorTheme() ColorTheme {
+	theme := tui.GetSelectedTheme()
 	return ColorTheme{
-		BorderForeground: "#ea9a97",
-		BorderBackground: "#232136",
+		BorderForeground: theme.Foreground,
+		BorderBackground: theme.Background,
 	}
 }
 
 func DefaultStyles() *Styles {
-	colors := colorTheme()
+	theme := tui.GetSelectedTheme()
 	s := new(Styles)
-	s.BorderColor = lipgloss.Color(colors.BorderForeground)
-	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.NormalBorder()).Padding(1).Width(80)
+	s.BorderColor = lipgloss.Color(theme.Foreground)
+	s.InputField = lipgloss.NewStyle().BorderForeground(lipgloss.Color(theme.Accent)).BorderStyle(lipgloss.NormalBorder()).Padding(1).Width(80)
 	return s
 }
 
@@ -91,6 +94,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "esc":
+			return m, func() tea.Msg {
+				return SwitchToPreviousViewMsg{}
+			}
 		case "enter":
 			if m.index == len(m.questions)-1 {
 				m.done = true

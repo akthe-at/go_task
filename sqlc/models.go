@@ -6,36 +6,51 @@ package sqlc
 
 import (
 	"database/sql"
+	"time"
 )
 
 type Area struct {
-	ID       int64
-	Title    string
-	Status   sql.NullString
-	Archived sql.NullBool
+	ID        int64          `json:"id"`
+	Title     string         `json:"title"`
+	Status    sql.NullString `json:"status"`
+	Archived  bool           `json:"archived"`
+	CreatedAt time.Time      `json:"created_at"`
+	LastMod   time.Time      `json:"last_mod"`
 }
 
 type BridgeNote struct {
-	NoteID       sql.NullInt64
-	ParentCat    sql.NullInt64
-	ParentTaskID sql.NullInt64
-	ParentAreaID sql.NullInt64
+	NoteID       sql.NullInt64 `json:"note_id"`
+	ParentCat    sql.NullInt64 `json:"parent_cat"`
+	ParentTaskID sql.NullInt64 `json:"parent_task_id"`
+	ParentAreaID sql.NullInt64 `json:"parent_area_id"`
 }
 
 type Note struct {
-	ID    int64
-	Title string
-	Path  string
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+	Path  string `json:"path"`
+}
+
+type ProgProjectLink struct {
+	ProjectID    sql.NullInt64 `json:"project_id"`
+	ParentCat    sql.NullInt64 `json:"parent_cat"`
+	ParentTaskID sql.NullInt64 `json:"parent_task_id"`
+	ParentAreaID sql.NullInt64 `json:"parent_area_id"`
+}
+
+type ProgrammingProject struct {
+	ID   int64  `json:"id"`
+	Path string `json:"path"`
 }
 
 type Task struct {
-	ID        int64
-	Title     string
-	Priority  sql.NullString
-	Status    sql.NullString
-	Archived  sql.NullBool
-	CreatedAt sql.NullTime
-	LastMod   sql.NullTime
-	DueDate   sql.NullTime
-	AreaID    sql.NullInt64
+	ID        int64          `json:"id"`
+	Title     string         `json:"title"`
+	Priority  sql.NullString `json:"priority"`
+	Status    sql.NullString `json:"status"`
+	Archived  bool           `json:"archived"`
+	CreatedAt time.Time      `json:"created_at"`
+	LastMod   time.Time      `json:"last_mod"`
+	DueDate   sql.NullTime   `json:"due_date"`
+	AreaID    sql.NullInt64  `json:"area_id"`
 }

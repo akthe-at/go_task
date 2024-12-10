@@ -71,6 +71,30 @@ INNER JOIN bridge_notes ON bridge_notes.note_id = notes.id
 LEFT JOIN tasks ON tasks.ID = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
 LEFT JOIN areas ON areas.ID = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2;
 
+-- name: UpdateAreaStatus :execresult
+UPDATE areas SET status = ?  where id = ?
+returning *;
+
+-- name: UpdateAreaArchived :execresult
+UPDATE areas SET archived = ?  where id = ?
+returning *;
+
+-- name: UpdateAreaTitle :execlastid
+UPDATE areas set title = ? where id = ?
+returning id;
+
+-- name: UpdateTaskStatus :execresult
+UPDATE tasks SET status = ?  where id = ?
+returning *;
+
+-- name: UpdateTaskPriority :execresult
+UPDATE tasks SET priority = ?  where id = ?
+returning *;
+
+-- name: UpdateTaskTitle :execresult
+UPDATE tasks set title = ? where id = ?
+returning *;
+
 
 -- name: DeleteNote :one
 DELETE FROM notes WHERE id = ?
@@ -83,7 +107,7 @@ returning *;
 -- name: CreateArea :execlastid
 INSERT INTO areas (title, status, archived)
 VALUES (?, ?, ?)
-returning *;
+returning id;
 
 -- name: ReadArea :one
 SELECT 
@@ -99,45 +123,58 @@ WHERE
     areas.id = ?;
 
 
--- name: DeleteAreaAndNotes :execresult
+-- name: DeleteNotesFromSingleArea :execresult
 DELETE FROM notes
 WHERE notes.id IN (
 		SELECT bridge_notes.note_id
 		FROM bridge_notes
 		WHERE parent_cat = 2 AND parent_area_id = ?
 );
-DELETE FROM areas WHERE id = ?;
 
--- name: DeleteAreasAndNotesMultiple :execresult
+-- name: DeleteNotesFromMultipleAreas :execresult
 DELETE FROM notes
 WHERE id IN (
     SELECT note_id
     FROM bridge_notes
-    WHERE parent_cat = 2 AND parent_area_id IN (?)
+    WHERE parent_cat = 2 AND parent_area_id IN (sqlc.slice(ids))
 )
-;
-DELETE FROM areas 
-WHERE id IN (?)
 RETURNING *;
 
--- name: DeleteArea :execresult
+-- name: DeleteSingleArea :one
 DELETE FROM areas WHERE id = ?
+returning id
 ;
 
+
 -- name: DeleteMultipleAreas :execresult
-DELETE FROM areas WHERE id IN (?)
+DELETE FROM areas WHERE id IN (sqlc.slice(ids))
 returning *;
 
 -- name: CreateTask :execlastid
-INSERT INTO tasks (title, priority, status, archived, created_at, last_mod, due_date)
-VALUES (?, ?, ?, ?, ?, ?, ?)
-returning *;
+INSERT INTO tasks (
+    title, priority, status, archived, due_date,
+    created_at, last_mod
+)
+VALUES (
+    ?, ?, ?, ?, ?,
+    datetime(current_timestamp, 'localtime'),
+    datetime(current_timestamp, 'localtime')
+)
+returning id;
 
 -- name: ReadTaskNote :many
 SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
 FROM notes
 INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
 WHERE bridge_notes.parent_task_id = ? 
+AND bridge_notes.parent_cat = 1;
+
+
+-- name: ReadTaskNotes :execrows
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_task_id in (sqlc.slice(ids))
 AND bridge_notes.parent_cat = 1;
 
 -- name: ReadAllTasks :many
@@ -161,6 +198,22 @@ DELETE FROM tasks
 WHERE id in (sqlc.slice(ids))
 ;
 
+
+-- name: ReadAreaNote :many
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_task_id = ?
+AND bridge_notes.parent_cat = 2;
+
+-- name: ReadAreaNotes :execrows
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+INNER JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE bridge_notes.parent_area_id in (sqlc.slice(ids))
+AND bridge_notes.parent_cat = 2
+;
+
 -- name: ReadAreas :many
 SELECT 
     areas.id, areas.title, areas.status, areas.archived,
@@ -173,3 +226,33 @@ LEFT JOIN
     notes ON bridge_notes.note_id = notes.id
 GROUP BY 
     areas.id;
+
+-- name: CheckProgProjectExists :one
+SELECT
+  CASE WHEN EXISTS (
+    SELECT 1
+    FROM programming_projects
+    WHERE path = ?
+  ) THEN 1 ELSE 0 END AS prog_proj_exists;
+
+
+-- name: FindProgProjectsForTask :many
+SELECT pp.*
+FROM programming_projects pp
+JOIN prog_project_links pl on pp.id = pl.project_id
+WHERE pl.parent_task_id = ?;
+
+-- name: FindProgProjectsForArea :many
+SELECT pp.*
+FROM programming_projects pp
+JOIN prog_project_links pl on pp.id = pl.project_id
+WHERE pl.parent_area_id = ?;
+
+-- name: InsertProgProject :one
+INSERT INTO programming_projects (path)
+VALUES (?)
+RETURNING id;
+
+-- name: InsertProjectLink :exec
+INSERT INTO prog_project_links (project_id, parent_cat, parent_task_id)
+VALUES (?, ?, ?)

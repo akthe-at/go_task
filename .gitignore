@@ -3,3 +3,4 @@
 *.exe
 /bin
 go_task
+launch.json

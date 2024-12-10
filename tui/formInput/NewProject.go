@@ -1,28 +1,22 @@
 package formInput
 
 import (
-	"os"
-	"os/exec"
-
 	"github.com/akthe-at/go_task/data"
+	"github.com/akthe-at/go_task/tui"
 	"github.com/charmbracelet/huh"
 )
 
 type NewAreaForm struct {
 	AreaForm  *huh.Form
 	AreaTitle string
-	Priority  data.PriorityType
 	Status    data.StatusType
 	Notes     []data.Note
 	Archived  bool
 	Submit    bool
 }
 
-func (n *NewAreaForm) NewAreaForm() error {
-	// Clear the terminal before showing form
-	cmd := exec.Command("clear")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+func (n *NewAreaForm) NewAreaForm(theme huh.Theme) error {
+	tui.ClearTerminalScreen()
 
 	groups := []*huh.Group{
 		huh.NewGroup(
@@ -30,16 +24,6 @@ func (n *NewAreaForm) NewAreaForm() error {
 				Title("What is the the name of the Project/Area?").
 				Prompt(">").
 				Value(&n.AreaTitle),
-
-			huh.NewSelect[data.PriorityType]().
-				Title("Priority Level").
-				Options(
-					huh.NewOption("Low", data.PriorityTypeLow).Selected(true),
-					huh.NewOption("Medium", data.PriorityTypeMedium),
-					huh.NewOption("High", data.PriorityTypeHigh),
-					huh.NewOption("Urgent", data.PriorityTypeUrgent),
-				).
-				Value(&n.Priority),
 
 			huh.NewSelect[data.StatusType]().
 				Title("Current Status?").
@@ -66,5 +50,5 @@ func (n *NewAreaForm) NewAreaForm() error {
 	}
 	n.AreaForm = huh.NewForm(groups...)
 
-	return n.AreaForm.Run()
+	return n.AreaForm.WithTheme(&theme).Run()
 }

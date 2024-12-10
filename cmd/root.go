@@ -23,8 +23,12 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 
+	"github.com/akthe-at/go_task/config"
 	"github.com/akthe-at/go_task/tui"
 	dataTable "github.com/akthe-at/go_task/tui/dataTable"
 	tea "github.com/charmbracelet/bubbletea"
@@ -67,7 +71,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.go_task.toml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/go_task/config.toml)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -76,26 +80,49 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("initConfig: Error getting user home directory: %v", err)
+	}
+
+	var configPath string
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".go_task" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigType("toml")
-		viper.SetConfigName(".go_task")
+		switch runtime.GOOS {
+		case "windows":
+			configPath = filepath.Join(home, ".config", "go_task")
+		case "linux":
+			if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+				configPath = filepath.Join(xdgConfig, "go_task")
+			} else {
+				configPath = filepath.Join(home, ".config", "go_task")
+			}
+		}
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
+	// TODO: This needs a better default location and name.
+	// Search config in home directory with name ".go_task" (without extension).
+	viper.AddConfigPath(configPath)
+	viper.SetConfigType("toml")
+	viper.SetConfigName("config")
 
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading config file: %v\n", err)
+		return
+	} else {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+
+	// FIXME: I wish this wasn't necessary but viper wouldn'tm unmarshal the data otherwise?
+	// Directly access the values from Viper and manually assign them to the struct
+	config.UserSettings.Selected.Editor = viper.GetString("selected.editor")
+	config.UserSettings.Selected.NotesPath = viper.GetString("selected.notes_path")
+	config.UserSettings.Selected.UseObsidian = viper.GetBool("selected.use_obsidian")
+	config.UserSettings.Selected.Theme = viper.GetString("selected.theme")
 
 	var userThemes tui.ColorThemes
 	if err := viper.Unmarshal(&userThemes); err != nil {

@@ -22,10 +22,13 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/spf13/cobra"
 )
 
@@ -46,6 +49,7 @@ var dbInitCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("DB is being setup...")
 
+		ctx := context.Background()
 		// Open a database connection
 		conn, err := db.ConnectDB()
 		if err != nil {
@@ -64,56 +68,18 @@ var dbInitCmd = &cobra.Command{
 		}
 
 		// // Create and Insert a new Task
-		test := data.Task{
-			Title:    "do laundry",
-			Priority: "high",
-			Status:   "Pending",
-			Archived: false,
+		test := sqlc.CreateTaskParams{
+			Title:    "do some laundry",
+			Priority: sql.NullString{String: string(data.PriorityTypeHigh), Valid: true},
+			Status:   sql.NullString{String: string(data.StatusToDo), Valid: true},
 		}
-		test.Create(conn)
-
-		err = test.Create(conn)
+		queries := sqlc.New(conn)
+		result, err := queries.CreateTask(ctx, test)
 		if err != nil {
 			fmt.Println("Error creating task:", err)
 		}
+		fmt.Println("Result:", result)
 
-		updated_task := data.Task{
-			ID:             1,
-			Title:          "do laundry again and again and again",
-			UpdateArchived: false,
-		}
-
-		_, err = updated_task.Update(conn)
-		if err != nil {
-			fmt.Println("Error updating task:", err)
-		}
-
-		deleted_task := data.Task{ID: 1}
-		err = deleted_task.Delete(conn)
-		if err != nil {
-			fmt.Println("Error deleting task:", err)
-		}
-
-		// Query Data
-		results, err := conn.Query(`SELECT * FROM tasks`)
-		if err != nil {
-			fmt.Println("Error when querying data:", err)
-		} else {
-			// View Data / Close Connection
-			defer results.Close()
-			for results.Next() {
-				var task data.Task
-				err := results.Scan(&task.ID, &task.Title, &task.Priority, &task.Status, &task.Archived, &task.CreatedAt, &task.LastModified, &task.DueDate)
-				if err != nil {
-					fmt.Println("Error when scanning data:", err)
-					continue
-				}
-				fmt.Printf("Task: %+v\n", task)
-			}
-			if err := results.Err(); err != nil {
-				fmt.Println("Error when iterating results:", err)
-			}
-		}
 		fmt.Println("Setup complete")
 	},
 }
