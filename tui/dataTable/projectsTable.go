@@ -343,7 +343,7 @@ func (m *ProjectsModel) deleteProject() tea.Cmd {
 			}
 		}
 		// delete the project
-		deletedID, err := queries.DeleteArea(ctx, projectID)
+		deletedID, err := queries.DeleteSingleArea(ctx, projectID)
 		if err != nil {
 			log.Printf("Error deleting area/project: %s", err)
 			return nil
