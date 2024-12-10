@@ -31,6 +31,18 @@ type Note struct {
 	Path  string `json:"path"`
 }
 
+type ProgProjectLink struct {
+	ProjectID    sql.NullInt64 `json:"project_id"`
+	ParentCat    sql.NullInt64 `json:"parent_cat"`
+	ParentTaskID sql.NullInt64 `json:"parent_task_id"`
+	ParentAreaID sql.NullInt64 `json:"parent_area_id"`
+}
+
+type ProgrammingProject struct {
+	ID   int64  `json:"id"`
+	Path string `json:"path"`
+}
+
 type Task struct {
 	ID        int64          `json:"id"`
 	Title     string         `json:"title"`

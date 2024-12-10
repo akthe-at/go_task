@@ -52,3 +52,20 @@ CREATE TABLE IF NOT EXISTS bridge_notes (
     FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS programming_projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS prog_project_links (
+    project_id INTEGER,
+    parent_cat INTEGER,
+    parent_task_id INTEGER, 
+    parent_area_id INTEGER,
+    FOREIGN KEY(project_id) REFERENCES programming_projects(id) ON DELETE CASCADE,
+    CHECK (parent_cat IN (1, 2)),
+    FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE
+);
+

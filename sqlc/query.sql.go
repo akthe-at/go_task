@@ -12,6 +12,22 @@ import (
 	"time"
 )
 
+const checkProgProjectExists = `-- name: CheckProgProjectExists :one
+SELECT
+  CASE WHEN EXISTS (
+    SELECT 1
+    FROM programming_projects
+    WHERE path = ?
+  ) THEN 1 ELSE 0 END AS prog_proj_exists
+`
+
+func (q *Queries) CheckProgProjectExists(ctx context.Context, path string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, checkProgProjectExists, path)
+	var prog_proj_exists int64
+	err := row.Scan(&prog_proj_exists)
+	return prog_proj_exists, err
+}
+
 const createArea = `-- name: CreateArea :execlastid
 INSERT INTO areas (title, status, archived)
 VALUES (?, ?, ?)
@@ -121,43 +137,6 @@ func (q *Queries) CreateTaskBridgeNote(ctx context.Context, arg CreateTaskBridge
 	return result.LastInsertId()
 }
 
-const deleteArea = `-- name: DeleteArea :one
-DELETE FROM areas WHERE id = ?
-returning id
-`
-
-func (q *Queries) DeleteArea(ctx context.Context, id int64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, deleteArea, id)
-	err := row.Scan(&id)
-	return id, err
-}
-
-const deleteAreaAndNotes = `-- name: DeleteAreaAndNotes :execresult
-DELETE FROM notes
-WHERE notes.id IN (
-		SELECT bridge_notes.note_id
-		FROM bridge_notes
-		WHERE parent_cat = 2 AND parent_area_id = ?
-)
-`
-
-func (q *Queries) DeleteAreaAndNotes(ctx context.Context, parentAreaID sql.NullInt64) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteAreaAndNotes, parentAreaID)
-}
-
-const deleteAreasAndNotesMultiple = `-- name: DeleteAreasAndNotesMultiple :execresult
-DELETE FROM notes
-WHERE id IN (
-    SELECT note_id
-    FROM bridge_notes
-    WHERE parent_cat = 2 AND parent_area_id IN (?)
-)
-`
-
-func (q *Queries) DeleteAreasAndNotesMultiple(ctx context.Context, parentAreaID sql.NullInt64) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteAreasAndNotesMultiple, parentAreaID)
-}
-
 const deleteMultipleAreas = `-- name: DeleteMultipleAreas :execresult
 ;
 
@@ -211,6 +190,54 @@ func (q *Queries) DeleteNotes(ctx context.Context, ids []int64) (sql.Result, err
 	return q.db.ExecContext(ctx, query, queryParams...)
 }
 
+const deleteNotesFromMultipleAreas = `-- name: DeleteNotesFromMultipleAreas :execresult
+DELETE FROM notes
+WHERE id IN (
+    SELECT note_id
+    FROM bridge_notes
+    WHERE parent_cat = 2 AND parent_area_id IN (/*SLICE:ids*/?)
+)
+RETURNING id, title, path
+`
+
+func (q *Queries) DeleteNotesFromMultipleAreas(ctx context.Context, ids []sql.NullInt64) (sql.Result, error) {
+	query := deleteNotesFromMultipleAreas
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	return q.db.ExecContext(ctx, query, queryParams...)
+}
+
+const deleteNotesFromSingleArea = `-- name: DeleteNotesFromSingleArea :execresult
+DELETE FROM notes
+WHERE notes.id IN (
+		SELECT bridge_notes.note_id
+		FROM bridge_notes
+		WHERE parent_cat = 2 AND parent_area_id = ?
+)
+`
+
+func (q *Queries) DeleteNotesFromSingleArea(ctx context.Context, parentAreaID sql.NullInt64) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteNotesFromSingleArea, parentAreaID)
+}
+
+const deleteSingleArea = `-- name: DeleteSingleArea :one
+DELETE FROM areas WHERE id = ?
+returning id
+`
+
+func (q *Queries) DeleteSingleArea(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, deleteSingleArea, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
 const deleteTask = `-- name: DeleteTask :one
 DELETE FROM tasks
 WHERE id = ?
@@ -244,6 +271,95 @@ func (q *Queries) DeleteTasks(ctx context.Context, ids []int64) (int64, error) {
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const findProgProjectsForArea = `-- name: FindProgProjectsForArea :many
+SELECT pp.id, pp.path
+FROM programming_projects pp
+JOIN prog_project_links pl on pp.id = pl.project_id
+WHERE pl.parent_area_id = ?
+`
+
+func (q *Queries) FindProgProjectsForArea(ctx context.Context, parentAreaID sql.NullInt64) ([]ProgrammingProject, error) {
+	rows, err := q.db.QueryContext(ctx, findProgProjectsForArea, parentAreaID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ProgrammingProject
+	for rows.Next() {
+		var i ProgrammingProject
+		if err := rows.Scan(&i.ID, &i.Path); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const findProgProjectsForTask = `-- name: FindProgProjectsForTask :many
+SELECT pp.id, pp.path
+FROM programming_projects pp
+JOIN prog_project_links pl on pp.id = pl.project_id
+WHERE pl.parent_task_id = ?
+`
+
+func (q *Queries) FindProgProjectsForTask(ctx context.Context, parentTaskID sql.NullInt64) ([]ProgrammingProject, error) {
+	rows, err := q.db.QueryContext(ctx, findProgProjectsForTask, parentTaskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ProgrammingProject
+	for rows.Next() {
+		var i ProgrammingProject
+		if err := rows.Scan(&i.ID, &i.Path); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const insertProgProject = `-- name: InsertProgProject :one
+INSERT INTO programming_projects (path)
+VALUES (?)
+RETURNING id
+`
+
+func (q *Queries) InsertProgProject(ctx context.Context, path string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertProgProject, path)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const insertProjectLink = `-- name: InsertProjectLink :exec
+INSERT INTO prog_project_links (project_id, parent_cat, parent_task_id)
+VALUES (?, ?, ?)
+`
+
+type InsertProjectLinkParams struct {
+	ProjectID    sql.NullInt64 `json:"project_id"`
+	ParentCat    sql.NullInt64 `json:"parent_cat"`
+	ParentTaskID sql.NullInt64 `json:"parent_task_id"`
+}
+
+func (q *Queries) InsertProjectLink(ctx context.Context, arg InsertProjectLinkParams) error {
+	_, err := q.db.ExecContext(ctx, insertProjectLink, arg.ProjectID, arg.ParentCat, arg.ParentTaskID)
+	return err
 }
 
 const readAllAreaNotes = `-- name: ReadAllAreaNotes :many
@@ -827,6 +943,52 @@ func (q *Queries) ReadTasks(ctx context.Context) ([]ReadTasksRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateAreaArchived = `-- name: UpdateAreaArchived :execresult
+UPDATE areas SET archived = ?  where id = ?
+returning id, title, status, archived, created_at, last_mod
+`
+
+type UpdateAreaArchivedParams struct {
+	Archived bool  `json:"archived"`
+	ID       int64 `json:"id"`
+}
+
+func (q *Queries) UpdateAreaArchived(ctx context.Context, arg UpdateAreaArchivedParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateAreaArchived, arg.Archived, arg.ID)
+}
+
+const updateAreaStatus = `-- name: UpdateAreaStatus :execresult
+UPDATE areas SET status = ?  where id = ?
+returning id, title, status, archived, created_at, last_mod
+`
+
+type UpdateAreaStatusParams struct {
+	Status sql.NullString `json:"status"`
+	ID     int64          `json:"id"`
+}
+
+func (q *Queries) UpdateAreaStatus(ctx context.Context, arg UpdateAreaStatusParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateAreaStatus, arg.Status, arg.ID)
+}
+
+const updateAreaTitle = `-- name: UpdateAreaTitle :execlastid
+UPDATE areas set title = ? where id = ?
+returning id
+`
+
+type UpdateAreaTitleParams struct {
+	Title string `json:"title"`
+	ID    int64  `json:"id"`
+}
+
+func (q *Queries) UpdateAreaTitle(ctx context.Context, arg UpdateAreaTitleParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateAreaTitle, arg.Title, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 const updateTaskPriority = `-- name: UpdateTaskPriority :execresult
