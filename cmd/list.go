@@ -26,6 +26,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -228,12 +229,19 @@ func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 
 	var rows [][]string
 	for _, task := range tasks {
+		formattedPath := path.Base(task.Path.String)
+		if formattedPath == "." {
+			formattedPath = ""
+		}
+
 		formattedDate := task.AgeInDays
 		row := []string{
 			fmt.Sprintf("%d", task.ID),
 			task.Title,
 			fmt.Sprintf("%f", formattedDate),
+			formattedPath,
 		}
+
 		var formattedNotes string
 		if task.NoteTitles != nil {
 			note := task.NoteTitles.(string)
@@ -277,7 +285,7 @@ func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 			}
 			return style
 		}).
-		Headers("ID", "Task", "Age of Task", "Notes").
+		Headers("ID", "Task", "Age of Task", "Project", "Notes").
 		Rows(rows...)
 	return &t
 }
