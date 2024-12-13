@@ -303,34 +303,18 @@ func (q *Queries) FindProgProjectsForArea(ctx context.Context, parentAreaID sql.
 	return items, nil
 }
 
-const findProgProjectsForTask = `-- name: FindProgProjectsForTask :many
+const findProgProjectsForTask = `-- name: FindProgProjectsForTask :one
 SELECT pp.id, pp.path
 FROM programming_projects pp
 JOIN prog_project_links pl on pp.id = pl.project_id
 WHERE pl.parent_task_id = ?
 `
 
-func (q *Queries) FindProgProjectsForTask(ctx context.Context, parentTaskID sql.NullInt64) ([]ProgrammingProject, error) {
-	rows, err := q.db.QueryContext(ctx, findProgProjectsForTask, parentTaskID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ProgrammingProject
-	for rows.Next() {
-		var i ProgrammingProject
-		if err := rows.Scan(&i.ID, &i.Path); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) FindProgProjectsForTask(ctx context.Context, parentTaskID sql.NullInt64) (ProgrammingProject, error) {
+	row := q.db.QueryRowContext(ctx, findProgProjectsForTask, parentTaskID)
+	var i ProgrammingProject
+	err := row.Scan(&i.ID, &i.Path)
+	return i, err
 }
 
 const insertProgProject = `-- name: InsertProgProject :one
@@ -441,6 +425,34 @@ func (q *Queries) ReadAllNotes(ctx context.Context) ([]ReadAllNotesRow, error) {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const readAllProgProjects = `-- name: ReadAllProgProjects :many
+SELECT path
+FROM programming_projects
+`
+
+func (q *Queries) ReadAllProgProjects(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, readAllProgProjects)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, err
+		}
+		items = append(items, path)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -897,10 +909,12 @@ func (q *Queries) ReadTaskNotes(ctx context.Context, ids []sql.NullInt64) (int64
 const readTasks = `-- name: ReadTasks :many
 SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
-    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles
+    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles, pp.path
 FROM tasks
 LEFT OUTER JOIN bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
 LEFT OUTER JOIN notes ON bridge_notes.note_id = notes.id
+LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_task_id = tasks.id
+LEFT OUTER JOIN programming_projects pp on pjl.project_id = pp.id
 GROUP BY tasks.id
 `
 
@@ -912,6 +926,7 @@ type ReadTasksRow struct {
 	Archived   bool           `json:"archived"`
 	AgeInDays  float64        `json:"age_in_days"`
 	NoteTitles interface{}    `json:"note_titles"`
+	Path       sql.NullString `json:"path"`
 }
 
 func (q *Queries) ReadTasks(ctx context.Context) ([]ReadTasksRow, error) {
@@ -931,6 +946,7 @@ func (q *Queries) ReadTasks(ctx context.Context) ([]ReadTasksRow, error) {
 			&i.Archived,
 			&i.AgeInDays,
 			&i.NoteTitles,
+			&i.Path,
 		); err != nil {
 			return nil, err
 		}
