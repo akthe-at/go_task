@@ -81,7 +81,7 @@ to quickly create a Cobra application.`,
 		case "priority":
 			priority, err := mapToPriorityType(args[2])
 			if err != nil {
-				log.Fatalf("Invalid status type: %v", err)
+				log.Fatalf("Invalid priority type: %v", err)
 			}
 
 			queries.UpdateTaskPriority(ctx, sqlc.UpdateTaskPriorityParams{
