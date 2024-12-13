@@ -32,10 +32,12 @@ WHERE
 -- name: ReadTasks :many
 SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
-    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles
+    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles, pp.path
 FROM tasks
 LEFT OUTER JOIN bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
 LEFT OUTER JOIN notes ON bridge_notes.note_id = notes.id
+LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_task_id = tasks.id
+LEFT OUTER JOIN programming_projects pp on pjl.project_id = pp.id
 GROUP BY tasks.id;
 
 -- name: ReadNote :many
@@ -227,6 +229,10 @@ LEFT JOIN
 GROUP BY 
     areas.id;
 
+-- name: ReadAllProgProjects :many
+SELECT path
+FROM programming_projects;
+
 -- name: CheckProgProjectExists :one
 SELECT
   CASE WHEN EXISTS (
@@ -236,7 +242,7 @@ SELECT
   ) THEN 1 ELSE 0 END AS prog_proj_exists;
 
 
--- name: FindProgProjectsForTask :many
+-- name: FindProgProjectsForTask :one
 SELECT pp.*
 FROM programming_projects pp
 JOIN prog_project_links pl on pp.id = pl.project_id
