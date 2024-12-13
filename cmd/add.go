@@ -168,8 +168,8 @@ var addTaskCmd = &cobra.Command{
 	},
 }
 
-// addProjectCmd represents the new command
-var addProjectCmd = &cobra.Command{
+// addAreaCmd represents the new command
+var addAreaCmd = &cobra.Command{
 	Use:   "project",
 	Short: "Creates a new project with a form or optionally raw string input",
 	Long: `
@@ -351,21 +351,21 @@ var addTaskNoteCmd = &cobra.Command{
 	},
 }
 
-// addProjectNoteCmd represents the command for adding new Project/Area notes to an existing Project/Area
-var addProjectNoteCmd = &cobra.Command{
+// addAreaNoteCmd represents the command for adding new Project/Area notes to an existing Project/Area
+var addAreaNoteCmd = &cobra.Command{
 	Use:   "note",
-	Short: "Add a note to a specific area/project",
+	Short: "Add a note to a specific area.",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 3 {
-			log.Fatalf("You must provide at least 3 arguments! Usage: add project note <project_id> <note_title> <note_path>")
+			log.Fatalf("You must provide at least 3 arguments! Usage: add area note <area_id> <note_title> <note_path>")
 		}
 
-		projectID, err := strconv.Atoi(args[0])
+		areaID, err := strconv.Atoi(args[0])
 		if err != nil {
-			log.Fatalf("Invalid project ID: %v", err)
+			log.Fatalf("Invalid area ID: %v", err)
 		}
 
 		noteTitle := args[1]
@@ -390,22 +390,22 @@ and usage of using your command. For example:
 			Path:  notePath,
 		})
 		if err != nil {
-			fmt.Printf("addProjectNoteCmd: There was an error creating the note: %v", err)
+			fmt.Printf("addAreaNoteCmd: There was an error creating the note: %v", err)
 		}
 
 		_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
 			NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
 			ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
-			ParentAreaID: sql.NullInt64{Int64: int64(projectID), Valid: true},
+			ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
 		})
 		if err != nil {
-			log.Fatalf("addProjectNoteCmd: Error creating task bridge note: %v", err)
+			log.Fatalf("addAreaNoteCmd: Error creating task bridge note: %v", err)
 		}
 		err = tx.Commit()
 		if err != nil {
-			fmt.Printf("addProjectNoteCmd: Error committing transaction: %v", err)
+			fmt.Printf("addAreaNoteCmd: Error committing transaction: %v", err)
 		} else {
-			fmt.Println("Note added to Area/Project successfully")
+			fmt.Println("Note added to Area successfully")
 		}
 	},
 }
@@ -413,16 +413,16 @@ and usage of using your command. For example:
 func init() {
 	rootCmd.AddCommand(addCmd)
 	addCmd.AddCommand(addTaskCmd)
-	addCmd.AddCommand(addProjectCmd)
+	addCmd.AddCommand(addAreaCmd)
 	addTaskCmd.AddCommand(addTaskNoteCmd)
-	addProjectCmd.AddCommand(addProjectNoteCmd)
+	addAreaCmd.AddCommand(addAreaNoteCmd)
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.
 	addCmd.PersistentFlags().BoolVarP(&rawFlag, "raw", "r", false, "Bypass using the form and use raw input instead")
-	addCmd.PersistentFlags().BoolVar(&Archived, "archived", false, "Archive the task or project upon creation")
-	addCmd.PersistentFlags().BoolVar(&NewNote, "new", false, "this flag is used to add a new note to an existing task or project")
+	addCmd.PersistentFlags().BoolVar(&Archived, "archived", false, "Archive the task or area upon creation")
+	addCmd.PersistentFlags().BoolVar(&NewNote, "new", false, "this flag is used to add a new note to an existing task or area")
 	addCmd.PersistentFlags().BoolVar(&openInEditor, "open", false, "this flag is used to open the note in an editor after creation")
 	addCmd.Flags().StringVarP(&noteTags, "tags", "t", "", "Tags for the note")
 	addCmd.Flags().StringVarP(&noteAliases, "aliases", "a", "", "Aliases for the note")
