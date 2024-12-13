@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/charmbracelet/log"
@@ -93,54 +92,73 @@ var deleteTaskCmd = &cobra.Command{
 	},
 }
 
-var deleteProjectCmd = &cobra.Command{
-	Use:   "project",
-	Short: "Delete a project/area given a unique ID",
+var deleteAreaCmd = &cobra.Command{
+	Use:   "area",
+	Short: "Delete a area given a unique ID",
 	Long: `
 	You can delete a task by providing the unique task ID.
-	You can use this command like this: go_task delete project <project_id>
+	You can use this command like this: go_task delete area <area_id>
 
-	Additionally, you can provide multiple project IDs to delete multiple projects at once:
-	"go_task delete project <project_id> <project_id> <project_id> ..."
+	Additionally, you can provide multiple area IDs to delete multiple areas at once:
+	"go_task delete area <area_id> <area_id> <area_id> ..."
 
-	You can find the task ID by using the 'go_task list projects' command.
+	You can find the task ID by using the 'go_task list areas' command.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var projectIDs []int
-		for _, project := range args {
-			projectID, err := strconv.Atoi(project)
+		var areaIDs []int64
+		for _, area := range args {
+			areaID, err := strconv.Atoi(area)
 			if err != nil {
 				log.Errorf("Error converting task ID to integer: %v", err)
 				return
 			}
-			projectIDs = append(projectIDs, projectID)
+			areaIDs = append(areaIDs, int64(areaID))
 		}
 
-		fmt.Println("delete called for task(s):", projectIDs)
-		if len(projectIDs) == 0 {
-			log.Errorf("No project IDs provided - delete command requires at least one project ID")
+		fmt.Println("delete called for task(s):", areaIDs)
+		if len(areaIDs) == 0 {
+			log.Errorf("No area IDs provided - delete command requires at least one area ID")
 			return
 		}
 
+		// ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
+		// queries := sqlc.New(conn)
+		//
+		// notesOption, err := cmd.Flags().GetString("notes")
+		// if err != nil {
+		// 	log.Fatalf("Error getting notes flag: %v", err)
+		// }
 
-		projects := data.Area{}
-		err = projects.DeleteMultiple(conn, projectIDs)
-		if err != nil {
-			log.Errorf("Error deleting project(s): %v", err)
-			return
-		}
+		// switch notesOption {
+		// case "all":
+		// 	_, err := queries.DeleteMultipleAreas(ctx, projectIDs)
+		// 	_, err = queries.DeleteNotesFromMultipleAreas(ctx, sql.NullInt64{int64(projectIDs), true})
+		// case "some":
+		// 	_, err := queries.DeleteMultipleAreas(ctx, projectIDs)
+		// 	if err != nil {
+		// 		log.Fatalf("Error deleting project(s): %v", err)
+		// 	}
+		// 	_, err = queries.DeleteNotesFromSingleArea(ctx, projectIDs)
+		// case "one":
+		// 	_, err = queries.DeleteSingleArea(ctx, projectIDs)
+		// 	_, err = queries.DeleteNote(ctx, projectIDs)
+		//
+		// default:
+		// 	_, err := queries.DeleteMultipleAreas(ctx, projectIDs)
+		//
+		// }
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteTaskCmd)
-	deleteCmd.AddCommand(deleteProjectCmd)
+	deleteCmd.AddCommand(deleteAreaCmd)
 
 	// Here you will define your flags and configuration settings.
 
@@ -150,5 +168,5 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// deleteCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	deleteAreaCmd.Flags().String("notes", "n", "Pass this flag to delete all, some, or none of the notes associated with the area.")
 }
