@@ -21,8 +21,8 @@ type NoteMetadata struct {
 }
 
 type NoteContent struct {
-	Metadata NoteMetadata
 	Body     string
+	Metadata NoteMetadata
 }
 
 func GenerateMarkdownFile(note NoteContent, outputPath string) (string, error) {
