@@ -3,12 +3,10 @@ package cmd
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -17,6 +15,7 @@ import (
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/akthe-at/go_task/tui/formInput"
+	"github.com/akthe-at/go_task/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -135,7 +134,7 @@ var addTaskCmd = &cobra.Command{
 				}
 				fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
 
-				ok, projectDir, err := checkIfProjDir()
+				ok, projectDir, err := utils.CheckIfProjDir()
 				if err != nil {
 					log.Fatalf("Error checking if project directory: %v", err)
 				}
