@@ -60,6 +60,12 @@ var addTaskCmd = &cobra.Command{
 			taskCat       int64 = 1 // ParentCategory Value for Tasks
 		)
 		ctx := context.Background()
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+		defer conn.Close()
+		queries := sqlc.New(conn)
 		if rawFlag {
 			validPriority, err := mapToPriorityType(inputPriority)
 			if err != nil {
@@ -71,12 +77,6 @@ var addTaskCmd = &cobra.Command{
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
-			conn, err := db.ConnectDB()
-			if err != nil {
-				log.Fatalf("Error connecting to database: %v", err)
-			}
-			defer conn.Close()
-
 			newTask := sqlc.CreateTaskParams{
 				Title:    inputTitle,
 				Priority: sql.NullString{String: string(validPriority), Valid: true},
@@ -84,7 +84,6 @@ var addTaskCmd = &cobra.Command{
 				Archived: Archived,
 			}
 
-			queries := sqlc.New(conn)
 			newTaskID, err := queries.CreateTask(ctx, newTask)
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
@@ -125,13 +124,6 @@ var addTaskCmd = &cobra.Command{
 			}
 
 			if form.Submit {
-				conn, err := db.ConnectDB()
-				if err != nil {
-					log.Fatalf("Error connecting to database: %v", err)
-				}
-				defer conn.Close()
-
-				queries := sqlc.New(conn)
 				result, err := queries.CreateTask(ctx, sqlc.CreateTaskParams{
 					Title:    form.TaskTitle,
 					Priority: sql.NullString{String: string(form.Priority), Valid: true},
