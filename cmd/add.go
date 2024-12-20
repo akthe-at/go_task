@@ -32,9 +32,11 @@ var (
 var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Parent command for adding tasks/projects/notes/etc.",
-	Long:  ``,
+	Long: `This command is used for adding new tasks, projects, notes, etc. 
+	There are subcommands for each of these.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("add cmd called without any further arguments...please complete the command.")
+		fmt.Println(`You invoked the "add" cmd without providing any further subcommands or further arguments,
+please complete the command to achieve the desired outcome.`)
 	},
 }
 
