@@ -53,14 +53,20 @@ var addTaskCmd = &cobra.Command{
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		var (
+			inputTitle          = args[0]
+			inputPriority       = args[1]
+			inputStatus         = args[2]
+			taskCat       int64 = 1 // ParentCategory Value for Tasks
+		)
 		ctx := context.Background()
 		if rawFlag {
-			priority, err := mapToPriorityType(args[1])
+			validPriority, err := mapToPriorityType(inputPriority)
 			if err != nil {
 				log.Fatalf("Invalid priority type: %v", err)
 			}
 
-			status, err := mapToStatusType(args[2])
+			validStatus, err := mapToStatusType(inputStatus)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
@@ -71,19 +77,19 @@ var addTaskCmd = &cobra.Command{
 			}
 			defer conn.Close()
 
-			theTask := sqlc.CreateTaskParams{
-				Title:    args[0],
-				Priority: sql.NullString{String: string(priority), Valid: true},
-				Status:   sql.NullString{String: string(status), Valid: true},
+			newTask := sqlc.CreateTaskParams{
+				Title:    inputTitle,
+				Priority: sql.NullString{String: string(validPriority), Valid: true},
+				Status:   sql.NullString{String: string(validStatus), Valid: true},
 				Archived: Archived,
 			}
 
 			queries := sqlc.New(conn)
-			result, err := queries.CreateTask(ctx, theTask)
+			newTaskID, err := queries.CreateTask(ctx, newTask)
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
 			}
-			fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
+			fmt.Println("Successfully created a task and it was assigned the following ID: ", newTaskID)
 
 			ok, projectDir, err := checkIfProjDir()
 			if err != nil {
@@ -101,8 +107,8 @@ var addTaskCmd = &cobra.Command{
 					queries.InsertProjectLink(ctx,
 						sqlc.InsertProjectLinkParams{
 							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
-							ParentCat:    sql.NullInt64{Int64: 1, Valid: true},
-							ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
+							ParentCat:    sql.NullInt64{Int64: taskCat, Valid: true},
+							ParentTaskID: sql.NullInt64{Int64: newTaskID, Valid: true},
 						},
 					)
 				}
@@ -152,7 +158,7 @@ var addTaskCmd = &cobra.Command{
 						err = queries.InsertProjectLink(ctx,
 							sqlc.InsertProjectLinkParams{
 								ProjectID:    sql.NullInt64{Int64: project, Valid: true},
-								ParentCat:    sql.NullInt64{Int64: 1, Valid: true},
+								ParentCat:    sql.NullInt64{Int64: taskCat, Valid: true},
 								ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
 							},
 						)
