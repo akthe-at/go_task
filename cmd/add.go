@@ -460,34 +460,5 @@ func mapToStatusType(input string) (data.StatusType, error) {
 	default:
 		return "", errors.New("invalid status type")
 	}
-}
-
-// checkIfProjDir checks if the current directory is a project directory
-// by checking for the presence of a .git directory in
-// the current directory or any of its parent directories.
-func checkIfProjDir() (bool, string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return false, "", fmt.Errorf("Error getting current directory: %v", err)
 	}
-
-	for {
-		files, err := os.ReadDir(dir)
-		if err != nil {
-			log.Fatalf("Error reading directory %v", err)
-		}
-		for _, file := range files {
-			if file.Name() == ".git" {
-				return true, dir, nil
-			}
-		}
-
-		parentDir := filepath.Dir(dir)
-		if parentDir == dir {
-			break
-		}
-		dir = parentDir
-	}
-
-	return false, "", nil
 }
