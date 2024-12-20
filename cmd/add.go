@@ -59,6 +59,7 @@ var addTaskCmd = &cobra.Command{
 			inputStatus         = args[2]
 			taskCat       int64 = 1 // ParentCategory Value for Tasks
 		)
+
 		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
@@ -66,6 +67,7 @@ var addTaskCmd = &cobra.Command{
 		}
 		defer conn.Close()
 		queries := sqlc.New(conn)
+
 		if rawFlag {
 			validPriority, err := mapToPriorityType(inputPriority)
 			if err != nil {
@@ -90,28 +92,30 @@ var addTaskCmd = &cobra.Command{
 			}
 			fmt.Println("Successfully created a task and it was assigned the following ID: ", newTaskID)
 
-			ok, projectDir, err := checkIfProjDir()
+			ok, projectDir, err := utils.CheckIfProjDir()
 			if err != nil {
-				log.Fatalf("Error checking if project directory: %v", err)
+				log.Fatalf("Error while checking if project directory: %v", err)
 			}
 			if ok {
 				projID, err := queries.CheckProgProjectExists(ctx, projectDir)
 				if err != nil {
-					log.Fatalf("Error checking if project exists: %v", err)
+					log.Fatalf("Error while checking if project exists: %v", err)
 				} else if projID == 0 {
 					project, err := queries.InsertProgProject(ctx, projectDir)
 					if err != nil {
 						log.Fatalf("Error inserting project: %v", err)
 					}
-					queries.InsertProjectLink(ctx,
+					err = queries.InsertProjectLink(ctx,
 						sqlc.InsertProjectLinkParams{
 							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
 							ParentCat:    sql.NullInt64{Int64: taskCat, Valid: true},
 							ParentTaskID: sql.NullInt64{Int64: newTaskID, Valid: true},
 						},
 					)
+					if err != nil {
+						log.Fatalf("Error inserting project link: %v", err)
+					}
 				}
-
 			}
 
 		} else {
@@ -432,6 +436,7 @@ func init() {
 	// newCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
+// mapToPriorityType maps a string to a PriorityType
 func mapToPriorityType(input string) (data.PriorityType, error) {
 	switch input {
 	case "low":
@@ -443,10 +448,11 @@ func mapToPriorityType(input string) (data.PriorityType, error) {
 	case "urgent":
 		return data.PriorityTypeUrgent, nil
 	default:
-		return "", errors.New("invalid priority type")
+		return "", fmt.Errorf("invalid priority type ( %v ) is not one of the valid priority values (low, medium, high, urgent)", input)
 	}
 }
 
+// mapToStatusType maps a string to a StatusType
 func mapToStatusType(input string) (data.StatusType, error) {
 	switch input {
 	case "todo":
@@ -458,7 +464,6 @@ func mapToStatusType(input string) (data.StatusType, error) {
 	case "done":
 		return data.StatusDone, nil
 	default:
-		return "", errors.New("invalid status type")
-	}
+		return "", fmt.Errorf("invalid status type ( %v ) is not one of the valid status values (todo, planning, doing, done)", input)
 	}
 }
