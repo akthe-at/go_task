@@ -172,18 +172,17 @@ var addTaskCmd = &cobra.Command{
 
 // addAreaCmd represents the new command
 var addAreaCmd = &cobra.Command{
-	Use:   "project",
-	Short: "Creates a new project with a form or optionally raw string input",
+	Use:   "area",
+	Short: "Creates a new area with a form or optionally raw string input",
 	Long: `
-	The command is used for creating new projects.
+	The command is used for creating new areas.
 
-	New projects can be created using a form or straight from the command line by passing
-	the --raw or -r flag.
+	New areas can be created using a form or directly from the command line by passing the --raw or -r flag.
+	You can also optionally provide an archived status for the area using the --archived flag.
 
-	You can also optionally provided an archived status for the task using the --archived flag.
-	Valid area/project statuses: todo, planning, doing, done
+	Valid area statuses: todo, planning, doing, done
 
-	Raw Example: 'go_task add project <project_title> <project_status>'
+	Raw Example: 'go_task add area "<area_title> <area_status>"'
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var (
@@ -196,10 +195,10 @@ var addAreaCmd = &cobra.Command{
 			if len(args) != 1 {
 				log.Fatalf(`
 You must provide at least 2 arguments!
-Usage: add project <project_title> <project_status>, 
+Usage: add area <area_title> <area_status>
 if one of your arguments has white space, please wrap it in "" marks.`)
 			}
-			status, err := mapToStatusType(args[1])
+			validStatus, err := mapToStatusType(inputStatus)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
@@ -245,7 +244,9 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 					Archived: form.Archived,
 				})
 				if err != nil {
-					log.Fatalf("AddProjectCmd: Error creating task: %v", err)
+					log.Fatalf("AddAreaCmd: Error creating task: %v", err)
+				} else {
+					fmt.Println("Successfully created a new area")
 				}
 			}
 		}
