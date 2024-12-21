@@ -218,14 +218,15 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 			},
 			)
 			if err != nil {
-				log.Fatalf("Error creating project: %v", err)
+				log.Fatalf("Error creating new area: %v", err)
+			} else {
+				fmt.Println("Successfully created a new area")
 			}
 
 		} else {
-
 			form := &formInput.NewAreaForm{}
-
 			theTheme := tui.GetSelectedTheme()
+
 			err := form.NewAreaForm(*tui.ThemeGoTask(theTheme))
 			if err != nil {
 				log.Fatalf("Error creating form: %v", err)
@@ -252,12 +253,13 @@ var addTaskNoteCmd = &cobra.Command{
 	Use:   "note",
 	Short: "Add a note to a specific task",
 	Long: `
-	To add a new note to an existing task, you can use the 'note' command.
-		This command will create a new note in the obsidian vault and create a bridge between the note and the task in the database.
-		To do this:
-			Type in: 'go_task add task note <task_id> <note_title> -t <note_tags> -a <note_aliases>'
-		OR
-		ty[e in: 'go_task add task note <task_id> <note_title> <note_path>'
+To add a new note to an existing task, you can use the 'note' command.
+This command will create a new note in the obsidian vault and create a bridge between the note and the task in the database.
+
+To do this:
+	Type in: 'go_task add task note <task_id> <note_title> <note_path>'
+OR to generate a new note AND add it to a specific task:
+	Type in: 'go_task add task note <task_id> <note_title> -t <note_tags> -a <note_aliases>'
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		var (
@@ -271,19 +273,12 @@ var addTaskNoteCmd = &cobra.Command{
 
 		if NewNote {
 			if len(args) < 2 {
-				log.Fatalf(" You must provide at least 2 arguments! Usage: note <task_id> <note_title> -t <note_tags> -a <note_aliases>")
+				log.Fatalf(" You must provide at least 2 arguments to generate a new note! Usage: note <task_id> <note_title> -t <note_tags> -a <note_aliases>")
 			}
 			// TODO: Need to fully flesh this out. Create a brand new note.
-			// 1. Create the actual note in the obsidian vault
-			// 	- Path is defined in user config or default of:
-			// 2. Create the note/bridge in the database
-			// 3. Will the note open in an editor after creation?
-			// Needs to correctly assign a new note id to the task id sqlc model. Also need to create the new note in the directory
-			// that is defined in the user config OR...some default?...This must properly create the markdown file, yaml header, etc.
-			// Figure out how we do or do not want to open this note in an editor after it is created.
-			// Do we want to be able to pass any body/text to the note upon creation?
-			// Do we want to be able to pipe into the note? that might not work so well?
-			// tui.ClearTerminalScreen()
+			// Do we want to be able to pass any body/text to the note upon creation? flag for body text
+			// Do we want to be able to pipe into the note? that might not work so well? I think this could be fine but long winded. better to copy and paste into the editor.
+			// We need to be able to check for repos here and add them...
 			fmt.Println("Creating a new note for task: ", inputTaskID)
 			theTags := strings.Split(noteTags, " ")
 			theAliases := strings.Split(noteAliases, " ")
@@ -321,8 +316,12 @@ var addTaskNoteCmd = &cobra.Command{
 
 			queries := sqlc.New(conn)
 			qtx := queries.WithTx(tx)
+			noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+				Title: inputNoteTitle,
+				Path:  output,
+			})
 			if err != nil {
-				log.Fatalf("Invalid task ID: %v", err)
+				fmt.Printf("addTaskNoteCmd: There was an error creating the note: %v", err)
 			}
 
 			_, err = qtx.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
