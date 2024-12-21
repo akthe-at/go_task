@@ -190,6 +190,14 @@ var addAreaCmd = &cobra.Command{
 			inputStatus = args[1]
 		)
 		ctx := context.Background()
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+		defer conn.Close()
+
+		queries := sqlc.New(conn)
+
 		if rawFlag {
 
 			if len(args) != 1 {
@@ -203,13 +211,6 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
-			conn, err := db.ConnectDB()
-			if err != nil {
-				log.Fatalf("Error connecting to database: %v", err)
-			}
-			defer conn.Close()
-
-			queries := sqlc.New(conn)
 			_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
 				Title:    inputTitle,
 				Status:   sql.NullString{String: string(validStatus), Valid: true},
@@ -231,13 +232,6 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 			}
 
 			if form.Submit {
-				conn, err := db.ConnectDB()
-				if err != nil {
-					log.Fatalf("Error connecting to database: %v", err)
-				}
-				defer conn.Close()
-
-				queries := sqlc.New(conn)
 				_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
 					Title:    form.AreaTitle,
 					Status:   sql.NullString{String: string(form.Status), Valid: true},
@@ -311,18 +305,25 @@ var addTaskNoteCmd = &cobra.Command{
 				}
 			}
 
-			// ctx := context.Background()
-			// conn, err := db.ConnectDB()
-			// if err != nil {
-			// 	log.Fatalf("Error connecting to database: %v", err)
-			// }
+			ctx := context.Background()
+			conn, err := db.ConnectDB()
+			if err != nil {
+				log.Fatalf("Error connecting to database: %v", err)
+			}
 
 		} else {
 			if len(args) < 3 {
 				log.Fatalf("You must provide at least 3 arguments! Usage: note <task_id> <note_title> <note_path>")
+			tx, err := conn.Begin()
+			if err != nil {
+				log.Fatalf("addTaskNoteCmd: Error beginning transaction: %v", err)
 			}
 
-			taskID, err := strconv.Atoi(args[0])
+			defer tx.Rollback()
+			defer conn.Close()
+
+			queries := sqlc.New(conn)
+			qtx := queries.WithTx(tx)
 			if err != nil {
 				log.Fatalf("Invalid task ID: %v", err)
 			}
