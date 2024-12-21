@@ -54,10 +54,9 @@ var addTaskCmd = &cobra.Command{
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		var (
-			inputTitle          = args[0]
-			inputPriority       = args[1]
-			inputStatus         = args[2]
-			taskCat       int64 = 1 // ParentCategory Value for Tasks
+			inputTitle    = args[0]
+			inputPriority = args[1]
+			inputStatus   = args[2]
 		)
 
 		ctx := context.Background()
@@ -108,7 +107,7 @@ var addTaskCmd = &cobra.Command{
 					err = queries.InsertProjectLink(ctx,
 						sqlc.InsertProjectLinkParams{
 							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
-							ParentCat:    sql.NullInt64{Int64: taskCat, Valid: true},
+							ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 							ParentTaskID: sql.NullInt64{Int64: newTaskID, Valid: true},
 						},
 					)
@@ -154,7 +153,7 @@ var addTaskCmd = &cobra.Command{
 						err = queries.InsertProjectLink(ctx,
 							sqlc.InsertProjectLinkParams{
 								ProjectID:    sql.NullInt64{Int64: project, Valid: true},
-								ParentCat:    sql.NullInt64{Int64: taskCat, Valid: true},
+								ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 								ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
 							},
 						)
@@ -187,6 +186,10 @@ var addAreaCmd = &cobra.Command{
 	Raw Example: 'go_task add project <project_title> <project_status>'
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
+		var (
+			inputTitle  = args[0]
+			inputStatus = args[1]
+		)
 		ctx := context.Background()
 		if rawFlag {
 
@@ -209,9 +212,8 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 
 			queries := sqlc.New(conn)
 			_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
-				Title:    args[0],
-				Status:   sql.NullString{String: string(status), Valid: true},
-				Archived: Archived,
+				Title:    inputTitle,
+				Status:   sql.NullString{String: string(validStatus), Valid: true},
 				Archived: archived,
 			},
 			)
@@ -263,6 +265,15 @@ var addTaskNoteCmd = &cobra.Command{
 		ty[e in: 'go_task add task note <task_id> <note_title> <note_path>'
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		var (
+			inputTaskID    = args[0]
+			inputNoteTitle = args[1]
+		)
+		taskID, err := strconv.Atoi(inputTaskID)
+		if err != nil {
+			log.Fatalf("Invalid task ID: %v", err)
+		}
+
 		if NewNote {
 			if len(args) < 2 {
 				log.Fatalf(" You must provide at least 2 arguments! Usage: note <task_id> <note_title> -t <note_tags> -a <note_aliases>")
@@ -278,12 +289,12 @@ var addTaskNoteCmd = &cobra.Command{
 			// Do we want to be able to pass any body/text to the note upon creation?
 			// Do we want to be able to pipe into the note? that might not work so well?
 			// tui.ClearTerminalScreen()
-			fmt.Println("Creating a new note for task: ", args[1])
+			fmt.Println("Creating a new note for task: ", inputTaskID)
 			theTags := strings.Split(noteTags, " ")
 			theAliases := strings.Split(noteAliases, " ")
 
-			id := data.GenerateNoteID(args[1])
-			output, err := data.TemplateMarkdownNote(args[1], id, theAliases, theTags)
+			id := data.GenerateNoteID(inputTaskID)
+			output, err := data.TemplateMarkdownNote(inputNoteTitle, id, theAliases, theTags)
 			if err != nil {
 				log.Fatal("Error with generating Template!", err)
 			}
@@ -315,7 +326,15 @@ var addTaskNoteCmd = &cobra.Command{
 				log.Fatalf("Invalid task ID: %v", err)
 			}
 
-			noteTitle := args[1]
+			_, err = qtx.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
+				NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+				ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+				ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
+			})
+			if err != nil {
+				log.Fatalf("addTaskNoteCmd: Error creating task bridge note: %v", err)
+			}
+			tx.Commit()
 			notePath := args[2]
 
 			ctx := context.Background()
@@ -333,7 +352,7 @@ var addTaskNoteCmd = &cobra.Command{
 			queries := sqlc.New(conn)
 			qtx := queries.WithTx(tx)
 			noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
-				Title: noteTitle,
+				Title: inputNoteTitle,
 				Path:  notePath,
 			})
 			if err != nil {
