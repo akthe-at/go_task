@@ -83,7 +83,7 @@ var addTaskCmd = &cobra.Command{
 				Title:    inputTitle,
 				Priority: sql.NullString{String: string(validPriority), Valid: true},
 				Status:   sql.NullString{String: string(validStatus), Valid: true},
-				Archived: Archived,
+				Archived: archived,
 			}
 
 			newTaskID, err := queries.CreateTask(ctx, newTask)
@@ -212,6 +212,7 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 				Title:    args[0],
 				Status:   sql.NullString{String: string(status), Valid: true},
 				Archived: Archived,
+				Archived: archived,
 			},
 			)
 			if err != nil {
