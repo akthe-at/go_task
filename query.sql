@@ -1,5 +1,5 @@
 -- name: CreateNote :execlastid
-INSERT INTO notes (title, path) VALUES  (?, ?)
+INSERT INTO notes (title, path) VALUES (?, ?)
 returning id;
 
 -- name: CreateTaskBridgeNote :execlastid
@@ -19,25 +19,35 @@ SELECT
     tasks.last_mod,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
     tasks.due_date,
-		IFNULL(GROUP_CONCAT(notes.title, ', '), '') as note_title
-FROM 
+    IFNULL(GROUP_CONCAT(notes.title, ', '), '') as note_title,
+    programming_projects.path AS prog_proj,
+    areas.title AS parent_area
+FROM
     tasks
-LEFT JOIN 
+LEFT OUTER JOIN
     bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
-LEFT JOIN 
+LEFT OUTER JOIN
     notes ON notes.id = bridge_notes.note_id
-WHERE 
+LEFT OUTER JOIN
+    prog_project_links ON tasks.id = prog_project_links.parent_task_id
+LEFT OUTER JOIN
+    programming_projects ON prog_project_links.project_id = programming_projects.id
+LEFT OUTER JOIN
+    areas ON tasks.area_id = areas.id
+WHERE
     tasks.id = ?;
+
 
 -- name: ReadTasks :many
 SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
-    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles, pp.path
+    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles, pp.path, area.title AS parent_area
 FROM tasks
 LEFT OUTER JOIN bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
 LEFT OUTER JOIN notes ON bridge_notes.note_id = notes.id
 LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_task_id = tasks.id
-LEFT OUTER JOIN programming_projects pp on pjl.project_id = pp.id
+LEFT OUTER JOIN programming_projects pp ON pjl.project_id = pp.id
+LEFT OUTER JOIN areas area ON area.id = tasks.area_id
 GROUP BY tasks.id;
 
 -- name: ReadNote :many
@@ -152,13 +162,14 @@ returning id
 DELETE FROM areas WHERE id IN (sqlc.slice(ids))
 returning *;
 
+
 -- name: CreateTask :execlastid
 INSERT INTO tasks (
-    title, priority, status, archived, due_date,
+    title, priority, status, archived, due_date, area_id,
     created_at, last_mod
 )
 VALUES (
-    ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?,
     datetime(current_timestamp, 'localtime'),
     datetime(current_timestamp, 'localtime')
 )
@@ -219,13 +230,15 @@ AND bridge_notes.parent_cat = 2
 -- name: ReadAreas :many
 SELECT 
     areas.id, areas.title, areas.status, areas.archived,
-    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles
+    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles, pp.path
 FROM 
     areas
 LEFT JOIN 
     bridge_notes ON areas.id = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2
 LEFT JOIN 
     notes ON bridge_notes.note_id = notes.id
+LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_task_id = areas.id
+LEFT OUTER JOIN programming_projects pp ON pjl.project_id = pp.id
 GROUP BY 
     areas.id;
 
@@ -259,6 +272,12 @@ INSERT INTO programming_projects (path)
 VALUES (?)
 RETURNING id;
 
--- name: InsertProjectLink :exec
+-- name: CreateProjectTaskLink :exec
 INSERT INTO prog_project_links (project_id, parent_cat, parent_task_id)
 VALUES (?, ?, ?)
+;
+
+-- name: CreateProjectAreaLink :exec
+INSERT INTO prog_project_links (project_id, parent_cat, parent_area_id)
+VALUES (?, ?, ?)
+;
