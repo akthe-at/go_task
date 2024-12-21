@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -12,6 +11,7 @@ import (
 // ConnectDB opens a connection to a SQLite database.
 // It returns a pointer to the sql.DB object and an error if any occurs.
 func ConnectDB() (*sql.DB, error) {
+	// FIXME: This needs to point at a config set db path or a default backup. Or perhaps embedded?
 	db, err := sql.Open("sqlite3", "file:new_demo.db")
 	if err != nil {
 		return nil, fmt.Errorf("invalid sql.Open() arguments: %w", err)
@@ -19,7 +19,7 @@ func ConnectDB() (*sql.DB, error) {
 
 	err = db.Ping()
 	if err != nil {
-		log.Fatal("failed to ping database: ", err)
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 	return db, nil
 }
@@ -129,8 +129,7 @@ CREATE TABLE IF NOT EXISTS prog_project_links (
     CHECK (parent_cat IN (1, 2)),
     FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
     FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE
-);
-`
+);`
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -138,7 +137,10 @@ CREATE TABLE IF NOT EXISTS prog_project_links (
 
 	_, err = tx.Exec(initialQueries)
 	if err != nil {
-		tx.Rollback()
+		err := tx.Rollback()
+		if err != nil {
+			fmt.Println("failed to rollback transaction: ", err)
+		}
 		return fmt.Errorf("failed to create table: %w", err)
 	}
 
@@ -166,7 +168,10 @@ func ResetDB(db *sql.DB) error {
 	}
 	_, err = tx.Exec(queries)
 	if err != nil {
-		tx.Rollback()
+		err := tx.Rollback()
+		if err != nil {
+			fmt.Printf("failed to rollback transaction: %v", err)
+		}
 		return fmt.Errorf("failed to drop tables: %w", err)
 	}
 	err = tx.Commit()
@@ -181,4 +186,3 @@ func ResetDB(db *sql.DB) error {
 
 	return nil
 }
-
