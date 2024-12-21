@@ -105,8 +105,8 @@ var addTaskCmd = &cobra.Command{
 					if err != nil {
 						log.Fatalf("Error inserting project: %v", err)
 					}
-					err = queries.InsertProjectLink(ctx,
-						sqlc.InsertProjectLinkParams{
+					err = queries.CreateProjectTaskLink(ctx,
+						sqlc.CreateProjectTaskLinkParams{
 							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
 							ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 							ParentTaskID: sql.NullInt64{Int64: newTaskID, Valid: true},
@@ -151,8 +151,8 @@ var addTaskCmd = &cobra.Command{
 						if err != nil {
 							log.Fatalf("Error inserting project: %v", err)
 						}
-						err = queries.InsertProjectLink(ctx,
-							sqlc.InsertProjectLinkParams{
+						err = queries.CreateProjectTaskLink(ctx,
+							sqlc.CreateProjectTaskLinkParams{
 								ProjectID:    sql.NullInt64{Int64: project, Valid: true},
 								ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 								ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
