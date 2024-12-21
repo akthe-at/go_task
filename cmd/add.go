@@ -444,11 +444,11 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.
 	addCmd.PersistentFlags().BoolVarP(&rawFlag, "raw", "r", false, "Bypass using the form and use raw input instead")
-	addCmd.PersistentFlags().BoolVar(&Archived, "archived", false, "Archive the task or area upon creation")
+	addCmd.PersistentFlags().BoolVar(&archived, "archived", false, "Archive the task or area upon creation")
 	addCmd.PersistentFlags().BoolVar(&NewNote, "new", false, "this flag is used to add a new note to an existing task or area")
 	addCmd.PersistentFlags().BoolVar(&openInEditor, "open", false, "this flag is used to open the note in an editor after creation")
-	addCmd.Flags().StringVarP(&noteTags, "tags", "t", "", "Tags for the note")
-	addCmd.Flags().StringVarP(&noteAliases, "aliases", "a", "", "Aliases for the note")
+	addCmd.PersistentFlags().StringVarP(&noteTags, "tags", "t", "", "Tags for the note")
+	addCmd.PersistentFlags().StringVarP(&noteAliases, "aliases", "a", "", "Aliases for the note")
 	// newCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
