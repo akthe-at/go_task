@@ -200,7 +200,7 @@ var addAreaCmd = &cobra.Command{
 
 		if rawFlag {
 
-			if len(args) != 1 {
+			if len(args) < 2 {
 				log.Fatalf(`
 You must provide at least 2 arguments!
 Usage: add area <area_title> <area_status>
@@ -311,9 +311,6 @@ var addTaskNoteCmd = &cobra.Command{
 				log.Fatalf("Error connecting to database: %v", err)
 			}
 
-		} else {
-			if len(args) < 3 {
-				log.Fatalf("You must provide at least 3 arguments! Usage: note <task_id> <note_title> <note_path>")
 			tx, err := conn.Begin()
 			if err != nil {
 				log.Fatalf("addTaskNoteCmd: Error beginning transaction: %v", err)
@@ -337,6 +334,12 @@ var addTaskNoteCmd = &cobra.Command{
 				log.Fatalf("addTaskNoteCmd: Error creating task bridge note: %v", err)
 			}
 			tx.Commit()
+
+			fmt.Println("Note added to task successfully")
+		} else {
+			if len(args) < 3 {
+				log.Fatalf("You must provide at least 3 arguments! Usage: note <task_id> <note_title> <note_path>")
+			}
 			notePath := args[2]
 
 			ctx := context.Background()
