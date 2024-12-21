@@ -21,7 +21,7 @@ import (
 
 var (
 	rawFlag      bool
-	Archived     bool
+	archived     bool
 	NewNote      bool
 	noteAliases  string
 	noteTags     string
