@@ -24,6 +24,7 @@ var (
 	archived     bool
 	NewNote      bool
 	noteAliases  string
+	noteBody     string
 	noteTags     string
 	openInEditor bool
 )
@@ -259,7 +260,7 @@ This command will create a new note in the obsidian vault and create a bridge be
 To do this:
 	Type in: 'go_task add task note <task_id> <note_title> <note_path>'
 OR to generate a new note AND add it to a specific task:
-	Type in: 'go_task add task note <task_id> <note_title> -t <note_tags> -a <note_aliases>'
+	Type in: 'go_task add task note <task_id> <note_title> -t <note_tags> -a <note_aliases> -b <note_body>'
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		var (
@@ -273,18 +274,14 @@ OR to generate a new note AND add it to a specific task:
 
 		if NewNote {
 			if len(args) < 2 {
-				log.Fatalf(" You must provide at least 2 arguments to generate a new note! Usage: note <task_id> <note_title> -t <note_tags> -a <note_aliases>")
+				log.Fatalf(" You must provide at least 2 arguments to generate a new note! Usage: note <task_id> <note_title> -t <note_tags> -a <note_aliases> -b <note_body>")
 			}
-			// TODO: Need to fully flesh this out. Create a brand new note.
-			// Do we want to be able to pass any body/text to the note upon creation? flag for body text
-			// Do we want to be able to pipe into the note? that might not work so well? I think this could be fine but long winded. better to copy and paste into the editor.
-			// We need to be able to check for repos here and add them...
 			fmt.Println("Creating a new note for task: ", inputTaskID)
 			theTags := strings.Split(noteTags, " ")
 			theAliases := strings.Split(noteAliases, " ")
 
 			id := data.GenerateNoteID(inputTaskID)
-			output, err := data.TemplateMarkdownNote(inputNoteTitle, id, theAliases, theTags)
+			output, err := data.TemplateMarkdownNote(inputNoteTitle, id, noteBody, theAliases, theTags)
 			if err != nil {
 				log.Fatal("Error with generating Template!", err)
 			}
@@ -333,8 +330,37 @@ OR to generate a new note AND add it to a specific task:
 				log.Fatalf("addTaskNoteCmd: Error creating task bridge note: %v", err)
 			}
 			tx.Commit()
-
 			fmt.Println("Note added to task successfully")
+
+			ok, projectDir, err := utils.CheckIfProjDir()
+			if err != nil {
+				log.Fatalf("Error while checking if project directory: %v", err)
+			}
+			if ok {
+				projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+				if err != nil {
+					log.Fatalf("Error while checking if project exists: %v", err)
+				} else if projID == 0 {
+
+					projID, err = queries.InsertProgProject(ctx, projectDir)
+					if err != nil {
+						log.Fatalf("Error inserting project: %v", err)
+					}
+				}
+
+				err = queries.InsertProjectLink(ctx,
+					sqlc.InsertProjectLinkParams{
+						ProjectID:    sql.NullInt64{Int64: projID, Valid: true},
+						ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+						ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
+					},
+				)
+				if err != nil {
+					log.Fatalf("Error inserting project link: %v", err)
+				}
+
+			}
+
 		} else {
 			if len(args) < 3 {
 				log.Fatalf("You must provide at least 3 arguments! Usage: note <task_id> <note_title> <note_path>")
@@ -371,9 +397,35 @@ OR to generate a new note AND add it to a specific task:
 			if err != nil {
 				log.Fatalf("addTaskNoteCmd: Error creating task bridge note: %v", err)
 			}
-			tx.Commit()
 
+			ok, projectDir, err := utils.CheckIfProjDir()
+			if err != nil {
+				log.Fatalf("Error while checking if project directory: %v", err)
+			}
+			if ok {
+				projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+				if err != nil {
+					log.Fatalf("Error while checking if project exists: %v", err)
+				} else if projID == 0 {
+					project, err := queries.InsertProgProject(ctx, projectDir)
+					if err != nil {
+						log.Fatalf("Error inserting project: %v", err)
+					}
+					err = queries.InsertProjectLink(ctx,
+						sqlc.InsertProjectLinkParams{
+							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
+							ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+							ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
+						},
+					)
+					if err != nil {
+						log.Fatalf("Error inserting project link: %v", err)
+					}
+				}
+			}
+			tx.Commit()
 			fmt.Println("Note added to task successfully")
+
 		}
 	},
 }
@@ -453,6 +505,7 @@ func init() {
 	addCmd.PersistentFlags().BoolVar(&openInEditor, "open", false, "this flag is used to open the note in an editor after creation")
 	addCmd.PersistentFlags().StringVarP(&noteTags, "tags", "t", "", "Tags for the note")
 	addCmd.PersistentFlags().StringVarP(&noteAliases, "aliases", "a", "", "Aliases for the note")
+	addCmd.PersistentFlags().StringVarP(&noteBody, "body", "b", "", "Text for the Note Body")
 	// newCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
