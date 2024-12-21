@@ -266,7 +266,9 @@ OR to generate a new note AND add it to a specific task:
 		var (
 			inputTaskID    = args[0]
 			inputNoteTitle = args[1]
+			inputNotePath  = args[2]
 		)
+
 		taskID, err := strconv.Atoi(inputTaskID)
 		if err != nil {
 			log.Fatalf("Invalid task ID: %v", err)
@@ -274,20 +276,20 @@ OR to generate a new note AND add it to a specific task:
 
 		if NewNote {
 			if len(args) < 2 {
-				log.Fatalf(" You must provide at least 2 arguments to generate a new note! Usage: note <task_id> <note_title> -t <note_tags> -a <note_aliases> -b <note_body>")
+				log.Fatalf("You must provide at least 2 arguments to generate a new note! Usage: note <task_id> <note_title> -t <note_tags> -a <note_aliases> -b <note_body>")
 			}
 			fmt.Println("Creating a new note for task: ", inputTaskID)
 			theTags := strings.Split(noteTags, " ")
 			theAliases := strings.Split(noteAliases, " ")
 
-			id := data.GenerateNoteID(inputTaskID)
-			output, err := data.TemplateMarkdownNote(inputNoteTitle, id, noteBody, theAliases, theTags)
+			newNoteID := data.GenerateNoteID(inputNoteTitle)
+			outputPath, err := data.TemplateMarkdownNote(inputNoteTitle, newNoteID, noteBody, theAliases, theTags)
 			if err != nil {
 				log.Fatal("Error with generating Template!", err)
 			}
 			if openInEditor {
 				editor := GetEditorConfig()
-				cmdr := exec.Command(editor, output)
+				cmdr := exec.Command(editor, outputPath)
 				cmdr.Stdin = os.Stdin
 				cmdr.Stdout = os.Stdout
 				cmdr.Stderr = os.Stderr
@@ -315,10 +317,10 @@ OR to generate a new note AND add it to a specific task:
 			qtx := queries.WithTx(tx)
 			noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
 				Title: inputNoteTitle,
-				Path:  output,
+				Path:  outputPath,
 			})
 			if err != nil {
-				fmt.Printf("addTaskNoteCmd: There was an error creating the note: %v", err)
+				log.Fatalf("addTaskNoteCmd: There was an error creating the note: %v", err)
 			}
 
 			_, err = qtx.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
@@ -329,43 +331,42 @@ OR to generate a new note AND add it to a specific task:
 			if err != nil {
 				log.Fatalf("addTaskNoteCmd: Error creating task bridge note: %v", err)
 			}
-			tx.Commit()
+			err = tx.Commit()
+			if err != nil {
+				log.Fatalf("addTaskNoteCmd: Error committing transaction: %v", err)
+			}
 			fmt.Println("Note added to task successfully")
 
 			ok, projectDir, err := utils.CheckIfProjDir()
 			if err != nil {
-				log.Fatalf("Error while checking if project directory: %v", err)
+				log.Fatalf("Error while checking if in a project directory: %v", err)
 			}
 			if ok {
 				projID, err := queries.CheckProgProjectExists(ctx, projectDir)
 				if err != nil {
 					log.Fatalf("Error while checking if project exists: %v", err)
-				} else if projID == 0 {
-
+				}
+				if projID == 0 {
 					projID, err = queries.InsertProgProject(ctx, projectDir)
 					if err != nil {
 						log.Fatalf("Error inserting project: %v", err)
 					}
 				}
 
-				err = queries.InsertProjectLink(ctx,
-					sqlc.InsertProjectLinkParams{
+				err = queries.CreateProjectTaskLink(ctx,
+					sqlc.CreateProjectTaskLinkParams{
 						ProjectID:    sql.NullInt64{Int64: projID, Valid: true},
 						ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 						ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
-					},
-				)
+					})
 				if err != nil {
 					log.Fatalf("Error inserting project link: %v", err)
 				}
-
 			}
-
 		} else {
 			if len(args) < 3 {
 				log.Fatalf("You must provide at least 3 arguments! Usage: note <task_id> <note_title> <note_path>")
 			}
-			notePath := args[2]
 
 			ctx := context.Background()
 			conn, err := db.ConnectDB()
@@ -383,7 +384,7 @@ OR to generate a new note AND add it to a specific task:
 			qtx := queries.WithTx(tx)
 			noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
 				Title: inputNoteTitle,
-				Path:  notePath,
+				Path:  inputNotePath,
 			})
 			if err != nil {
 				fmt.Printf("addTaskNoteCmd: There was an error creating the note: %v", err)
@@ -406,26 +407,29 @@ OR to generate a new note AND add it to a specific task:
 				projID, err := queries.CheckProgProjectExists(ctx, projectDir)
 				if err != nil {
 					log.Fatalf("Error while checking if project exists: %v", err)
-				} else if projID == 0 {
+				}
+				if projID == 0 {
 					project, err := queries.InsertProgProject(ctx, projectDir)
 					if err != nil {
 						log.Fatalf("Error inserting project: %v", err)
 					}
-					err = queries.InsertProjectLink(ctx,
-						sqlc.InsertProjectLinkParams{
+					err = queries.CreateProjectTaskLink(ctx,
+						sqlc.CreateProjectTaskLinkParams{
 							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
 							ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 							ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
-						},
-					)
+						})
 					if err != nil {
 						log.Fatalf("Error inserting project link: %v", err)
 					}
 				}
 			}
-			tx.Commit()
-			fmt.Println("Note added to task successfully")
-
+			err = tx.Commit()
+			if err != nil {
+				log.Fatalf("addTaskNoteCmd: Error committing transaction: %v", err)
+			} else {
+				fmt.Println("Note added to task successfully")
+			}
 		}
 	},
 }
@@ -434,71 +438,196 @@ OR to generate a new note AND add it to a specific task:
 var addAreaNoteCmd = &cobra.Command{
 	Use:   "note",
 	Short: "Add a note to a specific area.",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `
+To add a new note to an existing area, you can use the 'note' command.
+This command will create a new note in the obsidian vault and create a bridge between the note and the area in the database.
+
+To do this:
+	Type in: 'go_task add area note <area_id> <note_title> <note_path>'
+OR to generate a new note AND add it to a specific area:
+	Type in: 'go_task add area note <area_id> <note_title> -t <note_tags> -a <note_aliases> -b <note_body>'
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 3 {
-			log.Fatalf("You must provide at least 3 arguments! Usage: add area note <area_id> <note_title> <note_path>")
-		}
+		var (
+			inputAreaID    = args[0]
+			inputNoteTitle = args[1]
+			inputNotePath  = args[2]
+		)
 
-		areaID, err := strconv.Atoi(args[0])
+		areaID, err := strconv.Atoi(inputAreaID)
 		if err != nil {
 			log.Fatalf("Invalid area ID: %v", err)
 		}
 
-		noteTitle := args[1]
-		notePath := args[2]
+		if NewNote {
+			if len(args) < 2 {
+				log.Fatalf("You must provide at least 2 arguments to generate a new note! Usage: note <area_id> <note_title> -t <note_tags> -a <note_aliases> -b <note_body>")
+			}
+			fmt.Println("Creating a new note for area: ", inputAreaID)
+			theTags := strings.Split(noteTags, " ")
+			theAliases := strings.Split(noteAliases, " ")
 
-		ctx := context.Background()
-		conn, err := db.ConnectDB()
-		if err != nil {
-			log.Fatalf("Error connecting to database: %v", err)
-		}
-		tx, err := conn.Begin()
-		if err != nil {
-			log.Fatalf("addProjectNoteCmd: Error beginning transaction: %v", err)
-		}
-		defer tx.Rollback()
-		defer conn.Close()
+			newNoteID := data.GenerateNoteID(inputNoteTitle)
+			outputPath, err := data.TemplateMarkdownNote(inputNoteTitle, newNoteID, noteBody, theAliases, theTags)
+			if err != nil {
+				log.Fatal("An error occurred while generating the template: ", err)
+			}
 
-		queries := sqlc.New(conn)
-		qtx := queries.WithTx(tx)
-		noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
-			Title: noteTitle,
-			Path:  notePath,
-		})
-		if err != nil {
-			fmt.Printf("addAreaNoteCmd: There was an error creating the note: %v", err)
-		}
+			if openInEditor {
+				editor := GetEditorConfig()
+				cmdr := exec.Command(editor, outputPath)
+				cmdr.Stdin = os.Stdin
+				cmdr.Stdout = os.Stdout
+				cmdr.Stderr = os.Stderr
+				err := cmdr.Run()
+				if err != nil {
+					log.Fatalf("There was an error running the command: %v", err)
+				}
+			}
+			ctx := context.Background()
+			conn, err := db.ConnectDB()
+			if err != nil {
+				log.Fatalf("Error connecting to database: %v", err)
+			}
 
-		_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
-			NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
-			ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
-			ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
-		})
-		if err != nil {
-			log.Fatalf("addAreaNoteCmd: Error creating task bridge note: %v", err)
-		}
-		err = tx.Commit()
-		if err != nil {
-			fmt.Printf("addAreaNoteCmd: Error committing transaction: %v", err)
-		} else {
+			tx, err := conn.Begin()
+			if err != nil {
+				log.Fatalf("addAreaNoteCmd: Error beginning transaction: %v", err)
+			}
+
+			defer tx.Rollback()
+			defer conn.Close()
+
+			queries := sqlc.New(conn)
+			qtx := queries.WithTx(tx)
+			noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+				Title: inputNoteTitle,
+				Path:  outputPath,
+			})
+			if err != nil {
+				log.Fatalf("addAreaNoteCmd: There was an error creating the note: %v", err)
+			}
+
+			_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
+				NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+				ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
+				ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
+			})
+			if err != nil {
+				log.Fatalf("addAreaNoteCmd: Error creating area bridge note: %v", err)
+			}
+			err = tx.Commit()
+			if err != nil {
+				log.Fatalf("addAreaNoteCmd: Error committing transaction: %v", err)
+			}
 			fmt.Println("Note added to Area successfully")
+
+			ok, projectDir, err := utils.CheckIfProjDir()
+			if err != nil {
+				log.Fatalf("Error while checking if in a project directory: %v", err)
+			}
+			if ok {
+				projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+				if err != nil {
+					log.Fatalf("Error while checking if project exists: %v", err)
+				}
+				if projID == 0 {
+					projID, err = queries.InsertProgProject(ctx, projectDir)
+					if err != nil {
+						log.Fatalf("Error inserting project: %v", err)
+					}
+				}
+
+				err = queries.CreateProjectAreaLink(ctx, sqlc.CreateProjectAreaLinkParams{
+					ProjectID:    sql.NullInt64{Int64: projID, Valid: true},
+					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
+					ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
+				})
+				if err != nil {
+					log.Fatalf("Error inserting project link: %v", err)
+				}
+			}
+		} else {
+			if len(args) < 3 {
+				log.Fatalf("You must provide at least 3 arguments! Usage: add area note <area_id> <note_title> <note_path>")
+			}
+
+			ctx := context.Background()
+			conn, err := db.ConnectDB()
+			if err != nil {
+				log.Fatalf("Error connecting to database: %v", err)
+			}
+			tx, err := conn.Begin()
+			if err != nil {
+				log.Fatalf("addAreaNoteCmd: Error beginning transaction: %v", err)
+			}
+
+			defer tx.Rollback()
+			defer conn.Close()
+
+			queries := sqlc.New(conn)
+			qtx := queries.WithTx(tx)
+			noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+				Title: inputNoteTitle,
+				Path:  inputNotePath,
+			})
+			if err != nil {
+				fmt.Printf("addAreaNoteCmd: There was an error creating the note: %v", err)
+			}
+
+			_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
+				NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+				ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
+				ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
+			})
+			if err != nil {
+				log.Fatalf("addAreaNoteCmd: Error creating task bridge note: %v", err)
+			}
+
+			ok, projectDir, err := utils.CheckIfProjDir()
+			if err != nil {
+				log.Fatalf("Error while checking if in a project directory: %v", err)
+			}
+			if ok {
+				projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+				if err != nil {
+					log.Fatalf("Error while checking if project exists: %v", err)
+				}
+				if projID == 0 {
+					project, err := queries.InsertProgProject(ctx, projectDir)
+					if err != nil {
+						log.Fatalf("Error while inserting project: %v", err)
+					}
+					err = queries.CreateProjectAreaLink(ctx,
+						sqlc.CreateProjectAreaLinkParams{
+							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
+							ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
+							ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
+						})
+					if err != nil {
+						log.Fatalf("Error inserting project link: %v", err)
+					}
+				}
+			}
+			err = tx.Commit()
+			if err != nil {
+				log.Fatalf("addAreaNoteCmd: Error committing transaction: %v", err)
+			} else {
+				fmt.Println("Note added to Area successfully")
+			}
 		}
 	},
 }
 
 func init() {
+	// root commands
 	rootCmd.AddCommand(addCmd)
 	addCmd.AddCommand(addTaskCmd)
 	addCmd.AddCommand(addAreaCmd)
+	// subcommands
 	addTaskCmd.AddCommand(addTaskNoteCmd)
 	addAreaCmd.AddCommand(addAreaNoteCmd)
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.
+	// flags
 	addCmd.PersistentFlags().BoolVarP(&rawFlag, "raw", "r", false, "Bypass using the form and use raw input instead")
 	addCmd.PersistentFlags().BoolVar(&archived, "archived", false, "Archive the task or area upon creation")
 	addCmd.PersistentFlags().BoolVar(&NewNote, "new", false, "this flag is used to add a new note to an existing task or area")
@@ -506,11 +635,6 @@ func init() {
 	addCmd.PersistentFlags().StringVarP(&noteTags, "tags", "t", "", "Tags for the note")
 	addCmd.PersistentFlags().StringVarP(&noteAliases, "aliases", "a", "", "Aliases for the note")
 	addCmd.PersistentFlags().StringVarP(&noteBody, "body", "b", "", "Text for the Note Body")
-	// newCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// newCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 // mapToPriorityType maps a string to a PriorityType
