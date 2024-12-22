@@ -59,8 +59,7 @@ var deleteTaskCmd = &cobra.Command{
 		for _, task := range args {
 			taskID, err := strconv.Atoi(task)
 			if err != nil {
-				log.Errorf("Error converting task ID to integer: %v", err)
-				return
+				log.Fatalf("Error converting task ID to integer: %v", err)
 			}
 			taskIDs = append(taskIDs, int64(taskID))
 		}
