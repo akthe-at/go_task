@@ -61,12 +61,12 @@ var customBorder = table.Border{
 
 // This is the task table "screen" model
 type TaskModel struct {
+	deleteMessage    string
 	tableModel       table.Model
 	totalWidth       int
 	totalHeight      int
 	horizontalMargin int
 	verticalMargin   int
-	deleteMessage    string
 	archiveFilter    bool
 }
 
