@@ -352,6 +352,7 @@ func (m *TaskModel) addTask() tea.Cmd {
 		if err != nil {
 			log.Fatalf("Error creating task: %v", err)
 		}
+
 		var projectID int64
 		if form.ProjectAssignment == "local" {
 			projID, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
@@ -641,3 +642,10 @@ func extractNoteTitles(notes []data.Note) string {
 	}
 	return strings.Join(titles, ", ")
 }
+
+// func (tm *TaskModel) PrintRow(row table.Row) {
+// 	for key, value := range row.Data {
+// 		row.Data[key] = fmt.Sprintf("%v", strings.TrimSpace(fmt.Sprintf("%v ", value)))
+// 		fmt.Printf("%s: %v | ", key, row.Data[key])
+// 	}
+// }
