@@ -32,6 +32,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var deleteNotes bool
+
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
@@ -91,60 +93,65 @@ var deleteAreaCmd = &cobra.Command{
 	Use:   "area",
 	Short: "Delete a area given a unique ID",
 	Long: `
-	You can delete a task by providing the unique task ID.
+	You can delete an area by providing the unique area ID.
 	You can use this command like this: go_task delete area <area_id>
 
 	Additionally, you can provide multiple area IDs to delete multiple areas at once:
 	"go_task delete area <area_id> <area_id> <area_id> ..."
 
-	You can find the task ID by using the 'go_task list areas' command.
+	You can find the area ID by using the 'go_task list areas' command.
+
+	If you want to delete the notes associated with the area, you can use the --notes flag.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var areaIDs []int64
+
+		if len(args) < 1 {
+			log.Fatalf("No area IDs provided - delete command requires at least one area ID")
+		}
 		for _, area := range args {
 			areaID, err := strconv.Atoi(area)
 			if err != nil {
-				log.Fatalf("Error converting task ID to integer: %v", err)
+				log.Fatalf("Error converting area ID to integer: %v", err)
 			}
 			areaIDs = append(areaIDs, int64(areaID))
 		}
 
-		fmt.Println("delete called for task(s):", areaIDs)
-		if len(areaIDs) == 0 {
-			log.Fatalf("No area IDs provided - delete command requires at least one area ID")
-		}
+		fmt.Println("delete called for the following area(s):", areaIDs)
 
-		// ctx := context.Background()
+		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
-		defer conn.Close()
-		// queries := sqlc.New(conn)
-		//
-		// notesOption, err := cmd.Flags().GetString("notes")
-		// if err != nil {
-		// 	log.Fatalf("Error getting notes flag: %v", err)
-		// }
 
-		// switch notesOption {
-		// case "all":
-		// 	_, err := queries.DeleteMultipleAreas(ctx, projectIDs)
-		// 	_, err = queries.DeleteNotesFromMultipleAreas(ctx, sql.NullInt64{int64(projectIDs), true})
-		// case "some":
-		// 	_, err := queries.DeleteMultipleAreas(ctx, projectIDs)
-		// 	if err != nil {
-		// 		log.Fatalf("Error deleting project(s): %v", err)
-		// 	}
-		// 	_, err = queries.DeleteNotesFromSingleArea(ctx, projectIDs)
-		// case "one":
-		// 	_, err = queries.DeleteSingleArea(ctx, projectIDs)
-		// 	_, err = queries.DeleteNote(ctx, projectIDs)
-		//
-		// default:
-		// 	_, err := queries.DeleteMultipleAreas(ctx, projectIDs)
-		//
-		// }
+		tx, err := conn.Begin()
+		if err != nil {
+			log.Fatalf("addAreaNoteCmd: Error beginning transaction: %v", err)
+		}
+		defer conn.Close()
+		defer tx.Rollback()
+		queries := sqlc.New(conn)
+
+		qtx := queries.WithTx(tx)
+
+		_, err = qtx.DeleteMultipleAreas(ctx, areaIDs)
+		if err != nil {
+			log.Fatalf("Error deleting area(s): %v", err)
+		}
+
+		if deleteNotes {
+			_, err = qtx.DeleteNotes(ctx, areaIDs)
+			if err != nil {
+				log.Fatalf("There was an error deleting the notes associated with the area(s): %v", err)
+			}
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			tx.Rollback()
+			log.Fatalf("Error committing transaction: %v", err)
+		}
 	},
 }
 
@@ -161,5 +168,5 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	deleteAreaCmd.Flags().String("notes", "n", "Pass this flag to delete all, some, or none of the notes associated with the area.")
+	deleteAreaCmd.PersistentFlags().BoolVar(&deleteNotes, "notes", false, "Pass this flag to delete the notes associated with the area that is to be deleted.")
 }
