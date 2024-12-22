@@ -35,15 +35,10 @@ import (
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "The root command for deletion related commands.",
+	Long:  `This command is the root command for all deletion related commands. Please use --help to see all of the available subcommands and any various flags or options.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Delete called")
+		fmt.Println("The delete cmd invoked without any additional arguments. Please provide a subcommand.")
 	},
 }
 
