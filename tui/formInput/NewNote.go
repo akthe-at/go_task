@@ -21,7 +21,7 @@ type NewNoteForm struct {
 	Submit   bool
 }
 
-func (n *NewNoteForm) NewNoteForm() error {
+func (n *NewNoteForm) NewNoteForm(theme huh.Theme) error {
 	tui.ClearTerminalScreen()
 	taskOptions := fetchNoteParent(data.TaskNoteType)
 	areaOptions := fetchNoteParent(data.AreaNoteType)
@@ -71,7 +71,39 @@ func (n *NewNoteForm) NewNoteForm() error {
 	}
 	n.NoteForm = huh.NewForm(noteGroups...)
 
-	return n.NoteForm.Run()
+	return n.NoteForm.WithTheme(&theme).Run()
+}
+
+type NewQuickNoteForm struct {
+	NoteForm *huh.Form
+	Title    string
+	Path     string
+	Submit   bool
+}
+
+func (n *NewQuickNoteForm) NewNoteForm(theme huh.Theme) error {
+	tui.ClearTerminalScreen()
+
+	noteGroups := []*huh.Group{
+		huh.NewGroup(
+			huh.NewInput().
+				Title("What note do you want to add?").
+				Prompt(">").
+				Value(&n.Title),
+			huh.NewInput().
+				Title("What is the note path?").
+				Prompt(">").
+				Value(&n.Path),
+			huh.NewConfirm().
+				Title("Are you ready to save your note?").
+				Affirmative("Yes").
+				Negative("No").
+				Value(&n.Submit),
+		),
+	}
+	n.NoteForm = huh.NewForm(noteGroups...)
+
+	return n.NoteForm.WithTheme(&theme).Run()
 }
 
 func fetchNoteParent(selection data.NoteType) []huh.Option[int] {
@@ -96,12 +128,12 @@ func fetchNoteParent(selection data.NoteType) []huh.Option[int] {
 			options = append(options, huh.NewOption(fmt.Sprintf("%s - %d", task.Title, task.ID), int(task.ID)))
 		}
 	case data.AreaNoteType:
-		notes, err := queries.ReadAllNotes(ctx)
+		areas, err := queries.ReadAreas(ctx)
 		if err != nil {
 			return nil
 		}
-		for _, note := range notes {
-			options = append(options, huh.NewOption(note.Title, int(note.ID)))
+		for _, area := range areas {
+			options = append(options, huh.NewOption(area.Title, int(area.ID)))
 		}
 	}
 
