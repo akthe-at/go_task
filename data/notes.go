@@ -11,6 +11,10 @@ const (
 	AreaNoteType NoteType = 2
 )
 
+func (nt NoteType) String() string {
+	return [...]string{"Task Note", "Area Note"}[nt]
+}
+
 type NoteTable struct {
 	NoteID     int
 	NoteTitle  string
@@ -115,8 +119,8 @@ func (n *Note) ReadByID(db *sql.DB, noteID int) error {
 SELECT id, title, path, coalesce(bridge_notes.parent_task_id, bridge_notes.parent_area_id) as type
 FROM notes
 JOIN bridge_notes on notes.id = bridge_notes.note_id
-WHERE id = ?
-`
+WHERE id = ?`
+
 	row := db.QueryRow(query, noteID)
 
 	if err := row.Scan(&n.ID, &n.Title, &n.Path, &n.Type); err != nil {
