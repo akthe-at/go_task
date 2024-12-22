@@ -394,11 +394,18 @@ func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
 		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
 
+	formattedPath := path.Base(task.ProgProj.String)
+	if formattedPath == "." {
+		formattedPath = ""
+	}
+
 	row := []string{
 		fmt.Sprintf("%d", task.TaskID),
 		task.TaskTitle,
 		fmt.Sprintf("%f", task.AgeInDays),
 		fmt.Sprintf("%v", task.NoteTitle),
+		formattedPath,
+		fmt.Sprintf("%v", task.ParentArea),
 	}
 
 	t := *table.New().
@@ -428,7 +435,7 @@ func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
 			}
 			return style
 		}).
-		Headers("ID", "Task", "Age of Task", "Notes").
+		Headers("ID", "Task", "Age of Task", "Notes", "Project", "Area").
 		Rows([][]string{row}...)
 	return &t
 }
