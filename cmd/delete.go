@@ -56,6 +56,11 @@ var deleteTaskCmd = &cobra.Command{
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var taskIDs []int64
+
+		if len(args) < 1 {
+			log.Fatalf("No task IDs provided - delete command requires at least one task ID")
+		}
+
 		for _, task := range args {
 			taskID, err := strconv.Atoi(task)
 			if err != nil {
@@ -65,10 +70,7 @@ var deleteTaskCmd = &cobra.Command{
 		}
 
 		fmt.Println("delete cmd invoked for task(s):", taskIDs)
-		if len(taskIDs) == 0 {
-			log.Errorf("No task IDs provided - delete command requires at least one task ID")
-			return
-		}
+
 		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
