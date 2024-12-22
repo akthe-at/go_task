@@ -108,7 +108,7 @@ func (m NotesModel) calculateHeight() int {
 func (m *NotesModel) View() string {
 	body := strings.Builder{}
 
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add new Note by pressing 'A'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add a new Note by pressing 'A'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Projects by pressing 'F'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
@@ -148,8 +148,8 @@ func NotesView() NotesModel {
 				Faint(true).
 				Foreground(lipgloss.Color(theme.Secondary)).
 				Align(lipgloss.Center)),
-		table.NewFlexColumn(NoteColumnKey, "Title", 1),
-		table.NewFlexColumn(NoteColumnPath, "Path", 3),
+		table.NewColumn(NoteColumnKey, "Title", 15),
+		table.NewFlexColumn(NoteColumnPath, "Path", 2),
 		table.NewFlexColumn(NoteColumnLink, "Task", 1),
 		table.NewFlexColumn(NoteColumnParentType, "Note Type", 1),
 	}
@@ -159,7 +159,7 @@ func NotesView() NotesModel {
 	ctx := context.Background()
 	conn, err := db.ConnectDB()
 	if err != nil {
-		log.Panic(fmt.Sprintf("Notes View: There was an error connecting to the database: %v", err))
+		log.Panicf("Notes View: There was an error connecting to the database: %v", err)
 	}
 	defer conn.Close()
 
@@ -229,7 +229,7 @@ func (m *NotesModel) updateFooter() {
 	}
 
 	footerText := fmt.Sprintf(
-		"Pg. %d/%d - Currently looking at ID: %d",
+		"Pg. %d/%d - Currently looking at ID: %v",
 		m.tableModel.CurrentPage(),
 		m.tableModel.MaxPages(),
 		rowID,
@@ -239,56 +239,74 @@ func (m *NotesModel) updateFooter() {
 }
 
 func (m *NotesModel) addNote() tea.Cmd {
-	selectedIDs := []string{}
-
-	for _, row := range m.tableModel.SelectedRows() {
-		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
-	}
-	highlightedInfo := fmt.Sprintf("%v", m.tableModel.HighlightedRow().Data[NoteColumnKeyID])
-	taskID, err := strconv.Atoi(highlightedInfo)
-	if err != nil {
-		log.Printf("Error converting ID to int: %s", err)
-		return nil
-	}
-
-	form := &formInput.NewNoteForm{}
-	err = form.NewNoteForm()
-	if err != nil {
-		log.Fatalf("Error creating form: %v", err)
-	}
-
-	if form.Submit {
-
-		newNote := data.Note{
-			Title: form.Title,
-			Path:  form.Path,
-		}
-
-		conn, err := db.ConnectDB()
+	if m.tableModel.HighlightedRow().Data[NoteColumnKeyID] != nil {
+		highlightedInfo := fmt.Sprintf("%v", m.tableModel.HighlightedRow().Data[NoteColumnKeyID])
+		_, err := strconv.Atoi(highlightedInfo)
 		if err != nil {
-			log.Fatalf("Error connecting to database: %v", err)
-		}
-		defer conn.Close()
-		note := data.Note{
-			ID:    newNote.ID,
-			Path:  newNote.Path,
-			Title: newNote.Title,
-			Type:  newNote.Type,
-		}
-		err = note.Create(conn, taskID)
-		if err != nil {
-			log.Fatalf("Error creating task: %v", err)
-		}
-		// Requery the database and update the table model
-		rows, err := m.loadRowsFromDatabase()
-		if err != nil {
-			log.Printf("Error loading rows from database: %s", err)
+			log.Printf("Error converting ID to int: %s", err)
 			return nil
 		}
-		m.tableModel = m.tableModel.WithRows(rows)
 
-		// Update the footer
-		m.updateFooter()
+		form := &formInput.NewNoteForm{}
+		err = form.NewNoteForm()
+		if err != nil {
+			log.Fatalf("Error creating form: %v", err)
+		}
+
+		if form.Submit {
+			ctx := context.Background()
+			conn, err := db.ConnectDB()
+			if err != nil {
+				log.Panicf("error connecting to database: %v", err)
+			}
+			queries := sqlc.New(conn)
+			defer conn.Close()
+
+			newNoteID, err := queries.CreateNote(ctx, sqlc.CreateNoteParams{
+				Title: form.Title,
+				Path:  form.Path,
+			},
+			)
+			if err != nil {
+				log.Panicf("Error creating note: %s", err)
+			}
+			// FIXME: This is correctly adding to the TaskBridgeNotes/Notes tables now but when switching back to the datatable view, it needs to refresh the data.
+			switch form.Type {
+			case data.TaskNoteType:
+				_, err = queries.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
+					NoteID:       sql.NullInt64{Int64: newNoteID, Valid: true},
+					ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+					ParentTaskID: sql.NullInt64{Int64: int64(form.ParentID), Valid: true},
+				},
+				)
+				if err != nil {
+					log.Panicf("Error creating task bridge note: %s", err)
+					return nil
+				}
+			case data.AreaNoteType:
+				_, err := queries.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
+					NoteID:       sql.NullInt64{Int64: newNoteID, Valid: true},
+					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
+					ParentAreaID: sql.NullInt64{Int64: int64(form.ParentID), Valid: true},
+				},
+				)
+				if err != nil {
+					log.Panicf("Error creating area bridge note: %s", err)
+				}
+
+			}
+			// Requery the database and update the table model
+			rows, err := m.loadRowsFromDatabase()
+			if err != nil {
+				log.Printf("Error loading rows from database: %s", err)
+				return nil
+			}
+			m.tableModel = m.tableModel.WithRows(rows)
+			m.recalculateTable()
+
+			// Update the footer
+			m.updateFooter()
+		}
 	}
 
 	return nil
@@ -296,23 +314,26 @@ func (m *NotesModel) addNote() tea.Cmd {
 
 func (m *NotesModel) loadRowsFromDatabase() ([]table.Row, error) {
 	var filteredRows []table.Row
-	// I think I could embed a Notes struct into the NotesModel struct, then use that to query some data?
+	ctx := context.Background()
 
 	conn, err := db.ConnectDB()
 	if err != nil {
-		panic("")
+		return nil, fmt.Errorf("loadRowsFromDatabase: error connecting to database: %w", err)
 	}
+
+	queries := sqlc.New(conn)
 	defer conn.Close()
-	notes, err := m.Note.ReadAll(conn, data.TaskNoteType)
+	notes, err := queries.ReadAllNotes(ctx)
 	if err != nil {
-		log.Fatalf("NewNotesModel: Error connecting to database: %v", err)
+		return nil, fmt.Errorf("loadRowsFromDatabase: error reading all notes: %w", err)
 	}
+
 	for _, note := range notes {
 		newRow := table.NewRow(table.RowData{
-			NoteColumnKeyID:      note.NoteID,
-			NoteColumnKey:        note.NoteTitle,
-			NoteColumnPath:       note.NotePath,
-			NoteColumnLink:       note.LinkTitle,
+			NoteColumnKeyID:      note.ID,
+			NoteColumnKey:        note.Title,
+			NoteColumnPath:       note.Path,
+			NoteColumnLink:       note.AreaOrTaskTitle,
 			NoteColumnParentType: note.ParentType,
 		})
 		filteredRows = append(filteredRows, newRow)
