@@ -68,7 +68,6 @@ var deleteTaskCmd = &cobra.Command{
 			}
 			taskIDs = append(taskIDs, int64(taskID))
 		}
-
 		fmt.Println("delete cmd invoked for task(s):", taskIDs)
 
 		ctx := context.Background()
@@ -81,7 +80,7 @@ var deleteTaskCmd = &cobra.Command{
 		queries := sqlc.New(conn)
 		_, err = queries.DeleteTasks(ctx, taskIDs)
 		if err != nil {
-			log.Errorf("Error deleting task(s): %v", err)
+			log.Fatalf("Error deleting task(s): %v", err)
 		} else {
 			log.Printf("Succesfully Deleted!")
 		}
@@ -105,16 +104,14 @@ var deleteAreaCmd = &cobra.Command{
 		for _, area := range args {
 			areaID, err := strconv.Atoi(area)
 			if err != nil {
-				log.Errorf("Error converting task ID to integer: %v", err)
-				return
+				log.Fatalf("Error converting task ID to integer: %v", err)
 			}
 			areaIDs = append(areaIDs, int64(areaID))
 		}
 
 		fmt.Println("delete called for task(s):", areaIDs)
 		if len(areaIDs) == 0 {
-			log.Errorf("No area IDs provided - delete command requires at least one area ID")
-			return
+			log.Fatalf("No area IDs provided - delete command requires at least one area ID")
 		}
 
 		// ctx := context.Background()
