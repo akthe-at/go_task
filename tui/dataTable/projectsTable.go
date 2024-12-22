@@ -201,7 +201,8 @@ func (m *ProjectsModel) filterArchives() tea.Cmd {
 
 func (m *ProjectsModel) addNote() tea.Cmd {
 	form := &formInput.NewNoteForm{}
-	err := form.NewNoteForm()
+	theme := tui.GetSelectedTheme()
+	err := form.NewNoteForm(*tui.ThemeGoTask(theme))
 	if err != nil {
 		log.Fatalf("Error creating form: %v", err)
 	}
