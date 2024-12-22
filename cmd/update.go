@@ -81,7 +81,7 @@ to quickly create a Cobra application.`,
 		case "priority":
 			priority, err := mapToPriorityType(args[2])
 			if err != nil {
-				log.Fatalf("Invalid status type: %v", err)
+				log.Fatalf("Invalid priority type: %v", err)
 			}
 
 			queries.UpdateTaskPriority(ctx, sqlc.UpdateTaskPriorityParams{
@@ -106,9 +106,72 @@ to quickly create a Cobra application.`,
 	},
 }
 
+// updateAreaCmd represents the project update command
+var updateAreaCmd = &cobra.Command{
+	Use:   "area",
+	Short: "Update area details",
+	Long: `You must pass the id for the area that you wish to update...followed by the field that you wish to
+	update such as title, status, etc.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		id, _ := strconv.ParseInt(args[1], 10, 64)
+
+		ctx := context.Background()
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+		defer conn.Close()
+		queries := sqlc.New(conn)
+
+		switch args[0] {
+		case "title":
+			_, err = queries.UpdateAreaTitle(ctx, sqlc.UpdateAreaTitleParams{
+				Title: args[2],
+				ID:    id,
+			})
+			if err != nil {
+				log.Fatalf("Error updating area title: %v", err)
+			}
+
+		case "status":
+			status, err := mapToStatusType(args[2])
+			if err != nil {
+				log.Fatalf("Invalid status type: %v", err)
+			}
+
+			_, err = queries.UpdateAreaStatus(ctx, sqlc.UpdateAreaStatusParams{
+				Status: sql.NullString{String: string(status), Valid: true},
+				ID:     id,
+			})
+			if err != nil {
+				log.Fatalf("Error updating area status: %v", err)
+			}
+
+		case "archived":
+			archiveState, err := strconv.ParseBool(args[2])
+			if err != nil {
+				log.Fatalf("Invalid archive state: %v", err)
+			}
+
+			_, err = queries.UpdateAreaArchived(ctx, sqlc.UpdateAreaArchivedParams{
+				Archived: archiveState,
+				ID:       id,
+			})
+			if err != nil {
+				log.Fatalf("Error updating the archive status: %v", err)
+			}
+
+		default:
+			fmt.Println("default arg")
+			fmt.Println("test")
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(updateCmd)
 	updateCmd.AddCommand(updateTaskCmd)
+	updateCmd.AddCommand(updateAreaCmd)
 
 	// Here you will define your flags and configuration settings.
 

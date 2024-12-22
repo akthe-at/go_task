@@ -1,23 +1,33 @@
 package formInput
 
 import (
+	"context"
+	"path"
+
 	"github.com/akthe-at/go_task/data"
+	"github.com/akthe-at/go_task/db"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
+	"github.com/akthe-at/go_task/utils"
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/log"
 )
 
 type NewTaskForm struct {
-	TaskForm  *huh.Form
-	TaskTitle string
-	Priority  data.PriorityType
-	Status    data.StatusType
-	Notes     []data.Note
-	Archived  bool
-	Submit    bool
+	TaskTitle         string
+	ProjectAssignment string
+	ProgProject       string
+	TaskForm          *huh.Form
+	Priority          data.PriorityType
+	Status            data.StatusType
+	Notes             []data.Note
+	Archived          bool
+	Submit            bool
 }
 
 func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 	tui.ClearTerminalScreen()
+	// options := fetchProgProjects()
 
 	taskGroups := []*huh.Group{
 		huh.NewGroup(
@@ -52,6 +62,25 @@ func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 					huh.NewOption("Yes", true),
 				).
 				Value(&n.Archived),
+			huh.NewSelect[string]().
+				Title("Global or Project Specific Task?").
+				Options(
+					huh.NewOption("Global", "global"),
+					huh.NewOption("Local", "local").Selected(true),
+				).
+				Value(&n.ProjectAssignment),
+		),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Value(&n.ProgProject).
+				Title("Which Project Did You Want to Assign This Task To?").
+				OptionsFunc(func() []huh.Option[string] {
+					return fetchProgProjects()
+				}, &n.ProgProject),
+		).WithHideFunc(func() bool {
+			return n.ProjectAssignment == "global"
+		}),
+		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Are you ready to save your task?").
 				Affirmative("Yes").
@@ -62,4 +91,55 @@ func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 	n.TaskForm = huh.NewForm(taskGroups...)
 
 	return n.TaskForm.WithTheme(&theme).Run()
+}
+
+func fetchProgProjects() []huh.Option[string] {
+	projMap := make(map[string]string)
+	existingProjects := make(map[string]bool)
+
+	ctx := context.Background()
+	conn, err := db.ConnectDB()
+	if err != nil {
+		log.Errorf("There was an error connecting to the database: %v", err)
+	}
+
+	queries := sqlc.New(conn)
+	defer conn.Close()
+
+	projects, err := queries.ReadAllProgProjects(ctx)
+	if err != nil {
+		return nil
+	}
+	for _, proj := range projects {
+		projName := path.Base(proj)
+		if !existingProjects[projName] {
+			projMap[proj] = projName
+			existingProjects[projName] = true
+		}
+	}
+
+	ok, projectDir, err := utils.CheckIfProjDir()
+	if err != nil {
+		log.Fatalf("Error checking if project directory: %v", err)
+	}
+	if ok {
+		projectDirBase := path.Base(projectDir)
+		exists := false
+		for _, proj := range projMap {
+			if proj == projectDirBase {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			projMap[projectDir] = projectDirBase
+		}
+	}
+
+	var options []huh.Option[string]
+	for fullPath, baseName := range projMap {
+		options = append(options, huh.Option[string]{Value: fullPath, Key: baseName})
+	}
+
+	return options
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -31,9 +32,11 @@ const (
 	columnKeyTaskAge    = "age_in_days"
 	columnKeyDueDate    = "due_date"
 	columnKeyNotes      = "notes"
-	minWidth            = 150
-	minHeight           = 5
-	fixedVerticalMargin = 60
+	columnKeyPath       = "path"
+	columnKeyArea       = "parent_area"
+	minWidth            = 120
+	minHeight           = 10
+	fixedVerticalMargin = 80
 )
 
 var customBorder = table.Border{
@@ -58,12 +61,12 @@ var customBorder = table.Border{
 
 // This is the task table "screen" model
 type TaskModel struct {
+	deleteMessage    string
 	tableModel       table.Model
 	totalWidth       int
 	totalHeight      int
 	horizontalMargin int
 	verticalMargin   int
-	deleteMessage    string
 	archiveFilter    bool
 }
 
@@ -127,6 +130,28 @@ func (m *TaskModel) recalculateTable() {
 		WithMinimumHeight(m.calculateHeight())
 }
 
+func (m *TaskModel) refreshTableData() {
+	var filteredRows []table.Row
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		log.Printf("Error loading rows from database: %s", err)
+	}
+
+	for _, row := range rows {
+		archived, ok := row.Data[columnKeyArchived]
+		if !ok {
+			log.Printf("Error getting archived status from row: %s", err)
+		}
+		if archived == "false" {
+			filteredRows = append(filteredRows, row)
+		}
+	}
+
+	m.tableModel = m.tableModel.WithRows(filteredRows)
+
+	m.updateFooter()
+}
+
 func (m TaskModel) calculateWidth() int {
 	return m.totalWidth - m.horizontalMargin
 }
@@ -151,6 +176,10 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 
 	var rows []table.Row
 	for _, task := range tasks {
+		formattedPath := path.Base(task.Path.String)
+		if formattedPath == "." {
+			formattedPath = ""
+		}
 		row := table.NewRow(table.RowData{
 			columnKeyID:       fmt.Sprintf("%d", task.ID),
 			columnKeyTask:     task.Title,
@@ -159,6 +188,8 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 			columnKeyArchived: fmt.Sprintf("%t", task.Archived),
 			columnKeyTaskAge:  task.AgeInDays,
 			columnKeyNotes:    task.NoteTitles,
+			columnKeyPath:     formattedPath,
+			columnKeyArea:     task.ParentArea.String,
 		})
 		rows = append(rows, row)
 	}
@@ -234,6 +265,9 @@ func (m *TaskModel) addNote() tea.Cmd {
 
 		for _, row := range m.tableModel.SelectedRows() {
 			selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
+		}
+		if len(selectedIDs) > 1 {
+			log.Fatal("Currently unable to add note to multiple tasks at once")
 		}
 		highlightedInfo := fmt.Sprintf("%v", m.tableModel.HighlightedRow().Data[NoteColumnKeyID])
 		taskID, err := strconv.Atoi(highlightedInfo)
@@ -314,10 +348,40 @@ func (m *TaskModel) addTask() tea.Cmd {
 			Archived: form.Archived,
 		}
 
-		_, err = queries.CreateTask(ctx, newTask)
+		result, err := queries.CreateTask(ctx, newTask)
 		if err != nil {
 			log.Fatalf("Error creating task: %v", err)
 		}
+
+		var projectID int64
+		if form.ProjectAssignment == "local" {
+			projID, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
+			if err != nil {
+				log.Fatalf("Error checking if project exists: %v", err)
+			}
+			switch projID {
+			case 0:
+				projectID, err = queries.InsertProgProject(ctx, form.ProgProject)
+				if err != nil {
+					log.Fatalf("Error inserting project: %v", err)
+				}
+			case 1:
+				projectID = projID
+			default:
+				log.Fatalf("Unexpected projID: %v", projID)
+			}
+			err = queries.CreateProjectTaskLink(ctx,
+				sqlc.CreateProjectTaskLinkParams{
+					ProjectID:    sql.NullInt64{Int64: projectID, Valid: true},
+					ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+					ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
+				},
+			)
+			if err != nil {
+				log.Fatalf("Error inserting project link: %v", err)
+			}
+		}
+
 		// Requery the database and update the table model
 		rows, err := m.loadRowsFromDatabase()
 		if err != nil {
@@ -385,7 +449,7 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		if deletedID != taskID {
 			log.Fatalf("Error deleting task: %s", err)
 		} else {
-			m.deleteMessage = fmt.Sprintf("You deleted this task:  IDs: %s", highlightedInfo)
+			m.deleteMessage = fmt.Sprintf("You deleted the following task: %s", highlightedInfo)
 		}
 
 	} else if len(selectedIDs) > 1 {
@@ -424,7 +488,7 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		if result != int64(len(selectedIDs)) {
 			log.Printf("Error deleting tasks - Mismatch between selectedIDs and numDeleted: %s", err)
 		}
-		m.deleteMessage = fmt.Sprintf("You deleted these tasks:  IDs: %s", strings.Join(selectedIDs, ", "))
+		m.deleteMessage = fmt.Sprintf("You deleted the following tasks: %s", strings.Join(selectedIDs, ", "))
 	}
 
 	// Requery the database and update the table model
@@ -490,11 +554,13 @@ func TaskViewModel() TaskModel {
 				Foreground(lipgloss.Color(theme.Secondary)).
 				Align(lipgloss.Center)),
 		table.NewFlexColumn(columnKeyTask, "Task", 3),
-		table.NewFlexColumn(columnKeyPriority, "Priority", 1),
-		table.NewFlexColumn(columnKeyStatus, "Status", 1),
-		table.NewFlexColumn(columnKeyArchived, "Archived", 1),
-		table.NewFlexColumn(columnKeyTaskAge, "Task Age (Days)", 1),
+		table.NewColumn(columnKeyPriority, "Priority", 10),
+		table.NewColumn(columnKeyStatus, "Status", 10),
+		table.NewColumn(columnKeyArchived, "Archived", 10),
+		table.NewColumn(columnKeyTaskAge, "Task Age(Days)", 15),
 		table.NewFlexColumn(columnKeyNotes, "Notes", 3),
+		table.NewFlexColumn(columnKeyPath, "Repo", 1),
+		table.NewFlexColumn(columnKeyArea, "Area", 3),
 	}
 
 	model := TaskModel{archiveFilter: true}
@@ -533,7 +599,8 @@ func TaskViewModel() TaskModel {
 				Foreground(lipgloss.Color(theme.Success)).
 				Align(lipgloss.Left),
 		).
-		SortByAsc(columnKeyID).
+		SortByDesc(columnKeyTaskAge).
+		WithMultiline(true).
 		WithMissingDataIndicatorStyled(table.StyledCell{
 			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)),
 			Data:  "<Missing Data>",
@@ -575,3 +642,10 @@ func extractNoteTitles(notes []data.Note) string {
 	}
 	return strings.Join(titles, ", ")
 }
+
+// func (tm *TaskModel) PrintRow(row table.Row) {
+// 	for key, value := range row.Data {
+// 		row.Data[key] = fmt.Sprintf("%v", strings.TrimSpace(fmt.Sprintf("%v ", value)))
+// 		fmt.Printf("%s: %v | ", key, row.Data[key])
+// 	}
+// }

@@ -26,13 +26,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
-	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
+	"github.com/akthe-at/go_task/utils"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -84,15 +82,18 @@ to quickly create a Cobra application.`,
 		}
 
 		note, err := queries.ReadNoteByID(ctx, int64(noteID))
-		notePath, err := expandPath(note.Path)
+		if err != nil {
+			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
+		}
+		notePath, err := utils.ExpandPath(note.Path)
 		if err != nil {
 			log.Errorf("There was an error expanding the path: %v", err)
 		} else {
-			cmdr := exec.Command(editor, notePath)
-			cmdr.Stdin = os.Stdin
-			cmdr.Stdout = os.Stdout
-			cmdr.Stderr = os.Stderr
-			err = cmdr.Run()
+			editorProcess := exec.Command(editor, notePath)
+			editorProcess.Stdin = os.Stdin
+			editorProcess.Stdout = os.Stdout
+			editorProcess.Stderr = os.Stderr
+			err = editorProcess.Run()
 			if err != nil {
 				log.Errorf("There was an error running the command: %v", err)
 			}
@@ -118,15 +119,4 @@ func init() {
 func GetEditorConfig() string {
 	editor := viper.GetString("selected.editor")
 	return editor
-}
-
-func expandPath(path string) (string, error) {
-	if strings.HasPrefix(path, "~") {
-		usr, err := user.Current()
-		if err != nil {
-			return "", err
-		}
-		path = filepath.Join(usr.HomeDir, path[1:])
-	}
-	return path, nil
 }

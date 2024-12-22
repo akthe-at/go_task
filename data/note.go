@@ -21,8 +21,8 @@ type NoteMetadata struct {
 }
 
 type NoteContent struct {
-	Metadata NoteMetadata
 	Body     string
+	Metadata NoteMetadata
 }
 
 func GenerateMarkdownFile(note NoteContent, outputPath string) (string, error) {
@@ -44,7 +44,7 @@ func GenerateMarkdownFile(note NoteContent, outputPath string) (string, error) {
 	return outputPath, os.WriteFile(outputPath, content.Bytes(), 0644)
 }
 
-func TemplateMarkdownNote(Title string, ID string, aliases []string, tags []string) (string, error) {
+func TemplateMarkdownNote(Title, ID, body string, aliases []string, tags []string) (string, error) {
 	note := NoteContent{
 		Metadata: NoteMetadata{
 			Title:   Title,
@@ -52,7 +52,7 @@ func TemplateMarkdownNote(Title string, ID string, aliases []string, tags []stri
 			Aliases: aliases,
 			Tags:    tags,
 		},
-		Body: `test`,
+		Body: body,
 	}
 	notesPath := config.UserSettings.Selected.NotesPath
 	output, err := GenerateMarkdownFile(note, notesPath)

@@ -46,6 +46,7 @@ var rootCmd = &cobra.Command{
 	To launch the TUI version, simpy run go_task with no arguments. All other subcommands
 	interact with the CLI version of the application`,
 	Run: func(cmd *cobra.Command, args []string) {
+		tui.ClearTerminalScreen()
 		model := dataTable.NewRootModel()
 		p := tea.NewProgram(&model)
 		if _, err := p.Run(); err != nil {
@@ -102,8 +103,7 @@ func initConfig() {
 		}
 	}
 
-	// TODO: This needs a better default location and name.
-	// Search config in home directory with name ".go_task" (without extension).
+	// TODO: This needs a better name.
 	viper.AddConfigPath(configPath)
 	viper.SetConfigType("toml")
 	viper.SetConfigName("config")
@@ -113,8 +113,6 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading config file: %v\n", err)
 		return
-	} else {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
 	// FIXME: I wish this wasn't necessary but viper wouldn'tm unmarshal the data otherwise?

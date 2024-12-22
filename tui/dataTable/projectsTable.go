@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -26,6 +27,7 @@ const (
 	projectColumnKeyArchived  = "archived"
 	projectColumnKeyCreatedAt = "created_at"
 	projectColumnKeyNotes     = "notes"
+	projectColumnKeyPath      = "path"
 )
 
 // This is the task table "screen" model
@@ -123,12 +125,17 @@ func (m *ProjectsModel) loadRowsFromDatabase() ([]table.Row, error) {
 
 	var rows []table.Row
 	for _, project := range projects {
+		formattedPath := path.Base(project.Path.String)
+		if formattedPath == "." {
+			formattedPath = ""
+		}
 		row := table.NewRow(table.RowData{
 			projectColumnKeyID:       fmt.Sprintf("%d", project.ID),
 			projectColumnKeyProject:  project.Title,
 			projectColumnKeyStatus:   project.Status.String,
 			projectColumnKeyArchived: fmt.Sprintf("%t", project.Archived),
 			projectColumnKeyNotes:    project.NoteTitles,
+			projectColumnKeyPath:     formattedPath,
 		})
 		rows = append(rows, row)
 	}
@@ -201,15 +208,25 @@ func (m *ProjectsModel) addNote() tea.Cmd {
 
 	if form.Submit {
 		selectedIDs := []string{}
+		var projectID int
 
 		for _, row := range m.tableModel.SelectedRows() {
 			selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
 		}
-		highlightedInfo := fmt.Sprintf("%v", m.tableModel.HighlightedRow().Data[NoteColumnKeyID])
-		projectID, err := strconv.Atoi(highlightedInfo)
-		if err != nil {
-			log.Printf("Error converting ID to int: %s", err)
-			return nil
+
+		if len(selectedIDs) == 1 {
+			projectID, err = strconv.Atoi(selectedIDs[0])
+			if err != nil {
+				log.Printf("Error converting ID to int: %s", err)
+				return nil
+			}
+		} else {
+			highlightedInfo := fmt.Sprintf("%v", m.tableModel.HighlightedRow().Data[NoteColumnKeyID])
+			projectID, err = strconv.Atoi(highlightedInfo)
+			if err != nil {
+				log.Printf("Error converting ID to int: %s", err)
+				return nil
+			}
 		}
 
 		newNote := sqlc.CreateNoteParams{
@@ -293,6 +310,90 @@ func (m *ProjectsModel) addProject() tea.Cmd {
 		m.tableModel = m.tableModel.WithRows(rows)
 
 		m.updateFooter()
+		return func() tea.Msg {
+			return SwitchToProjectsTableViewMsg{}
+		}
+	}
+
+	return nil
+}
+
+func (m *ProjectsModel) refreshTableData() {
+	var filteredRows []table.Row
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		log.Printf("Error loading rows from database: %s", err)
+	}
+
+	for _, row := range rows {
+		archived, ok := row.Data[columnKeyArchived]
+		if !ok {
+			log.Printf("Error getting archived status from row: %s", err)
+		}
+		if archived == "false" {
+			filteredRows = append(filteredRows, row)
+		}
+	}
+
+	m.tableModel = m.tableModel.WithRows(filteredRows)
+
+	m.updateFooter()
+}
+
+func (m *ProjectsModel) addTaskToArea() tea.Cmd {
+	form := &formInput.NewTaskForm{}
+	theme := tui.GetSelectedTheme()
+
+	selectedAreaIDs := []string{}
+	for _, row := range m.tableModel.SelectedRows() {
+		selectedAreaIDs = append(selectedAreaIDs, row.Data[projectColumnKeyID].(string))
+	}
+	if len(selectedAreaIDs) > 1 {
+		log.Fatal("You can only select one project at a time to add a task to.")
+	}
+	highlightedInfo := m.tableModel.HighlightedRow().Data[projectColumnKeyID].(string)
+	areaID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+	if err != nil {
+		log.Printf("Error converting ID to int64: %s", err)
+		return nil
+	}
+
+	err = form.NewTaskForm(*tui.ThemeGoTask(theme))
+	if err != nil {
+		log.Fatalf("Error creating form: %v", err)
+	}
+
+	if form.Submit {
+		ctx := context.Background()
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Fatalf("Error connecting to database: %v", err)
+		}
+		defer conn.Close()
+		queries := sqlc.New(conn)
+		_, err = queries.CreateTask(ctx, sqlc.CreateTaskParams{
+			Title:    form.TaskTitle,
+			Priority: sql.NullString{String: string(form.Priority), Valid: true},
+			Status:   sql.NullString{String: string(form.Status), Valid: true},
+			Archived: form.Archived,
+			AreaID:   sql.NullInt64{Int64: areaID, Valid: true},
+		})
+		if err != nil {
+			log.Fatalf("Error creating new task: %v", err)
+		}
+
+		// Requery the database and update the table model
+		rows, err := m.loadRowsFromDatabase()
+		if err != nil {
+			log.Printf("Error loading rows from database: %s", err)
+			return nil
+		}
+		m.tableModel = m.tableModel.WithRows(rows)
+
+		m.updateFooter()
+		m.recalculateTable()
+		// FIXME: theres a visual bug here after completing this!
+		//
 		return func() tea.Msg {
 			return SwitchToProjectsTableViewMsg{}
 		}
@@ -411,7 +512,7 @@ func (m *ProjectsModel) deleteProject() tea.Cmd {
 func (m ProjectsModel) View() string {
 	body := strings.Builder{}
 
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add new Project by pressing 'A'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add a new Project by pressing 'A'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Projects by pressing 'F'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
@@ -457,6 +558,7 @@ func ProjectViewModel() ProjectsModel {
 		table.NewFlexColumn(projectColumnKeyProject, "Project", 3),
 		table.NewFlexColumn(projectColumnKeyStatus, "Status", 1),
 		table.NewFlexColumn(projectColumnKeyArchived, "Archived", 1),
+		table.NewFlexColumn(projectColumnKeyPath, "Repo", 1),
 		table.NewFlexColumn(projectColumnKeyNotes, "Notes", 3),
 	}
 
