@@ -79,13 +79,27 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case ProjectsTableView:
 				m.Projects.addProject()
 			}
+		case "T":
+			switch m.CurrentView {
+			case ProjectsTableView:
+				m.Projects.addTaskToArea()
+			case TasksTableView:
+				m.Tasks.recalculateTable()
+			case NotesTableView:
+				m.Notes.recalculateTable()
+			}
 		case "ctrl+t":
+			// tui.ClearTerminalScreen()
+			m.Tasks.refreshTableData()
 			m.PreviousView = m.CurrentView
 			m.CurrentView = TasksTableView
 		case "ctrl+n":
+			// tui.ClearTerminalScreen()
+			m.Notes.refreshTableData()
 			m.PreviousView = m.CurrentView
 			m.CurrentView = NotesTableView
 		case "ctrl+p":
+			// tui.ClearTerminalScreen()
 			m.PreviousView = m.CurrentView
 			m.CurrentView = ProjectsTableView
 		}

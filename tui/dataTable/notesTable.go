@@ -2,6 +2,7 @@ package datatable
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"strconv"
@@ -26,8 +27,8 @@ const (
 )
 
 type NotesModel struct {
-	tableModel       table.Model
 	Note             data.Note
+	tableModel       table.Model
 	totalWidth       int
 	totalHeight      int
 	horizontalMargin int
@@ -206,6 +207,17 @@ func NotesView() NotesModel {
 	model.updateFooter()
 
 	return model
+}
+
+func (m *NotesModel) refreshTableData() {
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		log.Printf("Error loading rows from database: %s", err)
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+
+	m.updateFooter()
 }
 
 func (m *NotesModel) updateFooter() {
