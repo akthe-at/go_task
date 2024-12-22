@@ -90,6 +90,7 @@ func (m *NotesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// recalculateTable Recalculates the table based on the current margins
 func (m *NotesModel) recalculateTable() {
 	m.tableModel = m.tableModel.
 		WithTargetWidth(m.calculateWidth()).
