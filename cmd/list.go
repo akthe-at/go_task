@@ -484,7 +484,7 @@ func styleAllNotesTable(notes []sqlc.ReadAllNotesRow) *table.Table {
 			}
 			return style
 		}).
-		Headers("ID", "Title", "Path", "Area/Task", "Parent ID").
+		Headers("ID", "Title", "Path", "Parent Title", "Area/Task").
 		Rows(rows...)
 	return &t
 }
