@@ -65,7 +65,7 @@ var deleteTaskCmd = &cobra.Command{
 			taskIDs = append(taskIDs, int64(taskID))
 		}
 
-		fmt.Println("delete called for task(s):", taskIDs)
+		fmt.Println("delete cmd invoked for task(s):", taskIDs)
 		if len(taskIDs) == 0 {
 			log.Errorf("No task IDs provided - delete command requires at least one task ID")
 			return
