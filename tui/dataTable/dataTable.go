@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -31,9 +32,11 @@ const (
 	columnKeyTaskAge    = "age_in_days"
 	columnKeyDueDate    = "due_date"
 	columnKeyNotes      = "notes"
-	minWidth            = 150
-	minHeight           = 5
-	fixedVerticalMargin = 60
+	columnKeyPath       = "path"
+	columnKeyArea       = "parent_area"
+	minWidth            = 120
+	minHeight           = 10
+	fixedVerticalMargin = 80
 )
 
 var customBorder = table.Border{
@@ -151,6 +154,10 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 
 	var rows []table.Row
 	for _, task := range tasks {
+		formattedPath := path.Base(task.Path.String)
+		if formattedPath == "." {
+			formattedPath = ""
+		}
 		row := table.NewRow(table.RowData{
 			columnKeyID:       fmt.Sprintf("%d", task.ID),
 			columnKeyTask:     task.Title,
@@ -159,6 +166,8 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 			columnKeyArchived: fmt.Sprintf("%t", task.Archived),
 			columnKeyTaskAge:  task.AgeInDays,
 			columnKeyNotes:    task.NoteTitles,
+			columnKeyPath:     formattedPath,
+			columnKeyArea:     task.ParentArea.String,
 		})
 		rows = append(rows, row)
 	}
@@ -234,6 +243,9 @@ func (m *TaskModel) addNote() tea.Cmd {
 
 		for _, row := range m.tableModel.SelectedRows() {
 			selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
+		}
+		if len(selectedIDs) > 1 {
+			log.Fatal("Currently unable to add note to multiple tasks at once")
 		}
 		highlightedInfo := fmt.Sprintf("%v", m.tableModel.HighlightedRow().Data[NoteColumnKeyID])
 		taskID, err := strconv.Atoi(highlightedInfo)
@@ -314,7 +326,7 @@ func (m *TaskModel) addTask() tea.Cmd {
 			Archived: form.Archived,
 		}
 
-		_, err = queries.CreateTask(ctx, newTask)
+		result, err := queries.CreateTask(ctx, newTask)
 		if err != nil {
 			log.Fatalf("Error creating task: %v", err)
 		}
@@ -490,11 +502,13 @@ func TaskViewModel() TaskModel {
 				Foreground(lipgloss.Color(theme.Secondary)).
 				Align(lipgloss.Center)),
 		table.NewFlexColumn(columnKeyTask, "Task", 3),
-		table.NewFlexColumn(columnKeyPriority, "Priority", 1),
-		table.NewFlexColumn(columnKeyStatus, "Status", 1),
-		table.NewFlexColumn(columnKeyArchived, "Archived", 1),
-		table.NewFlexColumn(columnKeyTaskAge, "Task Age (Days)", 1),
+		table.NewColumn(columnKeyPriority, "Priority", 10),
+		table.NewColumn(columnKeyStatus, "Status", 10),
+		table.NewColumn(columnKeyArchived, "Archived", 10),
+		table.NewColumn(columnKeyTaskAge, "Task Age(Days)", 15),
 		table.NewFlexColumn(columnKeyNotes, "Notes", 3),
+		table.NewFlexColumn(columnKeyPath, "Repo", 1),
+		table.NewFlexColumn(columnKeyArea, "Area", 3),
 	}
 
 	model := TaskModel{archiveFilter: true}
@@ -533,7 +547,8 @@ func TaskViewModel() TaskModel {
 				Foreground(lipgloss.Color(theme.Success)).
 				Align(lipgloss.Left),
 		).
-		SortByAsc(columnKeyID).
+		SortByDesc(columnKeyTaskAge).
+		WithMultiline(true).
 		WithMissingDataIndicatorStyled(table.StyledCell{
 			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)),
 			Data:  "<Missing Data>",
