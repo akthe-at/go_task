@@ -130,6 +130,28 @@ func (m *TaskModel) recalculateTable() {
 		WithMinimumHeight(m.calculateHeight())
 }
 
+func (m *TaskModel) refreshTableData() {
+	var filteredRows []table.Row
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		log.Printf("Error loading rows from database: %s", err)
+	}
+
+	for _, row := range rows {
+		archived, ok := row.Data[columnKeyArchived]
+		if !ok {
+			log.Printf("Error getting archived status from row: %s", err)
+		}
+		if archived == "false" {
+			filteredRows = append(filteredRows, row)
+		}
+	}
+
+	m.tableModel = m.tableModel.WithRows(filteredRows)
+
+	m.updateFooter()
+}
+
 func (m TaskModel) calculateWidth() int {
 	return m.totalWidth - m.horizontalMargin
 }
@@ -330,6 +352,35 @@ func (m *TaskModel) addTask() tea.Cmd {
 		if err != nil {
 			log.Fatalf("Error creating task: %v", err)
 		}
+		var projectID int64
+		if form.ProjectAssignment == "local" {
+			projID, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
+			if err != nil {
+				log.Fatalf("Error checking if project exists: %v", err)
+			}
+			switch projID {
+			case 0:
+				projectID, err = queries.InsertProgProject(ctx, form.ProgProject)
+				if err != nil {
+					log.Fatalf("Error inserting project: %v", err)
+				}
+			case 1:
+				projectID = projID
+			default:
+				log.Fatalf("Unexpected projID: %v", projID)
+			}
+			err = queries.CreateProjectTaskLink(ctx,
+				sqlc.CreateProjectTaskLinkParams{
+					ProjectID:    sql.NullInt64{Int64: projectID, Valid: true},
+					ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+					ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
+				},
+			)
+			if err != nil {
+				log.Fatalf("Error inserting project link: %v", err)
+			}
+		}
+
 		// Requery the database and update the table model
 		rows, err := m.loadRowsFromDatabase()
 		if err != nil {
@@ -397,7 +448,7 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		if deletedID != taskID {
 			log.Fatalf("Error deleting task: %s", err)
 		} else {
-			m.deleteMessage = fmt.Sprintf("You deleted this task:  IDs: %s", highlightedInfo)
+			m.deleteMessage = fmt.Sprintf("You deleted the following task: %s", highlightedInfo)
 		}
 
 	} else if len(selectedIDs) > 1 {
@@ -436,7 +487,7 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		if result != int64(len(selectedIDs)) {
 			log.Printf("Error deleting tasks - Mismatch between selectedIDs and numDeleted: %s", err)
 		}
-		m.deleteMessage = fmt.Sprintf("You deleted these tasks:  IDs: %s", strings.Join(selectedIDs, ", "))
+		m.deleteMessage = fmt.Sprintf("You deleted the following tasks: %s", strings.Join(selectedIDs, ", "))
 	}
 
 	// Requery the database and update the table model
