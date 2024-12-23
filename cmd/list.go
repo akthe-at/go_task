@@ -172,9 +172,9 @@ var allNotesCmd = &cobra.Command{
 }
 
 var projectsCmd = &cobra.Command{
-	Use:   "projects",
-	Short: "List your projects/areas",
-	Long: `This command is used for calling for a list of your areas/tasks.
+	Use:   "areas",
+	Short: "List your areas",
+	Long: `This command is used for calling for a list of your areas.
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -203,16 +203,6 @@ func init() {
 	listCmd.AddCommand(taskCmd)
 	listCmd.AddCommand(allNotesCmd)
 	taskCmd.AddCommand(taskNotesCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 type TasksRowWrapper struct {
