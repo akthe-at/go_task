@@ -108,7 +108,6 @@ var tasksCmd = &cobra.Command{
 			log.Errorf("There was an error reading the tasks from the database: %v", err)
 		}
 		table := styleTasksTable(tasks)
-		// FIXME: Does this need to be a special renderer?
 		fmt.Println(table)
 	},
 }
@@ -124,21 +123,21 @@ var taskNotesCmd = &cobra.Command{
 
 		conn, err := db.ConnectDB()
 		if err != nil {
-			log.Errorf("There was an error connecting to the database: %v", err)
+			log.Fatalf("There was an error connecting to the database: %v", err)
 		}
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
 		taskID, err = strconv.Atoi(args[0])
 		if err != nil {
-			log.Errorf("There was an error converting the task ID to an integer: %v", err)
+			log.Fatalf("There was an error converting the task ID to an integer: %v", err)
 		}
 
 		results, err := queries.ReadTaskNote(ctx,
 			sql.NullInt64{Int64: int64(taskID)},
 		)
 		if err != nil {
-			log.Errorf("There was an error reading the areas/projects from the database: %v", err)
+			log.Fatalf("There was an error reading the task notes from the database: %v", err)
 		}
 
 		table := styleTaskNotesTable(results)
