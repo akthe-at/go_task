@@ -269,12 +269,22 @@ func (t TaskRowWrapper) ToRow() []string {
 	if formattedPath == "." {
 		formattedPath = ""
 	}
+	var formattedNotes string
+	if t.NoteTitle != nil {
+		note := t.NoteTitle.(string)
+		notes := strings.Split(note, ",")
+		if len(notes) > 2 {
+			formattedNotes = strings.Join(notes[:2], ", ") + ", ..."
+		} else {
+			formattedNotes = note
+		}
+	}
 
 	return []string{
 		fmt.Sprintf("%d", t.TaskID),
 		t.TaskTitle,
 		fmt.Sprintf("%.2f", t.AgeInDays),
-		fmt.Sprintf("%v", t.NoteTitle),
+		formattedNotes,
 		formattedPath,
 		fmt.Sprintf("%v", t.ParentArea),
 	}
