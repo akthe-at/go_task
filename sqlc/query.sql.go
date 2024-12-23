@@ -9,7 +9,6 @@ import (
 	"context"
 	"database/sql"
 	"strings"
-	"time"
 )
 
 const checkProgProjectExists = `-- name: CheckProgProjectExists :one
@@ -815,8 +814,8 @@ SELECT
     tasks.priority,
     tasks.status,
     tasks.archived,
-    tasks.created_at,
-    tasks.last_mod,
+    datetime(tasks.created_at) AS created_at,
+    datetime(tasks.last_mod) AS last_mod,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
     tasks.due_date,
     IFNULL(GROUP_CONCAT(notes.title, ', '), '') as note_title,
@@ -844,8 +843,8 @@ type ReadTaskRow struct {
 	Priority   sql.NullString `json:"priority"`
 	Status     sql.NullString `json:"status"`
 	Archived   bool           `json:"archived"`
-	CreatedAt  time.Time      `json:"created_at"`
-	LastMod    time.Time      `json:"last_mod"`
+	CreatedAt  interface{}    `json:"created_at"`
+	LastMod    interface{}    `json:"last_mod"`
 	AgeInDays  float64        `json:"age_in_days"`
 	DueDate    sql.NullTime   `json:"due_date"`
 	NoteTitle  interface{}    `json:"note_title"`
