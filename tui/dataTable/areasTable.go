@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	data "github.com/akthe-at/go_task/data"
 	db "github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
@@ -21,17 +22,17 @@ import (
 )
 
 const (
-	projectColumnKeyID        = "id"
-	projectColumnKeyProject   = "title"
-	projectColumnKeyStatus    = "status"
-	projectColumnKeyArchived  = "archived"
-	projectColumnKeyCreatedAt = "created_at"
-	projectColumnKeyNotes     = "notes"
-	projectColumnKeyPath      = "path"
+	areaColumnKeyID        = "id"
+	areaColumnKeyProject   = "title"
+	areaColumnKeyStatus    = "status"
+	areaColumnKeyArchived  = "archived"
+	areaColumnKeyCreatedAt = "created_at"
+	areaColumnKeyNotes     = "notes"
+	areaColumnKeyPath      = "path"
 )
 
 // This is the task table "screen" model
-type ProjectsModel struct {
+type AreasModel struct {
 	tableModel       table.Model
 	totalWidth       int
 	totalHeight      int
@@ -42,9 +43,9 @@ type ProjectsModel struct {
 }
 
 // Init initializes the model (can use this to run commands upon model initialization)
-func (m *ProjectsModel) Init() tea.Cmd { return nil }
+func (m *AreasModel) Init() tea.Cmd { return nil }
 
-func (m *ProjectsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *AreasModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmd  tea.Cmd
 		cmds []tea.Cmd
@@ -95,21 +96,21 @@ func (m *ProjectsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *ProjectsModel) recalculateTable() {
+func (m *AreasModel) recalculateTable() {
 	m.tableModel = m.tableModel.
 		WithTargetWidth(m.calculateWidth()).
 		WithMinimumHeight(m.calculateHeight())
 }
 
-func (m ProjectsModel) calculateWidth() int {
+func (m AreasModel) calculateWidth() int {
 	return m.totalWidth - m.horizontalMargin
 }
 
-func (m ProjectsModel) calculateHeight() int {
+func (m AreasModel) calculateHeight() int {
 	return m.totalHeight - m.verticalMargin - fixedVerticalMargin
 }
 
-func (m *ProjectsModel) loadRowsFromDatabase() ([]table.Row, error) {
+func (m *AreasModel) loadRowsFromDatabase() ([]table.Row, error) {
 	ctx := context.Background()
 	conn, err := db.ConnectDB()
 	if err != nil {
@@ -118,31 +119,31 @@ func (m *ProjectsModel) loadRowsFromDatabase() ([]table.Row, error) {
 	queries := sqlc.New(conn)
 	defer conn.Close()
 
-	projects, err := queries.ReadAreas(ctx)
+	areas, err := queries.ReadAreas(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error reading projects: %w", err)
+		return nil, fmt.Errorf("error reading areas: %w", err)
 	}
 
 	var rows []table.Row
-	for _, project := range projects {
-		formattedPath := path.Base(project.Path.String)
+	for _, area := range areas {
+		formattedPath := path.Base(area.Path.String)
 		if formattedPath == "." {
 			formattedPath = ""
 		}
 		row := table.NewRow(table.RowData{
-			projectColumnKeyID:       fmt.Sprintf("%d", project.ID),
-			projectColumnKeyProject:  project.Title,
-			projectColumnKeyStatus:   project.Status.String,
-			projectColumnKeyArchived: fmt.Sprintf("%t", project.Archived),
-			projectColumnKeyNotes:    project.NoteTitles,
-			projectColumnKeyPath:     formattedPath,
+			areaColumnKeyID:       fmt.Sprintf("%d", area.ID),
+			areaColumnKeyProject:  area.Title,
+			areaColumnKeyStatus:   area.Status.String,
+			areaColumnKeyArchived: fmt.Sprintf("%t", area.Archived),
+			areaColumnKeyNotes:    area.NoteTitles,
+			areaColumnKeyPath:     formattedPath,
 		})
 		rows = append(rows, row)
 	}
 	return rows, nil
 }
 
-func (m *ProjectsModel) filterArchives() tea.Cmd {
+func (m *AreasModel) filterArchives() tea.Cmd {
 	var filteredRows []table.Row
 	// toggle m.archiveFilter from current status
 	m.archiveFilter = !m.archiveFilter
@@ -156,7 +157,7 @@ func (m *ProjectsModel) filterArchives() tea.Cmd {
 		}
 
 		for _, row := range rows {
-			archived, ok := row.Data[projectColumnKeyArchived]
+			archived, ok := row.Data[areaColumnKeyArchived]
 			if !ok {
 				log.Printf("Error getting archived status from row: %s", err)
 				return nil
@@ -180,7 +181,7 @@ func (m *ProjectsModel) filterArchives() tea.Cmd {
 		}
 
 		for _, row := range rows {
-			archived, ok := row.Data[projectColumnKeyArchived]
+			archived, ok := row.Data[areaColumnKeyArchived]
 			if !ok {
 				log.Printf("Error getting archived status from row: %s", err)
 				return nil
@@ -199,7 +200,7 @@ func (m *ProjectsModel) filterArchives() tea.Cmd {
 	}
 }
 
-func (m *ProjectsModel) addNote() tea.Cmd {
+func (m *AreasModel) addNote() tea.Cmd {
 	form := &formInput.NewNoteForm{}
 	theme := tui.GetSelectedTheme()
 	err := form.NewNoteForm(*tui.ThemeGoTask(theme))
@@ -209,21 +210,21 @@ func (m *ProjectsModel) addNote() tea.Cmd {
 
 	if form.Submit {
 		selectedIDs := []string{}
-		var projectID int
+		var areaID int
 
 		for _, row := range m.tableModel.SelectedRows() {
 			selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(string))
 		}
 
 		if len(selectedIDs) == 1 {
-			projectID, err = strconv.Atoi(selectedIDs[0])
+			areaID, err = strconv.Atoi(selectedIDs[0])
 			if err != nil {
 				log.Printf("Error converting ID to int: %s", err)
 				return nil
 			}
 		} else {
 			highlightedInfo := fmt.Sprintf("%v", m.tableModel.HighlightedRow().Data[NoteColumnKeyID])
-			projectID, err = strconv.Atoi(highlightedInfo)
+			areaID, err = strconv.Atoi(highlightedInfo)
 			if err != nil {
 				log.Printf("Error converting ID to int: %s", err)
 				return nil
@@ -250,7 +251,7 @@ func (m *ProjectsModel) addNote() tea.Cmd {
 		id, err := queries.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
 			NoteID:       sql.NullInt64{Int64: int64(noteID), Valid: true},
 			ParentCat:    sql.NullInt64{Int64: int64(form.Type), Valid: true},
-			ParentAreaID: sql.NullInt64{Int64: int64(projectID), Valid: true},
+			ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
 		},
 		)
 		if err != nil {
@@ -277,7 +278,7 @@ func (m *ProjectsModel) addNote() tea.Cmd {
 	}
 }
 
-func (m *ProjectsModel) addProject() tea.Cmd {
+func (m *AreasModel) addArea() tea.Cmd {
 	form := &formInput.NewAreaForm{}
 	theme := tui.GetSelectedTheme()
 
@@ -293,15 +294,48 @@ func (m *ProjectsModel) addProject() tea.Cmd {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
+
 		queries := sqlc.New(conn)
-		_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+		newArea := sqlc.CreateAreaParams{
 			Title:    form.AreaTitle,
 			Status:   sql.NullString{String: string(form.Status), Valid: true},
 			Archived: form.Archived,
-		})
+		}
+
+		result, err := queries.CreateArea(ctx, newArea)
 		if err != nil {
 			log.Fatalf("Error creating new area: %v", err)
 		}
+
+		var projectID int64
+		if form.ProjectAssignment == "local" {
+			projID, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
+			if err != nil {
+				log.Fatalf("Error checking if project exists: %v", err)
+			}
+			switch projID {
+			case 0:
+				projectID, err = queries.InsertProgProject(ctx, form.ProgProject)
+				if err != nil {
+					log.Fatalf("Error inserting project: %v", err)
+				}
+			case 1:
+				projectID = projID
+			default:
+				log.Fatalf("Unexpected projID: %v", projID)
+			}
+			err = queries.CreateProjectTaskLink(ctx,
+				sqlc.CreateProjectTaskLinkParams{
+					ProjectID:    sql.NullInt64{Int64: projectID, Valid: true},
+					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
+					ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
+				},
+			)
+			if err != nil {
+				log.Fatalf("Error inserting project link: %v", err)
+			}
+		}
+
 		// Requery the database and update the table model
 		rows, err := m.loadRowsFromDatabase()
 		if err != nil {
@@ -319,7 +353,7 @@ func (m *ProjectsModel) addProject() tea.Cmd {
 	return nil
 }
 
-func (m *ProjectsModel) refreshTableData() {
+func (m *AreasModel) refreshTableData() {
 	var filteredRows []table.Row
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
@@ -327,7 +361,7 @@ func (m *ProjectsModel) refreshTableData() {
 	}
 
 	for _, row := range rows {
-		archived, ok := row.Data[columnKeyArchived]
+		archived, ok := row.Data[areaColumnKeyArchived]
 		if !ok {
 			log.Printf("Error getting archived status from row: %s", err)
 		}
@@ -341,22 +375,21 @@ func (m *ProjectsModel) refreshTableData() {
 	m.updateFooter()
 }
 
-func (m *ProjectsModel) addTaskToArea() tea.Cmd {
+func (m *AreasModel) addTaskToArea() tea.Cmd {
 	form := &formInput.NewTaskForm{}
 	theme := tui.GetSelectedTheme()
 
 	selectedAreaIDs := []string{}
 	for _, row := range m.tableModel.SelectedRows() {
-		selectedAreaIDs = append(selectedAreaIDs, row.Data[projectColumnKeyID].(string))
+		selectedAreaIDs = append(selectedAreaIDs, row.Data[areaColumnKeyID].(string))
 	}
 	if len(selectedAreaIDs) > 1 {
-		log.Fatal("You can only select one project at a time to add a task to.")
+		log.Fatal("You can only select one area at a time to add a task to.")
 	}
-	highlightedInfo := m.tableModel.HighlightedRow().Data[projectColumnKeyID].(string)
+	highlightedInfo := m.tableModel.HighlightedRow().Data[areaColumnKeyID].(string)
 	areaID, err := strconv.ParseInt(highlightedInfo, 10, 64)
 	if err != nil {
-		log.Printf("Error converting ID to int64: %s", err)
-		return nil
+		log.Fatalf("Error converting ID to int64: %s", err)
 	}
 
 	err = form.NewTaskForm(*tui.ThemeGoTask(theme))
@@ -403,15 +436,15 @@ func (m *ProjectsModel) addTaskToArea() tea.Cmd {
 	return nil
 }
 
-func (m *ProjectsModel) deleteProject() tea.Cmd {
+func (m *AreasModel) deleteArea() tea.Cmd {
 	selectedIDs := []string{}
 	ctx := context.Background()
 	for _, row := range m.tableModel.SelectedRows() {
-		selectedIDs = append(selectedIDs, row.Data[projectColumnKeyID].(string))
+		selectedIDs = append(selectedIDs, row.Data[areaColumnKeyID].(string))
 	}
-	highlightedInfo := m.tableModel.HighlightedRow().Data[projectColumnKeyID].(string)
-	highlightedNote := m.tableModel.HighlightedRow().Data[projectColumnKeyNotes].(string)
-	projectID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+	highlightedInfo := m.tableModel.HighlightedRow().Data[areaColumnKeyID].(string)
+	highlightedNote := m.tableModel.HighlightedRow().Data[areaColumnKeyNotes].(string)
+	areaID, err := strconv.ParseInt(highlightedInfo, 10, 64)
 	if err != nil {
 		log.Printf("Error converting ID to int64: %s", err)
 		return nil
@@ -419,102 +452,92 @@ func (m *ProjectsModel) deleteProject() tea.Cmd {
 
 	conn, err := db.ConnectDB()
 	if err != nil {
-		log.Printf("Error connecting to database: %s", err)
-		return nil
+		log.Fatalf("Error connecting to database: %s", err)
 	}
 	defer conn.Close()
 
 	if len(selectedIDs) <= 1 {
 		queries := sqlc.New(conn)
 		// query the notes associated with the task
-		projectNoteIDs := []int64{}
-		projectNotes, err := queries.ReadAreaNote(ctx, sql.NullInt64{Int64: projectID, Valid: true})
+		areaNoteIDs := []int64{}
+		areaNotes, err := queries.ReadAreaNote(ctx, sql.NullInt64{Int64: areaID, Valid: true})
 		if err != nil {
-			log.Printf("Error reading notes: %s", err)
-			return nil
+			log.Fatalf("Error reading notes: %s", err)
 		}
-		for _, note := range projectNotes {
-			projectNoteIDs = append(projectNoteIDs, note.ID)
+		for _, note := range areaNotes {
+			areaNoteIDs = append(areaNoteIDs, note.ID)
 		}
 		// delete those notes
 		if highlightedNote != "" {
-			_, err := queries.DeleteNotes(ctx, projectNoteIDs)
+			_, err := queries.DeleteNotes(ctx, areaNoteIDs)
 			if err != nil {
-				log.Printf("Error deleting notes: %s", err)
-				return nil
+				log.Fatalf("Error deleting notes: %s", err)
 			}
 		}
 		// delete the project
-		deletedID, err := queries.DeleteSingleArea(ctx, projectID)
+		deletedID, err := queries.DeleteSingleArea(ctx, areaID)
 		if err != nil {
-			log.Printf("Error deleting area/project: %s", err)
-			return nil
+			log.Fatalf("Error deleting area: %s", err)
 		}
-		if deletedID != projectID {
-			log.Fatalf("Error deleting project: %s", err)
+		if deletedID != areaID {
+			log.Fatalf("Error deleting area: %s", err)
 		} else {
-			m.deleteMessage = fmt.Sprintf("You deleted this project:  IDs: %s", highlightedInfo)
+			m.deleteMessage = fmt.Sprintf("You deleted the following area:  IDs: %s", highlightedInfo)
 		}
 
 	} else if len(selectedIDs) > 1 {
 		queries := sqlc.New(conn)
-		// query the notes associated with the project
-		projectNoteIDs := []int64{}
-		taskNotes, err := queries.ReadAreaNote(ctx, sql.NullInt64{Int64: projectID, Valid: true})
+		// query the notes associated with the area
+		areaNoteIDs := []int64{}
+		taskNotes, err := queries.ReadAreaNote(ctx, sql.NullInt64{Int64: areaID, Valid: true})
 		if err != nil {
-			log.Printf("Error reading notes: %s", err)
-			return nil
+			log.Fatalf("Error reading notes: %s", err)
 		}
 		for _, note := range taskNotes {
-			projectNoteIDs = append(projectNoteIDs, note.ID)
+			areaNoteIDs = append(areaNoteIDs, note.ID)
 		}
 		// delete those notes
 		if highlightedNote != "" {
-			_, err := queries.DeleteNotes(ctx, projectNoteIDs)
+			_, err := queries.DeleteNotes(ctx, areaNoteIDs)
 			if err != nil {
-				log.Printf("Error deleting notes: %s", err)
-				return nil
+				log.Fatalf("Error deleting notes: %s", err)
 			}
 		}
-		toDeleteProjects := make([]int64, len(selectedIDs))
+		areasToDelete := make([]int64, len(selectedIDs))
 		for idx, id := range selectedIDs {
 			converted_id, err := strconv.ParseInt(id, 10, 64)
 			if err != nil {
 				log.Printf("Error converting ID to int: %s", err)
 			}
-			toDeleteProjects[idx] = converted_id
+			areasToDelete[idx] = converted_id
 		}
-		result, err := queries.DeleteTasks(ctx, toDeleteProjects)
+		result, err := queries.DeleteTasks(ctx, areasToDelete)
 		if err != nil {
-			log.Printf("Error deleting projects: %s", err)
-			return nil
+			log.Fatalf("Error deleting areas: %s", err)
 		}
 		if result != int64(len(selectedIDs)) {
-			log.Printf("Error deleting projectss - Mismatch between selectedIDs and numDeleted: %s", err)
+			log.Fatalf("Error deleting areas - Mismatch between selectedIDs and numDeleted: %s", err)
 		}
-		m.deleteMessage = fmt.Sprintf("You deleted these projects:  IDs: %s", strings.Join(selectedIDs, ", "))
+		m.deleteMessage = fmt.Sprintf("You deleted these areas:  IDs: %s", strings.Join(selectedIDs, ", "))
 	}
 
 	// Requery the database and update the table model
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
-		log.Printf("Error loading rows from database: %s", err)
-		return nil
+		log.Fatalf("Error loading rows from database: %s", err)
 	}
 	m.tableModel = m.tableModel.WithRows(rows)
 
-	// Update the footer
 	m.updateFooter()
 
 	return nil
 }
 
-// View This is where we define the UI for the projects table
-func (m ProjectsModel) View() string {
+func (m AreasModel) View() string {
 	body := strings.Builder{}
 
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add a new Project by pressing 'A'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Projects by pressing 'F'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add a new Area by pressing 'A'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Areas by pressing 'F'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
@@ -523,7 +546,7 @@ func (m ProjectsModel) View() string {
 	selectedIDs := []string{}
 
 	for _, row := range m.tableModel.SelectedRows() {
-		selectedIDs = append(selectedIDs, row.Data[projectColumnKeyID].(string))
+		selectedIDs = append(selectedIDs, row.Data[areaColumnKeyID].(string))
 	}
 
 	body.WriteString(
@@ -547,30 +570,30 @@ func (m ProjectsModel) View() string {
 	return body.String()
 }
 
-func ProjectViewModel() ProjectsModel {
+func ProjectViewModel() AreasModel {
 	theme := tui.GetSelectedTheme()
 
 	columns := []table.Column{
-		table.NewColumn(projectColumnKeyID, "ID", 10).WithStyle(
+		table.NewColumn(areaColumnKeyID, "ID", 10).WithStyle(
 			lipgloss.NewStyle().
 				Faint(true).
 				Foreground(lipgloss.Color(theme.Secondary)).
 				Align(lipgloss.Center)),
-		table.NewFlexColumn(projectColumnKeyProject, "Project", 3),
-		table.NewFlexColumn(projectColumnKeyStatus, "Status", 1),
-		table.NewFlexColumn(projectColumnKeyArchived, "Archived", 1),
-		table.NewFlexColumn(projectColumnKeyPath, "Repo", 1),
-		table.NewFlexColumn(projectColumnKeyNotes, "Notes", 3),
+		table.NewFlexColumn(areaColumnKeyProject, "Area", 3),
+		table.NewFlexColumn(areaColumnKeyStatus, "Status", 1),
+		table.NewFlexColumn(areaColumnKeyArchived, "Archived", 1),
+		table.NewFlexColumn(areaColumnKeyPath, "Repo", 1),
+		table.NewFlexColumn(areaColumnKeyNotes, "Notes", 3),
 	}
 
-	model := ProjectsModel{archiveFilter: true}
+	model := AreasModel{archiveFilter: true}
 	var filteredRows []table.Row
 	rows, err := model.loadRowsFromDatabase()
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, row := range rows {
-		archived, ok := row.Data[projectColumnKeyArchived]
+		archived, ok := row.Data[areaColumnKeyArchived]
 		if !ok {
 			log.Printf("Error getting archived status from row: %s", err)
 		}
@@ -599,7 +622,7 @@ func ProjectViewModel() ProjectsModel {
 				Foreground(lipgloss.Color(theme.Success)).
 				Align(lipgloss.Left),
 		).
-		SortByAsc(projectColumnKeyID).
+		SortByAsc(areaColumnKeyID).
 		WithMissingDataIndicatorStyled(table.StyledCell{
 			Style: lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)),
 			Data:  "<Missing Data>",
@@ -610,9 +633,9 @@ func ProjectViewModel() ProjectsModel {
 	return model
 }
 
-func (m *ProjectsModel) updateFooter() {
+func (m *AreasModel) updateFooter() {
 	highlightedRow := m.tableModel.HighlightedRow()
-	rowID, ok := highlightedRow.Data[projectColumnKeyID]
+	rowID, ok := highlightedRow.Data[areaColumnKeyID]
 	if !ok {
 		rowID = "No Rows Available"
 	}
@@ -627,7 +650,7 @@ func (m *ProjectsModel) updateFooter() {
 	m.tableModel = m.tableModel.WithStaticFooter(footerText)
 }
 
-func RunProjectsModel(m *ProjectsModel) {
+func RunProjectsModel(m *AreasModel) {
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
