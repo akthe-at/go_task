@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/akthe-at/go_task/config"
 	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
@@ -291,7 +292,7 @@ OR to generate a new note AND add it to a specific task:
 				log.Fatal("Error with generating Template!", err)
 			}
 			if openInEditor {
-				editor := utils.GetEditorConfig()
+				editor := config.GetEditorConfig()
 				cmdr := exec.Command(editor, outputPath)
 				cmdr.Stdin = os.Stdin
 				cmdr.Stdout = os.Stdout
@@ -557,7 +558,7 @@ OR to generate a new note AND add it to a specific area:
 				}
 
 				if openInEditor {
-					editor := utils.GetEditorConfig()
+					editor := config.GetEditorConfig()
 					cmdr := exec.Command(editor, outputPath)
 					cmdr.Stdin = os.Stdin
 					cmdr.Stdout = os.Stdout

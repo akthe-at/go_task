@@ -6,9 +6,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
-
-	"github.com/akthe-at/go_task/config"
-	"github.com/charmbracelet/log"
 )
 
 // CheckIfProjDir checks if the current directory is a project directory
@@ -52,15 +49,4 @@ func ExpandPath(path string) (string, error) {
 		path = filepath.Join(currentUser.HomeDir, path[1:])
 	}
 	return path, nil
-}
-
-// GetEditorConfig gets the editor from the config file
-// If no editor is set in the config file, it falls back to $EDITOR
-func GetEditorConfig() string {
-	editor := config.UserSettings.Selected.Editor
-	if editor == "" {
-		log.Warnf("No editor set in config file, falling back to $EDITOR.")
-		editor = os.Getenv("EDITOR")
-	}
-	return editor
 }

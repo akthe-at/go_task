@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"strconv"
 
+	"github.com/akthe-at/go_task/config"
 	"github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/utils"
@@ -66,7 +67,7 @@ var noteCmd = &cobra.Command{
 			log.Errorf("There was an error converting the noteID to an integer: %v", err)
 		}
 
-		editor := utils.GetEditorConfig()
+		editor := config.GetEditorConfig()
 
 		note, err := queries.ReadNoteByID(ctx, int64(noteID))
 		if err != nil {
