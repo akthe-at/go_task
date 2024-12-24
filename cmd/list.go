@@ -264,6 +264,7 @@ type TaskRowWrapper struct {
 	sqlc.ReadTaskRow
 }
 
+// ToRow converts the TaskRowWrapper to a slice of strings
 func (t TaskRowWrapper) ToRow() []string {
 	formattedPath := path.Base(t.ProgProj.String)
 	if formattedPath == "." {
@@ -304,6 +305,7 @@ func (a AllNotesRowWrapper) ToRow() []string {
 	}
 }
 
+// styleTable is a helper function to style the table output
 func styleTable(rows []TableRow, headers []string, colWidths map[int]int) *table.Table {
 	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
