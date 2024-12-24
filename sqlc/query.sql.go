@@ -1045,6 +1045,20 @@ func (q *Queries) UpdateAreaTitle(ctx context.Context, arg UpdateAreaTitleParams
 	return result.LastInsertId()
 }
 
+const updateTaskArchived = `-- name: UpdateTaskArchived :execresult
+UPDATE tasks SET archived = ? WHERE id = ?
+returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id
+`
+
+type UpdateTaskArchivedParams struct {
+	Archived bool  `json:"archived"`
+	ID       int64 `json:"id"`
+}
+
+func (q *Queries) UpdateTaskArchived(ctx context.Context, arg UpdateTaskArchivedParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateTaskArchived, arg.Archived, arg.ID)
+}
+
 const updateTaskPriority = `-- name: UpdateTaskPriority :execresult
 UPDATE tasks SET priority = ?  where id = ?
 returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id

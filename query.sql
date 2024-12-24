@@ -95,6 +95,7 @@ returning *;
 UPDATE areas set title = ? where id = ?
 returning id;
 
+
 -- name: UpdateTaskStatus :execresult
 UPDATE tasks SET status = ?  where id = ?
 returning *;
@@ -105,6 +106,10 @@ returning *;
 
 -- name: UpdateTaskTitle :execresult
 UPDATE tasks set title = ? where id = ?
+returning *;
+
+-- name: UpdateTaskArchived :execresult
+UPDATE tasks SET archived = ? WHERE id = ?
 returning *;
 
 
