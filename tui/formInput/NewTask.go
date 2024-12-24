@@ -20,7 +20,7 @@ type NewTaskForm struct {
 	TaskForm          *huh.Form
 	Priority          data.PriorityType
 	Status            data.StatusType
-	Notes             []data.Note
+	Notes             []sqlc.Note
 	Archived          bool
 	Submit            bool
 }

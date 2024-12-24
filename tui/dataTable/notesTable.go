@@ -27,7 +27,7 @@ const (
 )
 
 type NotesModel struct {
-	Note             data.Note
+	Note             sqlc.Note
 	tableModel       table.Model
 	totalWidth       int
 	totalHeight      int

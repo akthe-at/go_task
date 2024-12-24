@@ -2,6 +2,7 @@ package formInput
 
 import (
 	"github.com/akthe-at/go_task/data"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/charmbracelet/huh"
 )
@@ -12,7 +13,7 @@ type NewAreaForm struct {
 	ProgProject       string
 	AreaForm          *huh.Form
 	Status            data.StatusType
-	Notes             []data.Note
+	Notes             []sqlc.Note
 	Archived          bool
 	Submit            bool
 }

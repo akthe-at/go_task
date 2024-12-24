@@ -636,7 +636,7 @@ func RunModel(m *TaskModel) {
 	}
 }
 
-func extractNoteTitles(notes []data.Note) string {
+func extractNoteTitles(notes []sqlc.Note) string {
 	var titles []string
 	for _, note := range notes {
 		titles = append(titles, note.Title)
