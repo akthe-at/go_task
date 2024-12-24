@@ -9,7 +9,6 @@ import (
 	"context"
 	"database/sql"
 	"strings"
-	"time"
 )
 
 const checkProgProjectExists = `-- name: CheckProgProjectExists :one
@@ -815,11 +814,19 @@ SELECT
     tasks.priority,
     tasks.status,
     tasks.archived,
-    tasks.created_at,
-    tasks.last_mod,
+    datetime(tasks.created_at) AS created_at,
+    datetime(tasks.last_mod) AS last_mod,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
     tasks.due_date,
-    IFNULL(GROUP_CONCAT(notes.title, ', '), '') as note_title,
+    IFNULL(
+        (SELECT GROUP_CONCAT(title, ', ') 
+         FROM (SELECT DISTINCT notes.title 
+               FROM notes 
+               JOIN bridge_notes ON notes.id = bridge_notes.note_id 
+               WHERE bridge_notes.parent_task_id = tasks.id)
+        ), 
+        ''
+    ) AS note_title,
     programming_projects.path AS prog_proj,
     areas.title AS parent_area
 FROM
@@ -844,8 +851,8 @@ type ReadTaskRow struct {
 	Priority   sql.NullString `json:"priority"`
 	Status     sql.NullString `json:"status"`
 	Archived   bool           `json:"archived"`
-	CreatedAt  time.Time      `json:"created_at"`
-	LastMod    time.Time      `json:"last_mod"`
+	CreatedAt  interface{}    `json:"created_at"`
+	LastMod    interface{}    `json:"last_mod"`
 	AgeInDays  float64        `json:"age_in_days"`
 	DueDate    sql.NullTime   `json:"due_date"`
 	NoteTitle  interface{}    `json:"note_title"`
@@ -943,16 +950,38 @@ func (q *Queries) ReadTaskNotes(ctx context.Context, ids []sql.NullInt64) (int64
 }
 
 const readTasks = `-- name: ReadTasks :many
-SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived,
+SELECT 
+    tasks.id, 
+    tasks.title, 
+    tasks.priority, 
+    tasks.status, 
+    tasks.archived,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
-    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles, pp.path, area.title AS parent_area
-FROM tasks
-LEFT OUTER JOIN bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
-LEFT OUTER JOIN notes ON bridge_notes.note_id = notes.id
-LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_task_id = tasks.id
-LEFT OUTER JOIN programming_projects pp ON pjl.project_id = pp.id
-LEFT OUTER JOIN areas area ON area.id = tasks.area_id
-GROUP BY tasks.id
+    IFNULL(
+        (SELECT GROUP_CONCAT(title, ', ') 
+         FROM (SELECT DISTINCT notes.title 
+               FROM notes 
+               JOIN bridge_notes ON notes.id = bridge_notes.note_id 
+               WHERE bridge_notes.parent_task_id = tasks.id)
+        ), 
+        ''
+    ) AS note_titles,
+    pp.path, 
+    area.title AS parent_area
+FROM 
+    tasks
+LEFT OUTER JOIN 
+    bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
+LEFT OUTER JOIN 
+    notes ON bridge_notes.note_id = notes.id
+LEFT OUTER JOIN 
+    prog_project_links pjl ON pjl.parent_task_id = tasks.id
+LEFT OUTER JOIN 
+    programming_projects pp ON pjl.project_id = pp.id
+LEFT OUTER JOIN 
+    areas area ON area.id = tasks.area_id
+GROUP BY 
+    tasks.id
 `
 
 type ReadTasksRow struct {
@@ -1044,6 +1073,20 @@ func (q *Queries) UpdateAreaTitle(ctx context.Context, arg UpdateAreaTitleParams
 		return 0, err
 	}
 	return result.LastInsertId()
+}
+
+const updateTaskArchived = `-- name: UpdateTaskArchived :execresult
+UPDATE tasks SET archived = ? WHERE id = ?
+returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id
+`
+
+type UpdateTaskArchivedParams struct {
+	Archived bool  `json:"archived"`
+	ID       int64 `json:"id"`
+}
+
+func (q *Queries) UpdateTaskArchived(ctx context.Context, arg UpdateTaskArchivedParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateTaskArchived, arg.Archived, arg.ID)
 }
 
 const updateTaskPriority = `-- name: UpdateTaskPriority :execresult

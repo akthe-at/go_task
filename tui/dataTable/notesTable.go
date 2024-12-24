@@ -27,7 +27,7 @@ const (
 )
 
 type NotesModel struct {
-	Note             data.Note
+	Note             sqlc.Note
 	tableModel       table.Model
 	totalWidth       int
 	totalHeight      int
@@ -248,7 +248,8 @@ func (m *NotesModel) addNote() tea.Cmd {
 		}
 
 		form := &formInput.NewNoteForm{}
-		err = form.NewNoteForm()
+		theme := tui.GetSelectedTheme()
+		err = form.NewNoteForm(*tui.ThemeGoTask(theme))
 		if err != nil {
 			log.Fatalf("Error creating form: %v", err)
 		}

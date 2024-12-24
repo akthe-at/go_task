@@ -73,7 +73,7 @@ func TemplateMarkdownNote(Title, ID, body string, aliases []string, tags []strin
 func GenerateNoteID(title string) string {
 	var suffix string
 	if title != "" {
-		suffix = strings.ToLower(strings.Replace(title, " ", "-", -1))
+		suffix = strings.ToLower(strings.ReplaceAll(title, " ", "-"))
 		re := regexp.MustCompile("[^A-Za-z0-9-]")
 		suffix = re.ReplaceAllString(suffix, "$1")
 	} else {

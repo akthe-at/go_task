@@ -29,7 +29,7 @@ type RootModel struct {
 
 	Tasks    TaskModel
 	Notes    NotesModel
-	Projects ProjectsModel
+	Projects AreasModel
 
 	CurrentView  View
 	PreviousView View
@@ -87,7 +87,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case NotesTableView:
 				m.Notes.addNote()
 			case ProjectsTableView:
-				m.Projects.addProject()
+				m.Projects.addArea()
 			}
 		case "T":
 			switch m.CurrentView {
@@ -131,7 +131,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Notes = *updatedNotes.(*NotesModel)
 	case AddProjectMsg:
 		updatedProjects, _ := m.Projects.Update(msg)
-		m.Projects = *updatedProjects.(*ProjectsModel)
+		m.Projects = *updatedProjects.(*AreasModel)
 	case AddTaskMsg:
 		updatedTasks, _ := m.Tasks.Update(msg)
 		m.Tasks = *updatedTasks.(*TaskModel)
@@ -152,7 +152,7 @@ func (m *RootModel) propagate(msg tea.Msg) tea.Model {
 	m.Notes = *updatedNotes.(*NotesModel)
 
 	updatedProjects, _ = m.Projects.Update(msg)
-	m.Projects = *updatedProjects.(*ProjectsModel)
+	m.Projects = *updatedProjects.(*AreasModel)
 
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		msg.Height -= m.Notes.totalHeight

@@ -61,7 +61,15 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		id, _ := strconv.ParseInt(args[1], 10, 64)
+		var (
+			inputID    = args[1]
+			inputField = args[0]
+			inputEdit  = args[2]
+		)
+		convertedID, err := strconv.ParseInt(inputID, 10, 64)
+		if err != nil {
+			log.Fatalf("Error parsing id: %v", err)
+		}
 
 		ctx := context.Background()
 		conn, err := db.ConnectDB()
@@ -71,37 +79,51 @@ to quickly create a Cobra application.`,
 		defer conn.Close()
 		queries := sqlc.New(conn)
 
-		switch args[0] {
+		switch inputField {
 		case "title":
 			queries.UpdateTaskTitle(ctx, sqlc.UpdateTaskTitleParams{
-				Title: args[2],
-				ID:    id,
+				Title: inputEdit,
+				ID:    convertedID,
 			})
 
 		case "priority":
-			priority, err := mapToPriorityType(args[2])
+			priority, err := mapToPriorityType(inputEdit)
 			if err != nil {
 				log.Fatalf("Invalid priority type: %v", err)
 			}
 
 			queries.UpdateTaskPriority(ctx, sqlc.UpdateTaskPriorityParams{
 				Priority: sql.NullString{String: string(priority), Valid: true},
-				ID:       id,
+				ID:       convertedID,
 			})
 
 		case "status":
-			status, err := mapToStatusType(args[2])
+			status, err := mapToStatusType(inputEdit)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
 			queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
 				Status: sql.NullString{String: string(status), Valid: true},
-				ID:     id,
+				ID:     convertedID,
 			})
 
+		case "archived":
+			archiveState, err := strconv.ParseBool(inputField)
+			if err != nil {
+				log.Fatalf("Invalid archive state: %v", err)
+			}
+
+			_, err = queries.UpdateTaskArchived(ctx, sqlc.UpdateTaskArchivedParams{
+				Archived: archiveState,
+				ID:       convertedID,
+			})
+			if err != nil {
+				log.Fatalf("Error updating the archive status: %v", err)
+			}
+
 		default:
-			fmt.Println("default arg")
+			fmt.Printf("Unknown field: %v", inputField)
 		}
 	},
 }
@@ -113,7 +135,15 @@ var updateAreaCmd = &cobra.Command{
 	Long: `You must pass the id for the area that you wish to update...followed by the field that you wish to
 	update such as title, status, etc.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		id, _ := strconv.ParseInt(args[1], 10, 64)
+		var (
+			inputID    = args[1]
+			inputField = args[0]
+			inputEdit  = args[2]
+		)
+		convertedID, err := strconv.ParseInt(inputID, 10, 64)
+		if err != nil {
+			log.Fatalf("Error parsing id: %v", err)
+		}
 
 		ctx := context.Background()
 		conn, err := db.ConnectDB()
@@ -123,47 +153,46 @@ var updateAreaCmd = &cobra.Command{
 		defer conn.Close()
 		queries := sqlc.New(conn)
 
-		switch args[0] {
+		switch inputField {
 		case "title":
 			_, err = queries.UpdateAreaTitle(ctx, sqlc.UpdateAreaTitleParams{
-				Title: args[2],
-				ID:    id,
+				Title: inputEdit,
+				ID:    convertedID,
 			})
 			if err != nil {
 				log.Fatalf("Error updating area title: %v", err)
 			}
 
 		case "status":
-			status, err := mapToStatusType(args[2])
+			status, err := mapToStatusType(inputField)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
 			_, err = queries.UpdateAreaStatus(ctx, sqlc.UpdateAreaStatusParams{
 				Status: sql.NullString{String: string(status), Valid: true},
-				ID:     id,
+				ID:     convertedID,
 			})
 			if err != nil {
 				log.Fatalf("Error updating area status: %v", err)
 			}
 
 		case "archived":
-			archiveState, err := strconv.ParseBool(args[2])
+			archiveState, err := strconv.ParseBool(inputField)
 			if err != nil {
 				log.Fatalf("Invalid archive state: %v", err)
 			}
 
 			_, err = queries.UpdateAreaArchived(ctx, sqlc.UpdateAreaArchivedParams{
 				Archived: archiveState,
-				ID:       id,
+				ID:       convertedID,
 			})
 			if err != nil {
 				log.Fatalf("Error updating the archive status: %v", err)
 			}
 
 		default:
-			fmt.Println("default arg")
-			fmt.Println("test")
+			fmt.Printf("Unknown field: %v", inputField)
 		}
 	},
 }

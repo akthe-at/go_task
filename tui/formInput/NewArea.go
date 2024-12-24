@@ -2,21 +2,25 @@ package formInput
 
 import (
 	"github.com/akthe-at/go_task/data"
+	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/charmbracelet/huh"
 )
 
 type NewAreaForm struct {
-	AreaForm  *huh.Form
-	AreaTitle string
-	Status    data.StatusType
-	Notes     []data.Note
-	Archived  bool
-	Submit    bool
+	AreaTitle         string
+	ProjectAssignment string
+	ProgProject       string
+	AreaForm          *huh.Form
+	Status            data.StatusType
+	Notes             []sqlc.Note
+	Archived          bool
+	Submit            bool
 }
 
 func (n *NewAreaForm) NewAreaForm(theme huh.Theme) error {
 	tui.ClearTerminalScreen()
+	options := fetchProgProjects()
 
 	groups := []*huh.Group{
 		huh.NewGroup(
@@ -24,7 +28,6 @@ func (n *NewAreaForm) NewAreaForm(theme huh.Theme) error {
 				Title("What is the the name of the Project/Area?").
 				Prompt(">").
 				Value(&n.AreaTitle),
-
 			huh.NewSelect[data.StatusType]().
 				Title("Current Status?").
 				Options(
@@ -41,6 +44,23 @@ func (n *NewAreaForm) NewAreaForm(theme huh.Theme) error {
 					huh.NewOption("Yes", true),
 				).
 				Value(&n.Archived),
+			huh.NewSelect[string]().
+				Title("Global or Project Specific Area?").
+				Options(
+					huh.NewOption("Global", "global"),
+					huh.NewOption("Local", "local").Selected(true),
+				).
+				Value(&n.ProjectAssignment),
+		),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Value(&n.ProgProject).
+				Title("Which Project Did You Want to Assign This Area To?").
+				Options(options...),
+		).WithHideFunc(func() bool {
+			return n.ProjectAssignment == "global"
+		}),
+		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Are you ready to save?").
 				Affirmative("Yes").

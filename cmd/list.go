@@ -40,25 +40,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type TableRow interface {
+	ToRow() []string
+}
+
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "This is the root cmd for listing tasks, areas, and notes.",
+	Long:  `This is the root cmd for listing tasks, areas, and notes. You need to supply a subcommand to list tasks, areas, or notes.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("list called without arguments")
+		fmt.Println("The list root cmd called without arguments, please provide a subcommand.")
 	},
 }
 
 var taskCmd = &cobra.Command{
 	Use:   "task",
 	Short: "List a singular task",
-	Long:  `This command is used for viewing information about a singular task.`,
+	Long:  `This command is used for viewing information about a singular task. To view please provide the ID of the task.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var taskID int
 		if len(args) == 0 {
@@ -67,13 +66,13 @@ var taskCmd = &cobra.Command{
 
 		taskID, err := strconv.Atoi(args[0])
 		if err != nil {
-			log.Errorf("There was an error converting the task ID to an integer: %v", err)
+			log.Fatalf("There was an error converting the task ID to an integer: %v", err)
 		}
 
 		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
-			log.Errorf("There was an error connecting to the database: %v", err)
+			log.Fatalf("There was an error connecting to the database: %v", err)
 		}
 
 		queries := sqlc.New(conn)
@@ -81,7 +80,7 @@ var taskCmd = &cobra.Command{
 
 		task, err := queries.ReadTask(ctx, int64(taskID))
 		if err != nil {
-			log.Errorf("There was an error reading the tasks from the database: %v", err)
+			log.Fatalf("There was an error reading the tasks from the database: %v", err)
 		}
 
 		table := styleTaskTable(task)
@@ -109,7 +108,6 @@ var tasksCmd = &cobra.Command{
 			log.Errorf("There was an error reading the tasks from the database: %v", err)
 		}
 		table := styleTasksTable(tasks)
-		// FIXME: Does this need to be a special renderer?
 		fmt.Println(table)
 	},
 }
@@ -125,21 +123,21 @@ var taskNotesCmd = &cobra.Command{
 
 		conn, err := db.ConnectDB()
 		if err != nil {
-			log.Errorf("There was an error connecting to the database: %v", err)
+			log.Fatalf("There was an error connecting to the database: %v", err)
 		}
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
 		taskID, err = strconv.Atoi(args[0])
 		if err != nil {
-			log.Errorf("There was an error converting the task ID to an integer: %v", err)
+			log.Fatalf("There was an error converting the task ID to an integer: %v", err)
 		}
 
 		results, err := queries.ReadTaskNote(ctx,
 			sql.NullInt64{Int64: int64(taskID)},
 		)
 		if err != nil {
-			log.Errorf("There was an error reading the areas/projects from the database: %v", err)
+			log.Fatalf("There was an error reading the task notes from the database: %v", err)
 		}
 
 		table := styleTaskNotesTable(results)
@@ -173,9 +171,9 @@ var allNotesCmd = &cobra.Command{
 }
 
 var projectsCmd = &cobra.Command{
-	Use:   "projects",
-	Short: "List your projects/areas",
-	Long: `This command is used for calling for a list of your areas/tasks.
+	Use:   "areas",
+	Short: "List your areas",
+	Long: `This command is used for calling for a list of your areas.
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -204,243 +202,111 @@ func init() {
 	listCmd.AddCommand(taskCmd)
 	listCmd.AddCommand(allNotesCmd)
 	taskCmd.AddCommand(taskNotesCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
-	theme := tui.GetSelectedTheme()
-	re := lipgloss.NewRenderer(os.Stdout)
-	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
-		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
-	)
-	//
-
-	var rows [][]string
-	for _, task := range tasks {
-		formattedPath := path.Base(task.Path.String)
-		if formattedPath == "." {
-			formattedPath = ""
-		}
-
-		formattedDate := task.AgeInDays
-		row := []string{
-			fmt.Sprintf("%d", task.ID),
-			task.Title,
-			fmt.Sprintf("%f", formattedDate),
-			formattedPath,
-		}
-
-		var formattedNotes string
-		if task.NoteTitles != nil {
-			note := task.NoteTitles.(string)
-			notes := strings.Split(note, ",")
-			if len(notes) > 2 {
-				formattedNotes = strings.Join(notes[:2], ", ") + ", ..."
-			} else {
-				formattedNotes = note
-			}
-		}
-		row = append(row, formattedNotes)
-
-		rows = append(rows, row)
-	}
-	t := *table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			var style lipgloss.Style
-			switch {
-			case row == table.HeaderRow:
-				style = HeaderStyle
-			case row%2 == 0:
-				style = EvenRowStyle
-			case col == 3:
-				style = style.Width(35)
-			default:
-				style = OddRowStyle
-			}
-
-			if col == 0 {
-				style = style.Width(5)
-			}
-
-			if col == 1 {
-				style = style.Width(15)
-			}
-
-			if col == 4 {
-				style = style.Width(45)
-			}
-			return style
-		}).
-		Headers("ID", "Task", "Age of Task", "Project", "Notes").
-		Rows(rows...)
-	return &t
+type TasksRowWrapper struct {
+	sqlc.ReadTasksRow
 }
 
-func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
-	theme := tui.GetSelectedTheme()
-	re := lipgloss.NewRenderer(os.Stdout)
-	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
-		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
-	)
-
-	var rows [][]string
-	for _, area := range areas {
-		row := []string{
-			fmt.Sprintf("%d", area.ID),
-			area.Title,
-			fmt.Sprintf("%v", area.Status.String),
-		}
-		rows = append(rows, row)
-	}
-	t := *table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			var style lipgloss.Style
-			switch {
-			case row == table.HeaderRow:
-				style = HeaderStyle
-			case row%2 == 0:
-				style = EvenRowStyle
-			default:
-				style = OddRowStyle
-			}
-
-			if col == 0 {
-				style = style.Width(5)
-			}
-
-			if col == 1 {
-				style = style.Width(15)
-			}
-			return style
-		}).
-		Headers("ID", "Name", "Status").
-		Rows(rows...)
-	return &t
-}
-
-func styleTaskNotesTable(notesList []sqlc.ReadTaskNoteRow) *table.Table {
-	theme := tui.GetSelectedTheme()
-	re := lipgloss.NewRenderer(os.Stdout)
-	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
-		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
-	)
-
-	var rows [][]string
-	for _, note := range notesList {
-		row := []string{
-			fmt.Sprintf("%d", note.ID),
-			note.Title,
-			note.Path,
-		}
-		rows = append(rows, row)
-	}
-	t := *table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			var style lipgloss.Style
-			switch {
-			case row == table.HeaderRow:
-				style = HeaderStyle
-			case row%2 == 0:
-				style = EvenRowStyle
-			default:
-				style = OddRowStyle
-			}
-
-			if col == 0 {
-				style = style.Width(5)
-			}
-
-			if col == 1 {
-				style = style.Width(15)
-			}
-			return style
-		}).
-		Headers("ID", "Title", "Path").
-		Rows(rows...)
-	return &t
-}
-
-func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
-	theme := tui.GetSelectedTheme()
-	re := lipgloss.NewRenderer(os.Stdout)
-	var (
-		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
-		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
-		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
-		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
-	)
-
-	formattedPath := path.Base(task.ProgProj.String)
+func (t TasksRowWrapper) ToRow() []string {
+	formattedPath := path.Base(t.Path.String)
 	if formattedPath == "." {
 		formattedPath = ""
 	}
 
-	row := []string{
-		fmt.Sprintf("%d", task.TaskID),
-		task.TaskTitle,
-		fmt.Sprintf("%f", task.AgeInDays),
-		fmt.Sprintf("%v", task.NoteTitle),
-		formattedPath,
-		fmt.Sprintf("%v", task.ParentArea),
+	formattedDate := t.AgeInDays
+	var formattedNotes string
+	if t.NoteTitles != nil {
+		note := t.NoteTitles.(string)
+		notes := strings.Split(note, ",")
+		if len(notes) > 2 {
+			formattedNotes = strings.Join(notes[:2], ", ") + ", ..."
+		} else {
+			formattedNotes = note
+		}
 	}
 
-	t := *table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			var style lipgloss.Style
-			switch {
-			case row == table.HeaderRow:
-				style = HeaderStyle
-			case row%2 == 0:
-				style = EvenRowStyle
-			default:
-				style = OddRowStyle
-			}
-
-			if col == 0 {
-				style = style.Width(5)
-			}
-
-			if col == 1 {
-				style = style.Width(15)
-			}
-
-			if col == 4 {
-				style = style.Width(45)
-			}
-			return style
-		}).
-		Headers("ID", "Task", "Age of Task", "Notes", "Project", "Area").
-		Rows([][]string{row}...)
-	return &t
+	return []string{
+		fmt.Sprintf("%d", t.ID),
+		t.Title,
+		fmt.Sprintf("%.2f", formattedDate),
+		formattedNotes,
+		formattedPath,
+		t.ParentArea.String,
+	}
 }
 
-func styleAllNotesTable(notes []sqlc.ReadAllNotesRow) *table.Table {
+type AreaRowWrapper struct {
+	sqlc.ReadAreasRow
+}
+
+func (a AreaRowWrapper) ToRow() []string {
+	return []string{
+		fmt.Sprintf("%d", a.ID),
+		a.Title,
+		fmt.Sprintf("%v", a.Status.String),
+	}
+}
+
+type TaskNoteRowWrapper struct {
+	sqlc.ReadTaskNoteRow
+}
+
+func (n TaskNoteRowWrapper) ToRow() []string {
+	return []string{
+		fmt.Sprintf("%d", n.ID),
+		n.Title,
+		n.Path,
+	}
+}
+
+type TaskRowWrapper struct {
+	sqlc.ReadTaskRow
+}
+
+// ToRow converts the TaskRowWrapper to a slice of strings
+func (t TaskRowWrapper) ToRow() []string {
+	formattedPath := path.Base(t.ProgProj.String)
+	if formattedPath == "." {
+		formattedPath = ""
+	}
+	var formattedNotes string
+	if t.NoteTitle != nil {
+		note := t.NoteTitle.(string)
+		notes := strings.Split(note, ",")
+		if len(notes) > 2 {
+			formattedNotes = strings.Join(notes[:2], ", ") + ", ..."
+		} else {
+			formattedNotes = note
+		}
+	}
+
+	return []string{
+		fmt.Sprintf("%d", t.TaskID),
+		t.TaskTitle,
+		fmt.Sprintf("%.2f", t.AgeInDays),
+		formattedNotes,
+		formattedPath,
+		t.ParentArea.String,
+	}
+}
+
+type AllNotesRowWrapper struct {
+	sqlc.ReadAllNotesRow
+}
+
+func (a AllNotesRowWrapper) ToRow() []string {
+	return []string{
+		fmt.Sprintf("%d", a.ID),
+		a.Title,
+		a.Path,
+		a.AreaOrTaskTitle,
+		a.ParentType,
+	}
+}
+
+// styleTable is a helper function to style the table output
+func styleTable(rows []TableRow, headers []string, colWidths map[int]int) *table.Table {
 	theme := tui.GetSelectedTheme()
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
@@ -450,17 +316,11 @@ func styleAllNotesTable(notes []sqlc.ReadAllNotesRow) *table.Table {
 		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
 
-	var rows [][]string
-	for _, note := range notes {
-		row := []string{
-			fmt.Sprintf("%d", note.ID),
-			note.Title,
-			note.Path,
-			note.AreaOrTaskTitle,
-			note.ParentType,
-		}
-		rows = append(rows, row)
+	var tableRows [][]string
+	for _, row := range rows {
+		tableRows = append(tableRows, row.ToRow())
 	}
+
 	t := *table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Success))).
@@ -475,16 +335,65 @@ func styleAllNotesTable(notes []sqlc.ReadAllNotesRow) *table.Table {
 				style = OddRowStyle
 			}
 
-			if col == 0 {
-				style = style.Width(5)
+			if width, ok := colWidths[col]; ok {
+				style = style.Width(width)
 			}
 
-			if col == 1 {
-				style = style.Width(15)
-			}
 			return style
 		}).
-		Headers("ID", "Title", "Path", "Area/Task", "Parent ID").
-		Rows(rows...)
+		Headers(headers...).
+		Rows(tableRows...)
+
 	return &t
+}
+
+func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
+	var rows []TableRow
+	for _, task := range tasks {
+		rows = append(rows, TasksRowWrapper{task})
+	}
+
+	headers := []string{"ID", "Task", "Age of Task", "Notes", "Repo", "Area"}
+	colWidths := map[int]int{0: 5, 1: 15, 3: 45, 4: 15}
+	return styleTable(rows, headers, colWidths)
+}
+
+func styleAreaTable(areas []sqlc.ReadAreasRow) *table.Table {
+	var rows []TableRow
+	for _, area := range areas {
+		rows = append(rows, AreaRowWrapper{area})
+	}
+
+	headers := []string{"ID", "Name", "Status"}
+	colWidths := map[int]int{0: 5, 1: 15}
+	return styleTable(rows, headers, colWidths)
+}
+
+func styleTaskNotesTable(notesList []sqlc.ReadTaskNoteRow) *table.Table {
+	var rows []TableRow
+	for _, note := range notesList {
+		rows = append(rows, TaskNoteRowWrapper{note})
+	}
+	headers := []string{"ID", "Title", "Path"}
+	colWidths := map[int]int{0: 5, 1: 15}
+	return styleTable(rows, headers, colWidths)
+}
+
+func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
+	var rows []TableRow
+
+	rows = append(rows, TaskRowWrapper{task})
+	headers := []string{"ID", "Task", "Age of Task", "Notes", "Project", "Area"}
+	colWidths := map[int]int{0: 5, 1: 15, 4: 45}
+	return styleTable(rows, headers, colWidths)
+}
+
+func styleAllNotesTable(notes []sqlc.ReadAllNotesRow) *table.Table {
+	var rows []TableRow
+	for _, note := range notes {
+		rows = append(rows, AllNotesRowWrapper{note})
+	}
+	headers := []string{"ID", "Title", "Path", "Parent Title", "Area/Task"}
+	colWidths := map[int]int{0: 5, 1: 15, 2: 15, 3: 15, 4: 15}
+	return styleTable(rows, headers, colWidths)
 }

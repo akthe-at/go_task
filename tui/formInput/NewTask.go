@@ -20,14 +20,14 @@ type NewTaskForm struct {
 	TaskForm          *huh.Form
 	Priority          data.PriorityType
 	Status            data.StatusType
-	Notes             []data.Note
+	Notes             []sqlc.Note
 	Archived          bool
 	Submit            bool
 }
 
 func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 	tui.ClearTerminalScreen()
-	// options := fetchProgProjects()
+	options := fetchProgProjects()
 
 	taskGroups := []*huh.Group{
 		huh.NewGroup(
@@ -73,10 +73,8 @@ func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Value(&n.ProgProject).
-				Title("Which Project Did You Want to Assign This Task To?").
-				OptionsFunc(func() []huh.Option[string] {
-					return fetchProgProjects()
-				}, &n.ProgProject),
+				Title("Which Project Repo Did You Want to Assign This Task To?").
+				Options(options...),
 		).WithHideFunc(func() bool {
 			return n.ProjectAssignment == "global"
 		}),
