@@ -50,8 +50,8 @@ INSERT INTO bridge_notes (note_id, parent_cat, parent_task_id) VALUES
   (2, 1, 1);
 INSERT INTO bridge_notes (note_id, parent_cat, parent_area_id) VALUES 
   (3, 2, 1),
-  (4, 2, 1);
-`)`)
+  (4, 2, 1);`,
+	)
 	if err != nil {
 		panic("failed to insert test data: " + err.Error())
 	}
