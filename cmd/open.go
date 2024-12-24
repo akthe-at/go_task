@@ -33,35 +33,26 @@ import (
 	"github.com/akthe-at/go_task/utils"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-// openCmd rRepresents the open command
+// openCmd Represents the open command
 var openCmd = &cobra.Command{
 	Use:   "open",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "This is the root command for opening notes",
+	Long:  `The openCmd is used to open notes but it does not have any functionality and requires a subcommand to be run.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("open called")
+		fmt.Println("The open command requires a subcommand to be run. Please provide a subcommand.")
 	},
 }
 
 var noteCmd = &cobra.Command{
 	Use:   "note",
 	Short: "Open a note",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Long: `This command is used to open a note. It requires a noteID to be provided as an argument.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cobra.OnInitialize(initConfig)
+		inputNoteID := args[0]
+
 		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
@@ -70,53 +61,39 @@ to quickly create a Cobra application.`,
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
-		noteID, err := strconv.Atoi(args[0])
+		noteID, err := strconv.Atoi(inputNoteID)
 		if err != nil {
 			log.Errorf("There was an error converting the noteID to an integer: %v", err)
 		}
 
-		editor := GetEditorConfig()
-		if editor == "" {
-			log.Warnf("No editor set in config file, falling back to $EDITOR.")
-			editor = os.Getenv("EDITOR")
-		}
+		editor := utils.GetEditorConfig()
 
 		note, err := queries.ReadNoteByID(ctx, int64(noteID))
 		if err != nil {
-			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
+			log.Errorf("ReadNoteByID: There was an error reading the note: %v", err)
 		}
 		notePath, err := utils.ExpandPath(note.Path)
 		if err != nil {
-			log.Errorf("There was an error expanding the path: %v", err)
-		} else {
-			editorProcess := exec.Command(editor, notePath)
-			editorProcess.Stdin = os.Stdin
-			editorProcess.Stdout = os.Stdout
-			editorProcess.Stderr = os.Stderr
-			err = editorProcess.Run()
-			if err != nil {
-				log.Errorf("There was an error running the command: %v", err)
-			}
+			log.Fatalf("There was an error expanding the path: %v", err)
 		}
+
+		openNoteInEditor(editor, notePath)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(openCmd)
 	openCmd.AddCommand(noteCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// openCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// openCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func GetEditorConfig() string {
-	editor := viper.GetString("selected.editor")
-	return editor
+// openNoteInEditor Opens the note in the editor
+func openNoteInEditor(editor string, notePath string) {
+	editorProcess := exec.Command(editor, notePath)
+	editorProcess.Stdin = os.Stdin
+	editorProcess.Stdout = os.Stdout
+	editorProcess.Stderr = os.Stderr
+	err := editorProcess.Run()
+	if err != nil {
+		log.Fatalf("There was an error running the command: %v", err)
+	}
 }
