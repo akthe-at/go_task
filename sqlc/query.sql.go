@@ -818,7 +818,15 @@ SELECT
     datetime(tasks.last_mod) AS last_mod,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
     tasks.due_date,
-    IFNULL(GROUP_CONCAT(notes.title, ', '), '') as note_title,
+    IFNULL(
+        (SELECT GROUP_CONCAT(title, ', ') 
+         FROM (SELECT DISTINCT notes.title 
+               FROM notes 
+               JOIN bridge_notes ON notes.id = bridge_notes.note_id 
+               WHERE bridge_notes.parent_task_id = tasks.id)
+        ), 
+        ''
+    ) AS note_title,
     programming_projects.path AS prog_proj,
     areas.title AS parent_area
 FROM
@@ -942,16 +950,38 @@ func (q *Queries) ReadTaskNotes(ctx context.Context, ids []sql.NullInt64) (int64
 }
 
 const readTasks = `-- name: ReadTasks :many
-SELECT tasks.id, tasks.title, tasks.priority, tasks.status, tasks.archived,
+SELECT 
+    tasks.id, 
+    tasks.title, 
+    tasks.priority, 
+    tasks.status, 
+    tasks.archived,
     ROUND((julianday('now') - julianday(tasks.created_at)), 2) AS age_in_days,
-    IFNULL(GROUP_CONCAT(notes.title, ', '), '') AS note_titles, pp.path, area.title AS parent_area
-FROM tasks
-LEFT OUTER JOIN bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
-LEFT OUTER JOIN notes ON bridge_notes.note_id = notes.id
-LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_task_id = tasks.id
-LEFT OUTER JOIN programming_projects pp ON pjl.project_id = pp.id
-LEFT OUTER JOIN areas area ON area.id = tasks.area_id
-GROUP BY tasks.id
+    IFNULL(
+        (SELECT GROUP_CONCAT(title, ', ') 
+         FROM (SELECT DISTINCT notes.title 
+               FROM notes 
+               JOIN bridge_notes ON notes.id = bridge_notes.note_id 
+               WHERE bridge_notes.parent_task_id = tasks.id)
+        ), 
+        ''
+    ) AS note_titles,
+    pp.path, 
+    area.title AS parent_area
+FROM 
+    tasks
+LEFT OUTER JOIN 
+    bridge_notes ON tasks.id = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
+LEFT OUTER JOIN 
+    notes ON bridge_notes.note_id = notes.id
+LEFT OUTER JOIN 
+    prog_project_links pjl ON pjl.parent_task_id = tasks.id
+LEFT OUTER JOIN 
+    programming_projects pp ON pjl.project_id = pp.id
+LEFT OUTER JOIN 
+    areas area ON area.id = tasks.area_id
+GROUP BY 
+    tasks.id
 `
 
 type ReadTasksRow struct {
