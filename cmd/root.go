@@ -127,8 +127,10 @@ func initConfig() {
 		fmt.Printf("Unable to decode into struct, %v", err)
 		return
 	}
+	mergeThemes(userThemes)
+}
 
-	// Merge user themes with default themes
+func mergeThemes(userThemes tui.ColorThemes) {
 	if userThemes.RosePine != (tui.Theme{}) {
 		tui.Themes.RosePine = userThemes.RosePine
 	}
