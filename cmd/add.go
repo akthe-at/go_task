@@ -291,7 +291,7 @@ OR to generate a new note AND add it to a specific task:
 				log.Fatal("Error with generating Template!", err)
 			}
 			if openInEditor {
-				editor := GetEditorConfig()
+				editor := utils.GetEditorConfig()
 				cmdr := exec.Command(editor, outputPath)
 				cmdr.Stdin = os.Stdin
 				cmdr.Stdout = os.Stdout
@@ -557,7 +557,7 @@ OR to generate a new note AND add it to a specific area:
 				}
 
 				if openInEditor {
-					editor := GetEditorConfig()
+					editor := utils.GetEditorConfig()
 					cmdr := exec.Command(editor, outputPath)
 					cmdr.Stdin = os.Stdin
 					cmdr.Stdout = os.Stdout
