@@ -288,7 +288,7 @@ func (t TaskRowWrapper) ToRow() []string {
 		t.TaskTitle,
 		t.Priority.String,
 		t.Status.String,
-		fmt.Sprintf("%.2f", t.AgeInDays),
+		fmt.Sprintf("%.2f Days", t.AgeInDays),
 		formattedNotes,
 		formattedPath,
 		t.ParentArea.String,
@@ -357,7 +357,7 @@ func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 		rows = append(rows, TasksRowWrapper{task})
 	}
 
-	headers := []string{"ID", "Task", "Priority", "Status", "Age of Task", "Notes", "Repo", "Area"}
+	headers := []string{"ID", "Task", "Priority", "Status", "Time Since Created", "Notes", "Repo", "Area"}
 	colWidths := map[int]int{0: 5, 1: 15, 3: 45, 4: 15}
 	return styleTable(rows, headers, colWidths)
 }
@@ -387,7 +387,7 @@ func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
 	var rows []TableRow
 
 	rows = append(rows, TaskRowWrapper{task})
-	headers := []string{"ID", "Task", "Priority", "Status", "Age of Task", "Notes", "Project", "Area"}
+	headers := []string{"ID", "Task", "Priority", "Status", "Time Since Created", "Notes", "Project", "Area"}
 	colWidths := map[int]int{0: 5, 1: 15, 4: 45}
 	return styleTable(rows, headers, colWidths)
 }
