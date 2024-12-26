@@ -570,7 +570,7 @@ func (m AreasModel) View() string {
 	return body.String()
 }
 
-func ProjectViewModel() AreasModel {
+func AreaViewModel() AreasModel {
 	theme := tui.GetSelectedTheme()
 
 	columns := []table.Column{

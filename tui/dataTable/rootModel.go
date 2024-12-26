@@ -9,7 +9,7 @@ import (
 const (
 	NotesTableView View = iota
 	TasksTableView
-	ProjectsTableView
+	AreasTableView
 )
 
 var theme = tui.GetSelectedTheme()
@@ -18,7 +18,7 @@ type (
 	View                         int
 	AddNoteMsg                   struct{}
 	AddTaskMsg                   struct{}
-	AddProjectMsg                struct{}
+	AddAreaMsg                   struct{}
 	SwitchToTasksTableViewMsg    struct{}
 	SwitchToProjectsTableViewMsg struct{}
 )
@@ -27,9 +27,9 @@ type RootModel struct {
 	Height int
 	Width  int
 
-	Tasks    TaskModel
-	Notes    NotesModel
-	Projects AreasModel
+	Tasks TaskModel
+	Notes NotesModel
+	Areas AreasModel
 
 	CurrentView  View
 	PreviousView View
@@ -39,7 +39,7 @@ func NewRootModel() RootModel {
 	return RootModel{
 		Tasks:       TaskViewModel(),
 		Notes:       NotesView(),
-		Projects:    ProjectViewModel(),
+		Areas:       AreaViewModel(),
 		CurrentView: TasksTableView,
 	}
 }
@@ -75,10 +75,18 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "D":
-			if m.CurrentView == TasksTableView {
+			switch m.CurrentView {
+			case TasksTableView:
 				m.Tasks.deleteTask()
-			} else {
+			case NotesTableView:
 				m.Notes.deleteNote()
+			case AreasTableView:
+				m.Areas.deleteArea()
+			}
+		case "O":
+			switch m.CurrentView {
+			case NotesTableView:
+				m.Notes.openNote()
 			}
 		case "A":
 			switch m.CurrentView {
@@ -86,32 +94,33 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Tasks.addTask()
 			case NotesTableView:
 				m.Notes.addNote()
-			case ProjectsTableView:
-				m.Projects.addArea()
+			case AreasTableView:
+				m.Areas.addArea()
 			}
 		case "T":
 			switch m.CurrentView {
-			case ProjectsTableView:
-				m.Projects.addTaskToArea()
+			case AreasTableView:
+				m.Areas.addTaskToArea()
 			case TasksTableView:
 				m.Tasks.recalculateTable()
 			case NotesTableView:
 				m.Notes.recalculateTable()
 			}
 		case "ctrl+t":
-			// tui.ClearTerminalScreen()
 			m.Tasks.refreshTableData()
 			m.PreviousView = m.CurrentView
 			m.CurrentView = TasksTableView
+		case "ctrl+T":
+			m.Task.refreshTableData()
+			m.PreviousView = m.CurrentView
+			m.CurrentView = TaskTableView
 		case "ctrl+n":
-			// tui.ClearTerminalScreen()
 			m.Notes.refreshTableData()
 			m.PreviousView = m.CurrentView
 			m.CurrentView = NotesTableView
 		case "ctrl+p":
-			// tui.ClearTerminalScreen()
 			m.PreviousView = m.CurrentView
-			m.CurrentView = ProjectsTableView
+			m.CurrentView = AreasTableView
 		}
 
 	case tea.WindowSizeMsg:
@@ -122,16 +131,18 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.propagate(msg), nil
 	case SwitchToTasksTableViewMsg:
 		m.CurrentView = TasksTableView
+	case SwitchToTaskTableViewMsg:
+		m.CurrentView = TaskTableView
 	case SwitchToProjectsTableViewMsg:
-		m.CurrentView = ProjectsTableView
+		m.CurrentView = AreasTableView
 	case SwitchToPreviousViewMsg:
 		m.CurrentView = m.PreviousView
 	case AddNoteMsg:
 		updatedNotes, _ := m.Notes.Update(msg)
 		m.Notes = *updatedNotes.(*NotesModel)
-	case AddProjectMsg:
-		updatedProjects, _ := m.Projects.Update(msg)
-		m.Projects = *updatedProjects.(*AreasModel)
+	case AddAreaMsg:
+		updatedAreas, _ := m.Areas.Update(msg)
+		m.Areas = *updatedAreas.(*AreasModel)
 	case AddTaskMsg:
 		updatedTasks, _ := m.Tasks.Update(msg)
 		m.Tasks = *updatedTasks.(*TaskModel)
@@ -151,8 +162,8 @@ func (m *RootModel) propagate(msg tea.Msg) tea.Model {
 	updatedNotes, _ = m.Notes.Update(msg)
 	m.Notes = *updatedNotes.(*NotesModel)
 
-	updatedProjects, _ = m.Projects.Update(msg)
-	m.Projects = *updatedProjects.(*AreasModel)
+	updatedProjects, _ = m.Areas.Update(msg)
+	m.Areas = *updatedProjects.(*AreasModel)
 
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		msg.Height -= m.Notes.totalHeight
@@ -169,8 +180,8 @@ func (m RootModel) View() string {
 		return s.Render(m.Tasks.View())
 	case NotesTableView:
 		return s.Render(m.Notes.View())
-	case ProjectsTableView:
-		return s.Render(m.Projects.View())
+	case AreasTableView:
+		return s.Render(m.Areas.View())
 	default:
 		return s.Render("")
 	}
