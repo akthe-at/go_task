@@ -807,6 +807,58 @@ func (q *Queries) ReadNoteByID(ctx context.Context, id int64) (ReadNoteByIDRow, 
 	return i, err
 }
 
+const readNoteByIDs = `-- name: ReadNoteByIDs :many
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE notes.id in (/*SLICE:ids*/?)
+`
+
+type ReadNoteByIDsRow struct {
+	ID    int64         `json:"id"`
+	Title string        `json:"title"`
+	Path  string        `json:"path"`
+	Type  sql.NullInt64 `json:"type"`
+}
+
+func (q *Queries) ReadNoteByIDs(ctx context.Context, ids []int64) ([]ReadNoteByIDsRow, error) {
+	query := readNoteByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadNoteByIDsRow
+	for rows.Next() {
+		var i ReadNoteByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Path,
+			&i.Type,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const readTask = `-- name: ReadTask :one
 SELECT
     tasks.id AS task_id,
