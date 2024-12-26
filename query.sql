@@ -91,6 +91,13 @@ FROM notes
 JOIN bridge_notes on notes.id = bridge_notes.note_id
 WHERE notes.id = ?;
 
+
+-- name: ReadNoteByIDs :many
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE notes.id in (sqlc.slice(ids));
+
 -- name: ReadAllTaskNotes :many
 SELECT notes.id, notes.title, notes.path, tasks.title as task_title, tasks.id  as parent_id
 FROM notes

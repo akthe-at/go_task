@@ -8,11 +8,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/akthe-at/go_task/config"
 	data "github.com/akthe-at/go_task/data"
 	db "github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/akthe-at/go_task/tui/formInput"
+	"github.com/akthe-at/go_task/utils"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/evertras/bubble-table/table"
@@ -350,7 +352,7 @@ func (m *NotesModel) deleteNote() tea.Cmd {
 	for _, row := range m.tableModel.SelectedRows() {
 		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(int64))
 	}
-	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int)
+	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
 
 	conn, err := db.ConnectDB()
 	if err != nil {
@@ -381,6 +383,71 @@ func (m *NotesModel) deleteNote() tea.Cmd {
 		return nil
 	}
 	m.tableModel = m.tableModel.WithRows(rows)
+
+	// Update the footer
+	m.updateFooter()
+
+	return nil
+}
+
+func (m *NotesModel) openNote() tea.Cmd {
+	editor := config.GetEditorConfig()
+	ctx := context.Background()
+	selectedIDs := []int64{}
+
+	for _, row := range m.tableModel.SelectedRows() {
+		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(int64))
+	}
+	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
+
+	conn, err := db.ConnectDB()
+	if err != nil {
+		log.Printf("Error connecting to database: %s", err)
+		return nil
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+	if len(selectedIDs) == 1 {
+		note, err := queries.ReadNoteByID(ctx, taskID)
+		if err != nil {
+			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
+		}
+		notePath, err := utils.ExpandPath(note.Path)
+
+		utils.OpenNoteInEditor(editor, notePath)
+		if err != nil {
+			log.Fatalf("There was an error expanding the path: %v", err)
+		}
+	} else if len(selectedIDs) > 1 {
+		// fmt.Println("Can only open one note a time.")
+		notes, err := queries.ReadNoteByIDs(ctx, selectedIDs)
+		if err != nil {
+			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
+		}
+		notePaths := make([]string, len(notes))
+		for i, note := range notes {
+			notePath, err := utils.ExpandPath(note.Path)
+			if err != nil {
+				log.Fatalf("There was an error expanding the path: %v", err)
+			}
+			notePaths[i] = notePath
+		}
+		utils.OpenNoteInEditor(editor, notePaths...)
+
+	} else if len(selectedIDs) == 0 {
+
+		note, err := queries.ReadNoteByID(ctx, taskID)
+		if err != nil {
+			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
+		}
+		notePath, err := utils.ExpandPath(note.Path)
+
+		utils.OpenNoteInEditor(editor, notePath)
+		if err != nil {
+			log.Fatalf("There was an error expanding the path: %v", err)
+		}
+	}
 
 	// Update the footer
 	m.updateFooter()

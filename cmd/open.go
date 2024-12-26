@@ -24,8 +24,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"strconv"
 
 	"github.com/akthe-at/go_task/config"
@@ -78,23 +76,11 @@ var noteCmd = &cobra.Command{
 			log.Fatalf("There was an error expanding the path: %v", err)
 		}
 
-		openNoteInEditor(editor, notePath)
+		utils.OpenNoteInEditor(editor, notePath)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(openCmd)
 	openCmd.AddCommand(noteCmd)
-}
-
-// openNoteInEditor Opens the note in the editor
-func openNoteInEditor(editor string, notePath string) {
-	editorProcess := exec.Command(editor, notePath)
-	editorProcess.Stdin = os.Stdin
-	editorProcess.Stdout = os.Stdout
-	editorProcess.Stderr = os.Stderr
-	err := editorProcess.Run()
-	if err != nil {
-		log.Fatalf("There was an error running the command: %v", err)
-	}
 }

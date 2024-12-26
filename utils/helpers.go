@@ -2,7 +2,9 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -49,4 +51,16 @@ func ExpandPath(path string) (string, error) {
 		path = filepath.Join(currentUser.HomeDir, path[1:])
 	}
 	return path, nil
+}
+
+// openNoteInEditor Opens the note in the editor
+func OpenNoteInEditor(editor string, notePaths ...string) {
+	editorProcess := exec.Command(editor, notePaths...)
+	editorProcess.Stdin = os.Stdin
+	editorProcess.Stdout = os.Stdout
+	editorProcess.Stderr = os.Stderr
+	err := editorProcess.Run()
+	if err != nil {
+		log.Fatalf("There was an error running the command: %v", err)
+	}
 }
