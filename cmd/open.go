@@ -51,6 +51,9 @@ var noteCmd = &cobra.Command{
 	Long: `This command is used to open a note. It requires a noteID to be provided as an argument.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		inputNoteID := args[0]
+		if len(args) != 1 {
+			log.Fatal("The note command only takes 1 noteID as an argument. If you want to open multiple notes, use the notes command.")
+		}
 
 		ctx := context.Background()
 		conn, err := db.ConnectDB()
@@ -80,7 +83,51 @@ var noteCmd = &cobra.Command{
 	},
 }
 
+var notesCmd = &cobra.Command{
+	Use:   "notes",
+	Short: "Open multiple notes",
+
+	Long: `This command is used to open more than one note. It requires multiple noteIDs to be provided as an argument.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		var selectedIDs []int64
+
+		for _, arg := range args {
+			noteID, err := strconv.ParseInt(arg, 10, 64)
+			if err != nil {
+				log.Errorf("There was an error converting the noteID to an integer: %v", err)
+			}
+			selectedIDs = append(selectedIDs, noteID)
+		}
+
+		ctx := context.Background()
+		conn, err := db.ConnectDB()
+		if err != nil {
+			log.Errorf("There was an error connecting to the database: %v", err)
+		}
+		defer conn.Close()
+
+		queries := sqlc.New(conn)
+		notes, err := queries.ReadNoteByIDs(ctx, selectedIDs)
+		if err != nil {
+			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
+		}
+
+		notePaths := make([]string, len(notes))
+		for i, note := range notes {
+			notePath, err := utils.ExpandPath(note.Path)
+			if err != nil {
+				log.Fatalf("There was an error expanding the path: %v", err)
+			}
+			notePaths[i] = notePath
+		}
+
+		editor := config.GetEditorConfig()
+		utils.OpenNoteInEditor(editor, notePaths...)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(openCmd)
 	openCmd.AddCommand(noteCmd)
+	openCmd.AddCommand(notesCmd)
 }
