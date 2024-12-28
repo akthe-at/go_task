@@ -1141,6 +1141,20 @@ func (q *Queries) UpdateTaskArchived(ctx context.Context, arg UpdateTaskArchived
 	return q.db.ExecContext(ctx, updateTaskArchived, arg.Archived, arg.ID)
 }
 
+const updateTaskArea = `-- name: UpdateTaskArea :execresult
+UPDATE tasks set area_id = ? where id = ?
+returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id
+`
+
+type UpdateTaskAreaParams struct {
+	AreaID sql.NullInt64 `json:"area_id"`
+	ID     int64         `json:"id"`
+}
+
+func (q *Queries) UpdateTaskArea(ctx context.Context, arg UpdateTaskAreaParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateTaskArea, arg.AreaID, arg.ID)
+}
+
 const updateTaskPriority = `-- name: UpdateTaskPriority :execresult
 UPDATE tasks SET priority = ?  where id = ?
 returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id

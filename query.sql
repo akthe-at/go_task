@@ -79,6 +79,7 @@ LEFT OUTER JOIN
     areas area ON area.id = tasks.area_id
 GROUP BY 
     tasks.id;
+
 -- name: ReadNote :many
 SELECT notes.id, notes.title, bridge_notes.parent_cat as type
 FROM notes
@@ -146,6 +147,10 @@ returning *;
 
 -- name: UpdateTaskArchived :execresult
 UPDATE tasks SET archived = ? WHERE id = ?
+returning *;
+
+-- name: UpdateTaskArea :execresult
+UPDATE tasks set area_id = ? where id = ?
 returning *;
 
 
