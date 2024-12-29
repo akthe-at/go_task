@@ -44,16 +44,14 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("update called")
+		fmt.Println("update root called without subcommand, please see help for more information")
 	},
 }
 
-// TODO: This is going to require good helper text!!!
-//
 // updateTaskCmd represents the task update command
 var updateTaskCmd = &cobra.Command{
 	Use:   "task",
-	Short: "A brief description of your command",
+	Short: "Update a task's field",
 	Long: `To update a task you must pass  the field you wish to to modify, followed by the id of the task, and the new value for that field. 
 	For example, to update the title of a task with an id of 1 you would pass the following command:
 	go_task update task title 1 "New Title"`,
@@ -217,14 +215,4 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 	updateCmd.AddCommand(updateTaskCmd)
 	updateCmd.AddCommand(updateAreaCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// updateCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// updateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
