@@ -55,12 +55,6 @@ var addTaskCmd = &cobra.Command{
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		var (
-			inputTitle    = args[0]
-			inputPriority = args[1]
-			inputStatus   = args[2]
-		)
-
 		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
@@ -69,7 +63,17 @@ var addTaskCmd = &cobra.Command{
 		defer conn.Close()
 		queries := sqlc.New(conn)
 
+		if !rawFlag && len(args) > 1 {
+			log.Fatalf("You passed too many arguments for the form input, did you mean to use the --raw flag?")
+		}
+
 		if rawFlag {
+
+			var (
+				inputTitle    = args[0]
+				inputPriority = args[1]
+				inputStatus   = args[2]
+			)
 			validPriority, err := mapToPriorityType(inputPriority)
 			if err != nil {
 				log.Fatalf("Invalid priority type: %v", err)
@@ -187,8 +191,7 @@ var addAreaCmd = &cobra.Command{
 	Raw Example: 'go_task add area "<area_title> <area_status>"'
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: This command doesn't add a repo to the area currently...make sure to
-		// do this in both the form/and raw input variants
+		var areaID int64
 		ctx := context.Background()
 		conn, err := db.ConnectDB()
 		if err != nil {
@@ -197,6 +200,10 @@ var addAreaCmd = &cobra.Command{
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
+
+		if !rawFlag && len(args) > 1 {
+			log.Fatalf("You passed too many arguments for the form input, did you mean to use the --raw flag?")
+		}
 
 		if rawFlag {
 
@@ -216,7 +223,7 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
-			_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+			areaID, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
 				Title:    inputTitle,
 				Status:   sql.NullString{String: string(validStatus), Valid: true},
 				Archived: archived,
@@ -238,7 +245,7 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 			}
 
 			if form.Submit {
-				_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+				areaID, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
 					Title:    form.AreaTitle,
 					Status:   sql.NullString{String: string(form.Status), Valid: true},
 					Archived: form.Archived,
@@ -248,6 +255,33 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 				} else {
 					fmt.Println("Successfully created a new area")
 				}
+			}
+		}
+
+		ok, projectDir, err := utils.CheckIfProjDir()
+		if err != nil {
+			log.Fatalf("Error while checking if in a project directory: %v", err)
+		}
+		if ok {
+			projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+			if err != nil {
+				log.Fatalf("Error while checking if project exists: %v", err)
+			}
+			if projID == 0 {
+				projID, err = queries.InsertProgProject(ctx, projectDir)
+				if err != nil {
+					log.Fatalf("Error inserting project: %v", err)
+				}
+			}
+
+			err = queries.CreateProjectAreaLink(ctx,
+				sqlc.CreateProjectAreaLinkParams{
+					ProjectID:    sql.NullInt64{Int64: projID, Valid: true},
+					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
+					ParentAreaID: sql.NullInt64{Int64: areaID, Valid: true},
+				})
+			if err != nil {
+				log.Fatalf("Error inserting project link: %v", err)
 			}
 		}
 	},
