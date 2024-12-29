@@ -700,7 +700,7 @@ LEFT JOIN
     bridge_notes ON areas.id = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2
 LEFT JOIN 
     notes ON bridge_notes.note_id = notes.id
-LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_task_id = areas.id
+LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_area_id = areas.id
 LEFT OUTER JOIN programming_projects pp ON pjl.project_id = pp.id
 GROUP BY 
     areas.id
