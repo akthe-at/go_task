@@ -63,6 +63,7 @@ func (m *AreasModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tea.Quit)
 		case "F":
 			cmds = append(cmds, m.filterArchives())
+			m.refreshTableData()
 		case "left":
 			if m.calculateWidth() > minWidth {
 				m.horizontalMargin++
