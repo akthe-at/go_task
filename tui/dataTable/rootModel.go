@@ -65,7 +65,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-		case "D":
+		case "backspace":
 			switch m.CurrentView {
 			case TasksTableView:
 				m.Tasks.deleteTask()
@@ -74,10 +74,25 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case AreasTableView:
 				m.Areas.deleteArea()
 			}
+		case "p":
+			switch m.CurrentView {
+			case TasksTableView:
+				m.Tasks.updateStatus(data.StatusPlanning)
+			case NotesTableView:
+				// m.Areas.updateStatus(data.StatusDone)
+			}
+
 		case "a":
 			switch m.CurrentView {
 			case TasksTableView:
 				m.Tasks.archiveTask()
+		case "d":
+			switch m.CurrentView {
+			case TasksTableView:
+				m.Tasks.updateStatus(data.StatusDoing)
+			case NotesTableView:
+				// m.Areas.updateStatus(data.StatusDone)
+			}
 		case "t":
 			switch m.CurrentView {
 			case TasksTableView:
@@ -85,7 +100,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case NotesTableView:
 				// m.Areas.updateStatus(data.StatusDone)
 			}
-		case "d":
+		case "D":
 			switch m.CurrentView {
 			case TasksTableView:
 				m.Tasks.updateStatus(data.StatusDone)
