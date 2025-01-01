@@ -93,9 +93,7 @@ func (m *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "esc", "q":
 			cmds = append(cmds, tea.Quit)
 		case "F":
-			m.archiveFilterEnabled = !m.archiveFilterEnabled
 			cmds = append(cmds, m.filterArchives())
-			m.refreshTableData()
 		case "enter":
 			cmds = append(cmds, m.filterRows())
 		case "left":
@@ -138,26 +136,12 @@ func (m *TaskModel) recalculateTable() {
 }
 
 func (m *TaskModel) refreshTableData() {
-	var filteredRows []table.Row
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
 		log.Printf("Error loading rows from database: %s", err)
 	}
 
-	for _, row := range rows {
-		archived, ok := row.Data[columnKeyArchived]
-		if !ok {
-			log.Printf("Error getting archived status from row: %s", err)
-		}
-		if m.archiveFilterEnabled && archived == "false" {
-			filteredRows = append(filteredRows, row)
-		} else if !m.archiveFilterEnabled {
-			filteredRows = append(filteredRows, row)
-		}
-	}
-
-	m.tableModel = m.tableModel.WithRows(filteredRows)
-
+	m.tableModel = m.tableModel.WithRows(rows)
 	m.updateFooter()
 }
 
@@ -201,8 +185,24 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 			columnKeyArea:     task.ParentArea.String,
 		})
 		rows = append(rows, row)
+
 	}
-	return rows, nil
+
+	filteredRows := []table.Row{}
+	for _, row := range rows {
+		archived, ok := row.Data[columnKeyArchived]
+		if !ok {
+			log.Printf("Error getting archived status from row: %s", err)
+			return nil, err
+		}
+		if m.archiveFilterEnabled && archived == "false" {
+			filteredRows = append(filteredRows, row)
+		} else if !m.archiveFilterEnabled {
+			filteredRows = append(filteredRows, row)
+		}
+	}
+
+	return filteredRows, nil
 }
 
 func (m *TaskModel) filterRows() tea.Cmd {
@@ -227,8 +227,7 @@ func (m *TaskModel) filterRows() tea.Cmd {
 			return nil
 		}
 
-		var filteredRows []table.Row
-
+		var rows []table.Row
 		row := table.NewRow(table.RowData{
 			columnKeyID:       fmt.Sprintf("%d", result.TaskID),
 			columnKeyTask:     result.TaskTitle,
@@ -240,17 +239,9 @@ func (m *TaskModel) filterRows() tea.Cmd {
 			columnKeyPath:     result.ProgProj.String,
 			columnKeyArea:     result.ParentArea.String,
 		})
+		rows = append(rows, row)
 
-		archived := fmt.Sprintf("%t", result.Archived)
-		if m.archiveFilterEnabled && archived == "true" {
-			filteredRows = append(filteredRows, row)
-		} else if !m.archiveFilterEnabled && archived == "false" {
-			filteredRows = append(filteredRows, row)
-		} else {
-			filteredRows = append(filteredRows, row)
-		}
-
-		m.tableModel = m.tableModel.WithRows(filteredRows)
+		m.tableModel = m.tableModel.WithRows(rows)
 		m.updateFooter()
 
 		return nil
@@ -259,34 +250,11 @@ func (m *TaskModel) filterRows() tea.Cmd {
 }
 
 func (m *TaskModel) filterArchives() tea.Cmd {
-	var filteredRows []table.Row
 
 	m.archiveFilterEnabled = !m.archiveFilterEnabled
+	m.refreshTableData()
 
-	rows, err := m.loadRowsFromDatabase()
-	if err != nil {
-		log.Printf("Error loading rows from database: %s", err)
-		return nil
-	}
-
-	if m.archiveFilterEnabled {
-		for _, row := range rows {
-			archived, ok := row.Data[columnKeyArchived]
-			if !ok {
-				log.Printf("Error getting archived status from row: %s", err)
-				return nil
-			}
-			if archived == "false" {
-				filteredRows = append(filteredRows, row)
-			}
-		}
-	} else {
-		filteredRows = rows
-	}
-
-	m.tableModel = m.tableModel.WithRows(filteredRows)
 	m.updateFooter()
-	m.archiveFilterEnabled = !m.archiveFilterEnabled
 	return nil
 }
 
@@ -480,6 +448,7 @@ func (m *TaskModel) updateStatus(newStatus data.StatusType) tea.Cmd {
 		log.Printf("Error loading rows from database: %s", err)
 		return nil
 	}
+
 	m.tableModel = m.tableModel.WithRows(rows)
 
 	// Update the footer
@@ -653,19 +622,10 @@ func TaskViewModel() TaskModel {
 	}
 
 	model := TaskModel{archiveFilterEnabled: true, rowFilter: false}
-	var filteredRows []table.Row
+
 	rows, err := model.loadRowsFromDatabase()
 	if err != nil {
 		log.Fatal(err)
-	}
-	for _, row := range rows {
-		archived, ok := row.Data[columnKeyArchived]
-		if !ok {
-			log.Printf("Error getting archived status from row: %s", err)
-		}
-		if archived == "false" {
-			filteredRows = append(filteredRows, row)
-		}
 	}
 
 	keys := table.DefaultKeyMap()
@@ -673,7 +633,7 @@ func TaskViewModel() TaskModel {
 	keys.RowUp.SetKeys("k", "up", "w")
 
 	model.tableModel = table.New(columns).
-		WithRows(filteredRows).
+		WithRows(rows).
 		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Accent)).Bold(true)).
 		SelectableRows(true).
 		Focused(true).
