@@ -74,12 +74,12 @@ var addTaskCmd = &cobra.Command{
 				inputPriority = args[1]
 				inputStatus   = args[2]
 			)
-			validPriority, err := mapToPriorityType(inputPriority)
+			validPriority, err := data.StringToPriorityType(inputPriority)
 			if err != nil {
 				log.Fatalf("Invalid priority type: %v", err)
 			}
 
-			validStatus, err := mapToStatusType(inputStatus)
+			validStatus, err := data.StringToStatusType(inputStatus)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
@@ -218,7 +218,7 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 				inputTitle  = args[0]
 				inputStatus = args[1]
 			)
-			validStatus, err := mapToStatusType(inputStatus)
+			validStatus, err := data.StringToStatusType(inputStatus)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
@@ -719,36 +719,4 @@ func init() {
 	addCmd.PersistentFlags().StringVarP(&noteTags, "tags", "t", "", "Tags for the note")
 	addCmd.PersistentFlags().StringVarP(&noteAliases, "aliases", "a", "", "Aliases for the note")
 	addCmd.PersistentFlags().StringVarP(&noteBody, "body", "b", "", "Text for the Note Body")
-}
-
-// mapToPriorityType maps a string to a PriorityType
-func mapToPriorityType(input string) (data.PriorityType, error) {
-	switch input {
-	case "low":
-		return data.PriorityTypeLow, nil
-	case "medium":
-		return data.PriorityTypeMedium, nil
-	case "high":
-		return data.PriorityTypeHigh, nil
-	case "urgent":
-		return data.PriorityTypeUrgent, nil
-	default:
-		return "", fmt.Errorf("invalid priority type ( %v ) is not one of the valid priority values (low, medium, high, urgent)", input)
-	}
-}
-
-// mapToStatusType maps a string to a StatusType
-func mapToStatusType(input string) (data.StatusType, error) {
-	switch input {
-	case "todo":
-		return data.StatusToDo, nil
-	case "planning":
-		return data.StatusPlanning, nil
-	case "doing":
-		return data.StatusDoing, nil
-	case "done":
-		return data.StatusDone, nil
-	default:
-		return "", fmt.Errorf("invalid status type ( %v ) is not one of the valid status values (todo, planning, doing, done)", input)
-	}
 }
