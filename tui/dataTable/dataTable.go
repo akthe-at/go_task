@@ -404,6 +404,74 @@ func (m *TaskModel) addTask() tea.Cmd {
 	return nil
 }
 
+func (m *TaskModel) archiveTask() tea.Cmd {
+	selectedIDs := make(map[int64]bool)
+	var currentArchiveState bool
+	ctx := context.Background()
+	for _, row := range m.tableModel.SelectedRows() {
+		convertedID, err := strconv.ParseInt(row.Data[columnKeyID].(string), 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error converting ID to int64: %v", "error", err)
+		}
+		parsedArchiveStatus, err := strconv.ParseBool(row.Data[columnKeyArchived].(string))
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error converting archived status to bool: %v", "error", err)
+		}
+		selectedIDs[convertedID] = parsedArchiveStatus
+	}
+
+	conn, err := db.ConnectDB()
+	if err != nil {
+		slog.Error("TaskModel - archiveTask: Error connecting to database: %v", "error", err)
+		return nil
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
+		currentArchiveState, err = strconv.ParseBool(m.tableModel.HighlightedRow().Data[columnKeyArchived].(string))
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error converting archived status to bool: %v", "error", err)
+		}
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error converting ID to int64: %v", "error", err)
+			return nil
+		}
+		_, err = queries.UpdateTaskArchived(ctx, sqlc.UpdateTaskArchivedParams{
+			Archived: !currentArchiveState,
+			ID:       taskID,
+		})
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error updating task archived status: %v", "error", err)
+		}
+
+	} else if len(selectedIDs) >= 1 {
+		for ID, archiveStatus := range selectedIDs {
+			_, err = queries.UpdateTaskArchived(ctx, sqlc.UpdateTaskArchivedParams{
+				Archived: !archiveStatus,
+				ID:       ID,
+			})
+			if err != nil {
+				slog.Error("TaskModel - archiveTask: Error updating task archived status: %v", "error", err)
+			}
+		}
+	}
+
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		slog.Error("TaskModel - archiveTask: Error loading rows from database: %v", "error", err)
+		return nil
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+	m.updateFooter()
+
+	return nil
+}
+
 func (m *TaskModel) updateStatus(newStatus data.StatusType) tea.Cmd {
 	var selectedIDs []int64
 	ctx := context.Background()
