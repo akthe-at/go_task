@@ -62,16 +62,6 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		// case "enter":
-		// 	switch m.CurrentView {
-		// 	case TasksTableView:
-		// 		highlightedRow := m.Tasks.tableModel.HighlightedRow()
-		// 		m.Tasks.PrintRow(highlightedRow)
-		// 	case NotesTableView:
-		// 		m.Notes.recalculateTable()
-		// 	case ProjectsTableView:
-		// 		m.Projects.recalculateTable()
-		// 	}
 		case "ctrl+c":
 			return m, tea.Quit
 		case "D":
