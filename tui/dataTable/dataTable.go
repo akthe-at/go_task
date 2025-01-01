@@ -404,6 +404,68 @@ func (m *TaskModel) addTask() tea.Cmd {
 	return nil
 }
 
+func (m *TaskModel) togglePriorityStatus() tea.Cmd {
+	selectedIDs := make(map[int64]data.PriorityType)
+	ctx := context.Background()
+	conn, err := db.ConnectDB()
+	if err != nil {
+		slog.Error("TaskModel - togglePriorityStatus: Error connecting to database: %v", "error", err)
+		return nil
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
+		currentPriorityStateStr, ok := m.tableModel.HighlightedRow().Data[columnKeyPriority].(string)
+		if !ok {
+			slog.Error("TaskModel - togglePriorityStatus: Error converting priority status to PriorityType: %v", "error", err)
+			return nil
+		}
+
+		currentPriorityState, err := data.StringToPriorityType(currentPriorityStateStr)
+		if err != nil {
+			slog.Error("TaskModel - togglePriorityStatus: Error converting priority status to PriorityType: %v", "error", err)
+			return nil
+		}
+
+		var newPriorityState data.PriorityType
+		switch currentPriorityState {
+		case data.PriorityTypeLow:
+			newPriorityState = data.PriorityTypeMedium
+		case data.PriorityTypeMedium:
+			newPriorityState = data.PriorityTypeHigh
+		case data.PriorityTypeHigh:
+			newPriorityState = data.PriorityTypeUrgent
+		case data.PriorityTypeUrgent:
+			newPriorityState = data.PriorityTypeLow
+		}
+
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - togglePriorityStatus: Error converting ID to int64: %v", "error", err)
+			return nil
+		}
+		queries.UpdateTaskPriority(ctx, sqlc.UpdateTaskPriorityParams{
+			Priority: sql.NullString{String: string(newPriorityState), Valid: true},
+			ID:       taskID,
+		},
+		)
+	}
+
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		slog.Error("TaskModel - togglePriorityStatus: Error loading rows from database: %v", "error", err)
+		return nil
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+	m.updateFooter()
+
+	return nil
+}
+
 func (m *TaskModel) archiveTask() tea.Cmd {
 	selectedIDs := make(map[int64]bool)
 	var currentArchiveState bool
@@ -515,7 +577,6 @@ func (m *TaskModel) updateStatus(newStatus data.StatusType) tea.Cmd {
 		}
 	}
 
-	// Requery the database and update the table model
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
 		log.Printf("Error loading rows from database: %s", err)
@@ -523,8 +584,6 @@ func (m *TaskModel) updateStatus(newStatus data.StatusType) tea.Cmd {
 	}
 
 	m.tableModel = m.tableModel.WithRows(rows)
-
-	// Update the footer
 	m.updateFooter()
 
 	return nil
@@ -622,15 +681,12 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		m.deleteMessage = fmt.Sprintf("You deleted the following tasks: %s", strings.Join(selectedIDs, ", "))
 	}
 
-	// Requery the database and update the table model
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
 		log.Printf("Error loading rows from database: %s", err)
 		return nil
 	}
 	m.tableModel = m.tableModel.WithRows(rows)
-
-	// Update the footer
 	m.updateFooter()
 
 	return nil
@@ -640,13 +696,17 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 func (m TaskModel) View() string {
 	body := strings.Builder{}
 
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add a new Task by pressing 'A'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+n to switch to the Notes View.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press ctrl+p to switch to the Areas View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Add a new Task by pressing 'A'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press left/right or page up/down to move between pages") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'space' to select a row, 'q' or 'ctrl+c' to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'enter' to filter table to a singular task") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'backspace' to delete row(s) after selecting or highlighting them.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 't'/'p'/'d'/'D' to Toggle Task Status to Todo, Planning, Doing, or Done, respectively.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'P' to toggle the priority status of a highlighted task.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'a' to toggle archive status of a highlighted or selected tasks.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'ctrl+n' to switch to the Notes View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'ctrl+p' to switch to the Areas View.") + "\n")
 
 	selectedIDs := []string{}
 

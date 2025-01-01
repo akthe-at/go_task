@@ -82,6 +82,13 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// m.Areas.updateStatus(data.StatusDone)
 			}
 
+		case "P":
+			switch m.CurrentView {
+			case TasksTableView:
+				m.Tasks.togglePriorityStatus()
+			case NotesTableView:
+				// m.Areas.updateStatus(data.StatusDone)
+			}
 		case "a":
 			switch m.CurrentView {
 			case TasksTableView:
