@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path"
 	"strconv"
@@ -33,13 +34,13 @@ const (
 
 // This is the task table "screen" model
 type AreasModel struct {
-	tableModel       table.Model
-	totalWidth       int
-	totalHeight      int
-	horizontalMargin int
-	verticalMargin   int
-	deleteMessage    string
-	archiveFilter    bool
+	tableModel           table.Model
+	totalWidth           int
+	totalHeight          int
+	horizontalMargin     int
+	verticalMargin       int
+	deleteMessage        string
+	archiveFilterEnabled bool
 }
 
 // Init initializes the model (can use this to run commands upon model initialization)
@@ -141,64 +142,29 @@ func (m *AreasModel) loadRowsFromDatabase() ([]table.Row, error) {
 		})
 		rows = append(rows, row)
 	}
-	return rows, nil
+	filteredRows := []table.Row{}
+	for _, row := range rows {
+		archived, ok := row.Data[areaColumnKeyArchived]
+		if !ok {
+			log.Printf("Error getting archived status from row: %s", err)
+			return nil, err
+		}
+		if m.archiveFilterEnabled && archived == "false" {
+			filteredRows = append(filteredRows, row)
+		} else if !m.archiveFilterEnabled {
+			filteredRows = append(filteredRows, row)
+		}
+	}
+
+	return filteredRows, nil
 }
 
 func (m *AreasModel) filterArchives() tea.Cmd {
-	var filteredRows []table.Row
-	// toggle m.archiveFilter from current status
-	m.archiveFilter = !m.archiveFilter
+	m.archiveFilterEnabled = !m.archiveFilterEnabled
+	m.refreshTableData()
 
-	if m.archiveFilter {
-
-		rows, err := m.loadRowsFromDatabase()
-		if err != nil {
-			log.Printf("Error loading rows from database: %s", err)
-			return nil
-		}
-
-		for _, row := range rows {
-			archived, ok := row.Data[areaColumnKeyArchived]
-			if !ok {
-				log.Printf("Error getting archived status from row: %s", err)
-				return nil
-			}
-			if archived == "false" {
-				filteredRows = append(filteredRows, row)
-			}
-		}
-
-		m.tableModel = m.tableModel.WithRows(filteredRows)
-
-		// Update the footer
-		m.updateFooter()
-
-		return nil
-	} else {
-		rows, err := m.loadRowsFromDatabase()
-		if err != nil {
-			log.Printf("Error loading rows from database: %s", err)
-			return nil
-		}
-
-		for _, row := range rows {
-			archived, ok := row.Data[areaColumnKeyArchived]
-			if !ok {
-				log.Printf("Error getting archived status from row: %s", err)
-				return nil
-			}
-			if archived == "true" {
-				filteredRows = append(filteredRows, row)
-			}
-		}
-
-		m.tableModel = m.tableModel.WithRows(rows)
-
-		// Update the footer
-		m.updateFooter()
-
-		return nil
-	}
+	m.updateFooter()
+	return nil
 }
 
 func (m *AreasModel) addNote() tea.Cmd {
@@ -355,23 +321,12 @@ func (m *AreasModel) addArea() tea.Cmd {
 }
 
 func (m *AreasModel) refreshTableData() {
-	var filteredRows []table.Row
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
 		log.Printf("Error loading rows from database: %s", err)
 	}
 
-	for _, row := range rows {
-		archived, ok := row.Data[areaColumnKeyArchived]
-		if !ok {
-			log.Printf("Error getting archived status from row: %s", err)
-		}
-		if archived == "false" {
-			filteredRows = append(filteredRows, row)
-		}
-	}
-
-	m.tableModel = m.tableModel.WithRows(filteredRows)
+	m.tableModel = m.tableModel.WithRows(rows)
 
 	m.updateFooter()
 }
@@ -587,20 +542,10 @@ func AreaViewModel() AreasModel {
 		table.NewFlexColumn(areaColumnKeyNotes, "Notes", 3),
 	}
 
-	model := AreasModel{archiveFilter: true}
-	var filteredRows []table.Row
+	model := AreasModel{archiveFilterEnabled: true}
 	rows, err := model.loadRowsFromDatabase()
 	if err != nil {
 		log.Fatal(err)
-	}
-	for _, row := range rows {
-		archived, ok := row.Data[areaColumnKeyArchived]
-		if !ok {
-			log.Printf("Error getting archived status from row: %s", err)
-		}
-		if archived == "false" {
-			filteredRows = append(filteredRows, row)
-		}
 	}
 
 	keys := table.DefaultKeyMap()
@@ -608,7 +553,7 @@ func AreaViewModel() AreasModel {
 	keys.RowUp.SetKeys("k", "up", "w")
 
 	model.tableModel = table.New(columns).
-		WithRows(filteredRows).
+		WithRows(rows).
 		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Accent)).Bold(true)).
 		SelectableRows(true).
 		Focused(true).
@@ -656,4 +601,72 @@ func RunProjectsModel(m *AreasModel) {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
+}
+
+func (m *AreasModel) archiveArea() tea.Cmd {
+	selectedIDs := make(map[int64]bool)
+	var currentArchiveState bool
+	ctx := context.Background()
+	for _, row := range m.tableModel.SelectedRows() {
+		convertedID, err := strconv.ParseInt(row.Data[areaColumnKeyID].(string), 10, 64)
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error converting ID to int64: %v", "error", err)
+		}
+		parsedArchiveStatus, err := strconv.ParseBool(row.Data[areaColumnKeyArchived].(string))
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error converting archived status to bool: %v", "error", err)
+		}
+		selectedIDs[convertedID] = parsedArchiveStatus
+	}
+
+	conn, err := db.ConnectDB()
+	if err != nil {
+		slog.Error("AreasModel - archiveArea: Error connecting to database: %v", "error", err)
+		return nil
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[areaColumnKeyID].(string)
+		currentArchiveState, err = strconv.ParseBool(m.tableModel.HighlightedRow().Data[areaColumnKeyArchived].(string))
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error converting archived status to bool: %v", "error", err)
+		}
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error converting ID to int64: %v", "error", err)
+			return nil
+		}
+		_, err = queries.UpdateAreaArchived(ctx, sqlc.UpdateAreaArchivedParams{
+			Archived: !currentArchiveState,
+			ID:       taskID,
+		})
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error updating area archived status: %v", "error", err)
+		}
+
+	} else if len(selectedIDs) >= 1 {
+		for ID, archiveStatus := range selectedIDs {
+			_, err = queries.UpdateAreaArchived(ctx, sqlc.UpdateAreaArchivedParams{
+				Archived: !archiveStatus,
+				ID:       ID,
+			})
+			if err != nil {
+				slog.Error("AreasModel - archiveArea: Error updating area archived status: %v", "error", err)
+			}
+		}
+	}
+
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		slog.Error("AreasModel - archiveArea: Error loading rows from database: %v", "error", err)
+		return nil
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+	m.updateFooter()
+
+	return nil
 }

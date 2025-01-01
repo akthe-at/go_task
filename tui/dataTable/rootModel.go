@@ -93,6 +93,9 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.CurrentView {
 			case TasksTableView:
 				m.Tasks.archiveTask()
+			case AreasTableView:
+				m.Areas.archiveArea()
+			}
 		case "d":
 			switch m.CurrentView {
 			case TasksTableView:
