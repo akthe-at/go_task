@@ -250,7 +250,6 @@ func (m *TaskModel) filterRows() tea.Cmd {
 }
 
 func (m *TaskModel) filterArchives() tea.Cmd {
-
 	m.archiveFilterEnabled = !m.archiveFilterEnabled
 	m.refreshTableData()
 
@@ -406,41 +405,47 @@ func (m *TaskModel) addTask() tea.Cmd {
 }
 
 func (m *TaskModel) updateStatus(newStatus data.StatusType) tea.Cmd {
-	// selectedIDs := []string{}
+	var selectedIDs []int64
 	ctx := context.Background()
-	// for _, row := range m.tableModel.SelectedRows() {
-	// 	selectedIDs = append(selectedIDs, row.Data[columnKeyID].(string))
-	// }
-	highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
-	taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
-	if err != nil {
-		log.Printf("Error converting ID to int64: %s", err)
-		return nil
+	for _, row := range m.tableModel.SelectedRows() {
+		convertedID, err := strconv.ParseInt(row.Data[columnKeyID].(string), 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - UpdateStatus: Error converting ID to int64: %v", "error", err)
+		}
+		selectedIDs = append(selectedIDs, convertedID)
 	}
 
 	conn, err := db.ConnectDB()
 	if err != nil {
-		log.Printf("Error connecting to database: %s", err)
+		slog.Error("TaskModel - UpdateStatus: Error connecting to database: %v", "error", err)
 		return nil
 	}
 	defer conn.Close()
 
-	// if len(selectedIDs) <= 1 {
 	queries := sqlc.New(conn)
-	_, err = queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{Status: sql.NullString{String: string(newStatus), Valid: true}, ID: taskID})
-	if err != nil {
-		slog.Error("Error updating task status: %v", "error", err)
-		return nil
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - UpdateStatus: Error converting ID to int64: %v", "error", err)
+			return nil
+		}
+
+		_, err = queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{Status: sql.NullString{String: string(newStatus), Valid: true}, ID: taskID})
+		if err != nil {
+			slog.Error("TaskModel - UpdateStatus: Error updating task status: %v", "error", err)
+			return nil
+		}
+	} else if len(selectedIDs) >= 1 {
+		for _, ID := range selectedIDs {
+			_, err := queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{Status: sql.NullString{String: string(newStatus), Valid: true}, ID: ID})
+			if err != nil {
+				slog.Error("TaskModel - UpdateStatus: Error updating task status: %v", "error", err)
+				return nil
+			}
+		}
 	}
-	// for _, note := range taskNotes {
-	// 	taskNoteIDs = append(taskNoteIDs, note.ID)
-	// }
-	// 	// delete those notes
-	// 	if highlightedNote != "" {
-	// 	}
-	//
-	// } else if len(selectedIDs) > 1 {
-	// }
 
 	// Requery the database and update the table model
 	rows, err := m.loadRowsFromDatabase()
