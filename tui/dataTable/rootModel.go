@@ -1,6 +1,7 @@
 package datatable
 
 import (
+	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -73,6 +74,20 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case AreasTableView:
 				m.Areas.deleteArea()
 			}
+		case "t":
+			switch m.CurrentView {
+			case TasksTableView:
+				m.Tasks.updateStatus(data.StatusToDo)
+			case NotesTableView:
+				// m.Areas.updateStatus(data.StatusDone)
+			}
+		case "d":
+			switch m.CurrentView {
+			case TasksTableView:
+				m.Tasks.updateStatus(data.StatusDone)
+			case NotesTableView:
+				// m.Areas.updateStatus(data.StatusDone)
+			}
 		case "O":
 			switch m.CurrentView {
 			case NotesTableView:
@@ -100,10 +115,6 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Tasks.refreshTableData()
 			m.PreviousView = m.CurrentView
 			m.CurrentView = TasksTableView
-		case "ctrl+T":
-			m.Task.refreshTableData()
-			m.PreviousView = m.CurrentView
-			m.CurrentView = TaskTableView
 		case "ctrl+n":
 			m.Notes.refreshTableData()
 			m.PreviousView = m.CurrentView
@@ -121,8 +132,6 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.propagate(msg), nil
 	case SwitchToTasksTableViewMsg:
 		m.CurrentView = TasksTableView
-	case SwitchToTaskTableViewMsg:
-		m.CurrentView = TaskTableView
 	case SwitchToProjectsTableViewMsg:
 		m.CurrentView = AreasTableView
 	case SwitchToPreviousViewMsg:
