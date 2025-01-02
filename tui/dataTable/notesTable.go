@@ -113,10 +113,10 @@ func (m *NotesModel) View() string {
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add a new Note by pressing 'A'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Projects by pressing 'F'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+t to switch to the Tasks View.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press ctrl+p to switch to the Areas View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'space' to select a row, 'q' or 'ctrl+c' to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'backspace' to delete row(s) after selecting or highlighting them.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'ctrl+t' to switch to the Tasks View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'ctrl+p' to switch to the Areas View.") + "\n")
 	selectedIDs := []int64{}
 
 	for _, row := range m.tableModel.SelectedRows() {
@@ -420,7 +420,6 @@ func (m *NotesModel) openNote() tea.Cmd {
 			log.Fatalf("There was an error expanding the path: %v", err)
 		}
 	} else if len(selectedIDs) > 1 {
-		// fmt.Println("Can only open one note a time.")
 		notes, err := queries.ReadNoteByIDs(ctx, selectedIDs)
 		if err != nil {
 			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
