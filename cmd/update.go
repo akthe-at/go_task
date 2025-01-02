@@ -28,6 +28,7 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/spf13/cobra"
@@ -85,7 +86,7 @@ var updateTaskCmd = &cobra.Command{
 			}
 
 		case "priority":
-			priority, err := mapToPriorityType(inputEdit)
+			priority, err := data.StringToPriorityType(inputEdit)
 			if err != nil {
 				log.Fatalf("Invalid priority type: %v", err)
 			}
@@ -99,7 +100,7 @@ var updateTaskCmd = &cobra.Command{
 			}
 
 		case "status":
-			status, err := mapToStatusType(inputEdit)
+			status, err := data.StringToStatusType(inputEdit)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
@@ -178,7 +179,7 @@ var updateAreaCmd = &cobra.Command{
 			}
 
 		case "status":
-			status, err := mapToStatusType(inputField)
+			status, err := data.StringToStatusType(inputField)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
