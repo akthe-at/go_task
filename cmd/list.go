@@ -315,7 +315,7 @@ func styleTable(rows []TableRow, headers []string, colWidths map[int]int) *table
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
 		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
-		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
+		CellStyle    = re.NewStyle().Padding(0, 1).Width(10)
 		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
 		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
@@ -346,6 +346,7 @@ func styleTable(rows []TableRow, headers []string, colWidths map[int]int) *table
 			return style
 		}).
 		Headers(headers...).
+		// Widh(96).
 		Rows(tableRows...)
 
 	return &t
@@ -358,7 +359,7 @@ func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 	}
 
 	headers := []string{"ID", "Task", "Priority", "Status", "Task Age", "Notes", "Project", "Area"}
-	colWidths := map[int]int{0: 1, 1: 20, 2: 10, 3: 10, 4: 15, 5: 25, 6: 10, 7: 10}
+	colWidths := map[int]int{0: 2, 1: 15, 2: 10, 3: 10, 4: 10, 5: 15, 6: 10, 7: 10}
 	return styleTable(rows, headers, colWidths)
 }
 
@@ -388,7 +389,7 @@ func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
 
 	rows = append(rows, TaskRowWrapper{task})
 	headers := []string{"ID", "Task", "Priority", "Status", "Task Age", "Notes", "Project", "Area"}
-	colWidths := map[int]int{0: 1, 1: 20, 2: 10, 3: 10, 4: 15, 5: 25, 6: 10, 7: 10}
+	colWidths := map[int]int{0: 2, 1: 15, 2: 10, 3: 10, 4: 10, 5: 15, 6: 10, 7: 10}
 	return styleTable(rows, headers, colWidths)
 }
 
