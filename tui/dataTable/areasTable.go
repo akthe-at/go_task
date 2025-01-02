@@ -41,6 +41,7 @@ type AreasModel struct {
 	verticalMargin       int
 	deleteMessage        string
 	archiveFilterEnabled bool
+	rowFilter            bool
 }
 
 // Init initializes the model (can use this to run commands upon model initialization)
@@ -64,7 +65,8 @@ func (m *AreasModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tea.Quit)
 		case "F":
 			cmds = append(cmds, m.filterArchives())
-			m.refreshTableData()
+		case "enter":
+			cmds = append(cmds, m.filterRows())
 		case "left":
 			if m.calculateWidth() > minWidth {
 				m.horizontalMargin++
@@ -159,11 +161,101 @@ func (m *AreasModel) loadRowsFromDatabase() ([]table.Row, error) {
 	return filteredRows, nil
 }
 
+func (m *AreasModel) filterRows() tea.Cmd {
+	ctx := context.Background()
+	dbConn, err := db.ConnectDB()
+	if err != nil {
+		log.Fatalf("There was an issue connecting to the database: %s", err)
+	}
+	defer dbConn.Close()
+	queries := sqlc.New(dbConn)
+	m.rowFilter = !m.rowFilter
+
+	if m.tableModel.HighlightedRow().Data[areaColumnKeyID] != nil {
+		rowID, err := strconv.ParseInt(m.tableModel.HighlightedRow().Data[areaColumnKeyID].(string), 10, 64)
+		if err != nil {
+			log.Fatalf("Error converting ID to int: %s", err)
+		}
+
+		result, err := queries.ReadArea(ctx, rowID)
+		if err != nil {
+			slog.Error("Error reading area from database: %s", "error", err)
+			return nil
+		}
+
+		var rows []table.Row
+		row := table.NewRow(table.RowData{
+			areaColumnKeyID:       fmt.Sprintf("%d", result.ID),
+			areaColumnKeyProject:  result.Title,
+			areaColumnKeyStatus:   result.Status.String,
+			areaColumnKeyArchived: fmt.Sprintf("%t", result.Archived),
+			areaColumnKeyNotes:    fmt.Sprintf("%v", result.Title_2),
+		})
+		rows = append(rows, row)
+
+		m.tableModel = m.tableModel.WithRows(rows)
+		m.updateFooter()
+
+		return nil
+	}
+	return nil
+}
+
 func (m *AreasModel) filterArchives() tea.Cmd {
 	m.archiveFilterEnabled = !m.archiveFilterEnabled
 	m.refreshTableData()
 
 	m.updateFooter()
+	return nil
+}
+
+func (m *AreasModel) updateStatus(newStatus data.StatusType) tea.Cmd {
+	var selectedIDs []int64
+	ctx := context.Background()
+	for _, row := range m.tableModel.SelectedRows() {
+		convertedID, err := strconv.ParseInt(row.Data[columnKeyID].(string), 10, 64)
+		if err != nil {
+			log.Fatalf("AreasModel - UpdateStatus: Error converting ID to int64: %v", err)
+		}
+		selectedIDs = append(selectedIDs, convertedID)
+	}
+
+	conn, err := db.ConnectDB()
+	if err != nil {
+		log.Fatalf("AreasModel - UpdateStatus: Error connecting to database: %v", err)
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			log.Fatalf("AreasModel - UpdateStatus: Error converting ID to int64: %v", err)
+		}
+
+		_, err = queries.UpdateAreaStatus(ctx, sqlc.UpdateAreaStatusParams{Status: sql.NullString{String: string(newStatus), Valid: true}, ID: taskID})
+		if err != nil {
+			log.Fatalf("AreasModel - UpdateStatus: Error updating Area status: %v", err)
+		}
+	} else if len(selectedIDs) >= 1 {
+		for _, ID := range selectedIDs {
+			_, err := queries.UpdateAreaStatus(ctx, sqlc.UpdateAreaStatusParams{Status: sql.NullString{String: string(newStatus), Valid: true}, ID: ID})
+			if err != nil {
+				log.Fatalf("AreasModel - UpdateStatus: Error updating area status: %v", err)
+			}
+		}
+	}
+
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		log.Fatalf("Error loading rows from database: %s", err)
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+	m.updateFooter()
+
 	return nil
 }
 

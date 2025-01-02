@@ -78,15 +78,14 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.CurrentView {
 			case TasksTableView:
 				m.Tasks.updateStatus(data.StatusPlanning)
-			case NotesTableView:
-				// m.Areas.updateStatus(data.StatusDone)
+			case AreasTableView:
+				m.Areas.updateStatus(data.StatusPlanning)
 			}
-
 		case "P":
 			switch m.CurrentView {
 			case TasksTableView:
 				m.Tasks.togglePriorityStatus()
-			case NotesTableView:
+				// case NotesTableView:
 				// m.Areas.updateStatus(data.StatusDone)
 			}
 		case "a":
@@ -100,22 +99,22 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.CurrentView {
 			case TasksTableView:
 				m.Tasks.updateStatus(data.StatusDoing)
-			case NotesTableView:
-				// m.Areas.updateStatus(data.StatusDone)
+			case AreasTableView:
+				m.Areas.updateStatus(data.StatusDoing)
 			}
 		case "t":
 			switch m.CurrentView {
 			case TasksTableView:
 				m.Tasks.updateStatus(data.StatusToDo)
-			case NotesTableView:
-				// m.Areas.updateStatus(data.StatusDone)
+			case AreasTableView:
+				m.Areas.updateStatus(data.StatusToDo)
 			}
 		case "D":
 			switch m.CurrentView {
 			case TasksTableView:
 				m.Tasks.updateStatus(data.StatusDone)
-			case NotesTableView:
-				// m.Areas.updateStatus(data.StatusDone)
+			case AreasTableView:
+				m.Areas.updateStatus(data.StatusDone)
 			}
 		case "O":
 			switch m.CurrentView {
@@ -149,6 +148,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.PreviousView = m.CurrentView
 			m.CurrentView = NotesTableView
 		case "ctrl+p":
+			m.Areas.refreshTableData()
 			m.PreviousView = m.CurrentView
 			m.CurrentView = AreasTableView
 		}
@@ -182,7 +182,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *RootModel) propagate(msg tea.Msg) tea.Model {
 	var updatedTasks tea.Model
 	var updatedNotes tea.Model
-	var updatedProjects tea.Model
+	var updatedAreas tea.Model
 
 	updatedTasks, _ = m.Tasks.Update(msg)
 	m.Tasks = *updatedTasks.(*TaskModel)
@@ -190,8 +190,8 @@ func (m *RootModel) propagate(msg tea.Msg) tea.Model {
 	updatedNotes, _ = m.Notes.Update(msg)
 	m.Notes = *updatedNotes.(*NotesModel)
 
-	updatedProjects, _ = m.Areas.Update(msg)
-	m.Areas = *updatedProjects.(*AreasModel)
+	updatedAreas, _ = m.Areas.Update(msg)
+	m.Areas = *updatedAreas.(*AreasModel)
 
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		msg.Height -= m.Notes.totalHeight
