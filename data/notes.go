@@ -37,13 +37,13 @@ func StringToPriorityType(s string) (PriorityType, error) {
 	case string(PriorityTypeUrgent):
 		return PriorityTypeUrgent, nil
 	default:
-		return "", fmt.Errorf("invalid priority type: %s", s)
+		return "", fmt.Errorf("invalid priority type ( %s ) is not one of the valid priority values (low, medium, high, urgent)", s)
 	}
 }
 
 // StringToStatusType converts a string to a StatusType by mapping a string to a StatusType
-func StringToStatusType(input string) (StatusType, error) {
-	switch input {
+func StringToStatusType(s string) (StatusType, error) {
+	switch s {
 	case "todo":
 		return StatusToDo, nil
 	case "planning":
@@ -53,6 +53,6 @@ func StringToStatusType(input string) (StatusType, error) {
 	case "done":
 		return StatusDone, nil
 	default:
-		return "", fmt.Errorf("invalid status type ( %v ) is not one of the valid status values (todo, planning, doing, done)", input)
+		return "", fmt.Errorf("invalid status type ( %s ) is not one of the valid status values (todo, planning, doing, done)", s)
 	}
 }
