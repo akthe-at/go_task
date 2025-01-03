@@ -306,11 +306,10 @@ FROM programming_projects;
 
 -- name: CheckProgProjectExists :one
 SELECT
-  CASE WHEN EXISTS (
-    SELECT 1
-    FROM programming_projects
-    WHERE path = ?
-  ) THEN 1 ELSE 0 END AS prog_proj_exists;
+  COALESCE(pp.id, 0) AS prog_proj_exists
+FROM
+  (SELECT ? AS path) AS input
+  LEFT JOIN programming_projects pp ON pp.path = input.path;
 
 
 -- name: FindProgProjectsForTask :one
