@@ -147,31 +147,38 @@ var addTaskCmd = &cobra.Command{
 				if err != nil {
 					log.Fatalf("Error checking if project directory: %v", err)
 				}
-				if ok {
-					projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+
+				var projectID int64
+				if form.ProjectAssignment == "local" {
+					projID, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
 					if err != nil {
 						log.Fatalf("Error checking if project exists: %v", err)
-					} else if projID == 0 {
-						project, err := queries.InsertProgProject(ctx, projectDir)
+					}
+					switch projID {
+					case 0:
+						projectID, err = queries.InsertProgProject(ctx, form.ProgProject)
 						if err != nil {
 							log.Fatalf("Error inserting project: %v", err)
 						}
-						err = queries.CreateProjectTaskLink(ctx,
-							sqlc.CreateProjectTaskLinkParams{
-								ProjectID:    sql.NullInt64{Int64: project, Valid: true},
-								ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
-								ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
-							},
-						)
-						if err != nil {
-							log.Fatalf("Error inserting project link: %v", err)
-						}
+					case 1:
+						projectID = projID
+					default:
+						log.Fatalf("Unexpected error, projID is an issue: %v", projID)
 					}
-
+					err = queries.CreateProjectTaskLink(ctx,
+						sqlc.CreateProjectTaskLinkParams{
+							ProjectID:    sql.NullInt64{Int64: projectID, Valid: true},
+							ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+							ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
+						},
+					)
+					if err != nil {
+						log.Fatalf("Error inserting project link: %v", err)
+					}
 				}
 
-				fmt.Println("Successfully assigned the new task a programming project ID: ", projectDir)
 			}
+			fmt.Println("Successfully assigned the new task a programming project ID: ", form.ProgProject)
 		}
 	},
 }
