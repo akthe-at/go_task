@@ -12,7 +12,13 @@ import (
 // It returns a pointer to the sql.DB object and an error if any occurs.
 func ConnectDB() (*sql.DB, error) {
 	// FIXME: This needs to point at a config set db path or a default backup. Or perhaps embedded?
-	db, err := sql.Open("sqlite3", "file:new_demo.db")
+	XDG_DATA_HOME := os.Getenv("XDG_DATA_HOME")
+	dbPath := XDG_DATA_HOME + "/go_task"
+	err := os.MkdirAll(dbPath, os.ModePerm)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create directory: %2", err)
+	}
+	db, err := sql.Open("sqlite3", XDG_DATA_HOME+"/go_task/taskdb.db")
 	if err != nil {
 		return nil, fmt.Errorf("invalid sql.Open() arguments: %w", err)
 	}
