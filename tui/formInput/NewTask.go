@@ -86,19 +86,19 @@ func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 			huh.NewSelect[string]().
 				Title("Did you want to assign this task to a specific area?").
 				Options(
-					huh.NewOption("Yes", "yes"),
-					huh.NewOption("No", "no").Selected(true),
+					huh.NewOption("Yes", "yes").Selected(true),
+					huh.NewOption("No", "no"),
 				).
 				Value(&n.AreaAssignment),
-		).WithHideFunc(func() bool {
-			return n.AreaAssignment == "yes"
-		}),
+		),
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Value(&n.Area).
 				Title("Which area did you want to assign this task to?").
 				Options(areaOptions...),
-		),
+		).WithHideFunc(func() bool {
+			return n.AreaAssignment == "no"
+		}),
 		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Are you ready to save your task?").

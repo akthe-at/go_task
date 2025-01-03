@@ -160,20 +160,20 @@ var addTaskCmd = &cobra.Command{
 
 				var projectID int64
 				if form.ProjectAssignment == "local" {
-					projID, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
+					projExists, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
 					if err != nil {
 						log.Fatalf("Error checking if project exists: %v", err)
 					}
-					switch projID {
-					case 0:
+					switch {
+					case projExists == 0:
 						projectID, err = queries.InsertProgProject(ctx, form.ProgProject)
 						if err != nil {
 							log.Fatalf("Error inserting project: %v", err)
 						}
-					case 1:
-						projectID = projID
+					case projExists > 0:
+						projectID = projExists
 					default:
-						log.Fatalf("Unexpected error, projID is an issue: %v", projID)
+						log.Fatalf("Unexpected error, projID is an issue: %v", projExists)
 					}
 					err = queries.CreateProjectTaskLink(ctx,
 						sqlc.CreateProjectTaskLinkParams{

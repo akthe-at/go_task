@@ -378,13 +378,13 @@ func (m *TaskModel) addTask() tea.Cmd {
 			if err != nil {
 				log.Fatalf("Error checking if project exists: %v", err)
 			}
-			switch projID {
-			case 0:
+			switch {
+			case projID == 0:
 				projectID, err = queries.InsertProgProject(ctx, form.ProgProject)
 				if err != nil {
 					log.Fatalf("Error inserting project: %v", err)
 				}
-			case 1:
+			case projID > 0:
 				projectID = projID
 			default:
 				log.Fatalf("Unexpected projID: %v", projID)
