@@ -358,6 +358,20 @@ func (m *TaskModel) addTask() tea.Cmd {
 			log.Fatalf("Error creating task: %v", err)
 		}
 
+		if form.AreaAssignment == "yes" {
+			areaID, err := strconv.ParseInt(form.Area, 10, 64)
+			if err != nil {
+				log.Fatalf("Error parsing area ID: %v", err)
+			}
+			fmt.Println("AreaID Post Conversion is: ", areaID)
+			_, err = queries.UpdateTaskArea(ctx, sqlc.UpdateTaskAreaParams{
+				AreaID: sql.NullInt64{Int64: areaID, Valid: true}, ID: result,
+			})
+			if err != nil {
+				slog.Error("Error updating task area: %v", "error", err)
+			}
+		}
+
 		var projectID int64
 		if form.ProjectAssignment == "local" {
 			projID, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
@@ -387,7 +401,6 @@ func (m *TaskModel) addTask() tea.Cmd {
 			}
 		}
 
-		// Requery the database and update the table model
 		rows, err := m.loadRowsFromDatabase()
 		if err != nil {
 			log.Printf("Error loading rows from database: %s", err)

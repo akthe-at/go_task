@@ -3,6 +3,7 @@ package formInput
 import (
 	"context"
 	"path"
+	"strconv"
 
 	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
@@ -15,6 +16,8 @@ import (
 
 type NewTaskForm struct {
 	TaskTitle         string
+	AreaAssignment    string
+	Area              string
 	ProjectAssignment string
 	ProgProject       string
 	TaskForm          *huh.Form
@@ -28,6 +31,7 @@ type NewTaskForm struct {
 func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 	tui.ClearTerminalScreen()
 	options := fetchProgProjects()
+	areaOptions := fetchAreas()
 
 	taskGroups := []*huh.Group{
 		huh.NewGroup(
@@ -79,6 +83,23 @@ func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 			return n.ProjectAssignment == "global"
 		}),
 		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Did you want to assign this task to a specific area?").
+				Options(
+					huh.NewOption("Yes", "yes"),
+					huh.NewOption("No", "no").Selected(true),
+				).
+				Value(&n.AreaAssignment),
+		).WithHideFunc(func() bool {
+			return n.AreaAssignment == "yes"
+		}),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Value(&n.Area).
+				Title("Which area did you want to assign this task to?").
+				Options(areaOptions...),
+		),
+		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Are you ready to save your task?").
 				Affirmative("Yes").
@@ -89,6 +110,28 @@ func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 	n.TaskForm = huh.NewForm(taskGroups...)
 
 	return n.TaskForm.WithTheme(&theme).Run()
+}
+
+func fetchAreas() []huh.Option[string] {
+	ctx := context.Background()
+	conn, err := db.ConnectDB()
+	if err != nil {
+		log.Errorf("There was an error connecting to the database: %v", err)
+	}
+
+	queries := sqlc.New(conn)
+	defer conn.Close()
+
+	areas, err := queries.ReadAllAreas(ctx)
+	if err != nil {
+		return nil
+	}
+	var options []huh.Option[string]
+	for _, area := range areas {
+		options = append(options, huh.Option[string]{Value: strconv.FormatInt(area.ID, 10), Key: area.Title})
+	}
+
+	return options
 }
 
 func fetchProgProjects() []huh.Option[string] {

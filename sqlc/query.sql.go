@@ -409,6 +409,59 @@ func (q *Queries) ReadAllAreaNotes(ctx context.Context) ([]ReadAllAreaNotesRow, 
 	return items, nil
 }
 
+const readAllAreas = `-- name: ReadAllAreas :many
+SELECT 
+    areas.id, areas.title, areas.status, areas.archived,
+    notes.id, notes.title, notes.path
+FROM 
+    areas
+LEFT JOIN 
+    bridge_notes ON areas.id = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2
+LEFT JOIN 
+    notes ON bridge_notes.note_id = notes.id
+`
+
+type ReadAllAreasRow struct {
+	ID       int64          `json:"id"`
+	Title    string         `json:"title"`
+	Status   sql.NullString `json:"status"`
+	Archived bool           `json:"archived"`
+	ID_2     sql.NullInt64  `json:"id_2"`
+	Title_2  sql.NullString `json:"title_2"`
+	Path     sql.NullString `json:"path"`
+}
+
+func (q *Queries) ReadAllAreas(ctx context.Context) ([]ReadAllAreasRow, error) {
+	rows, err := q.db.QueryContext(ctx, readAllAreas)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadAllAreasRow
+	for rows.Next() {
+		var i ReadAllAreasRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Status,
+			&i.Archived,
+			&i.ID_2,
+			&i.Title_2,
+			&i.Path,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const readAllNotes = `-- name: ReadAllNotes :many
 SELECT notes.id, notes.title, notes.path, coalesce(tasks.title, areas.title) [area_or_task_title], case when bridge_notes.parent_cat = 1 then 'Task' else 'Area' end as [parent_type]
 FROM notes

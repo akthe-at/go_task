@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strconv"
@@ -60,6 +61,7 @@ var addTaskCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
+
 		defer conn.Close()
 		queries := sqlc.New(conn)
 
@@ -141,11 +143,19 @@ var addTaskCmd = &cobra.Command{
 				if err != nil {
 					log.Fatalf("Error creating task: %v", err)
 				}
-				fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
 
-				ok, projectDir, err := utils.CheckIfProjDir()
-				if err != nil {
-					log.Fatalf("Error checking if project directory: %v", err)
+				fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
+				if form.AreaAssignment == "yes" {
+					areaID, err := strconv.ParseInt(form.Area, 10, 64)
+					if err != nil {
+						log.Fatalf("Error parsing area ID: %v", err)
+					}
+					_, err = queries.UpdateTaskArea(ctx, sqlc.UpdateTaskAreaParams{
+						AreaID: sql.NullInt64{Int64: areaID, Valid: true}, ID: result,
+					})
+					if err != nil {
+						slog.Error("Error updating task area: %v", "error", err)
+					}
 				}
 
 				var projectID int64

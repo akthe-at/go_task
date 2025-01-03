@@ -181,6 +181,18 @@ WHERE
     areas.id = ?;
 
 
+-- name: ReadAllAreas :many
+SELECT 
+    areas.id, areas.title, areas.status, areas.archived,
+    notes.id, notes.title, notes.path
+FROM 
+    areas
+LEFT JOIN 
+    bridge_notes ON areas.id = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2
+LEFT JOIN 
+    notes ON bridge_notes.note_id = notes.id;
+
+
 -- name: DeleteNotesFromSingleArea :execresult
 DELETE FROM notes
 WHERE notes.id IN (
