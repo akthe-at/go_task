@@ -550,9 +550,15 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 		}
 		// delete those notes
 		if highlightedNote != "" {
-			_, err := queries.DeleteNotes(ctx, areaNoteIDs)
-			if err != nil {
-				log.Fatalf("Error deleting notes: %s", err)
+			for _, areaNoteID := range areaNoteIDs {
+				_, err = queries.DeleteNote(ctx, areaNoteID)
+				if err != nil {
+					log.Fatalf("Error deleting note: %s", err)
+				}
+				_, err = queries.RecycleNoteID(ctx, areaNoteID)
+				if err != nil {
+					log.Fatalf("Error recycling note ID: %s", err)
+				}
 			}
 		}
 		// delete the project
@@ -583,9 +589,15 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 		}
 		// delete those notes
 		if highlightedNote != "" {
-			_, err := queries.DeleteNotes(ctx, areaNoteIDs)
-			if err != nil {
-				log.Fatalf("Error deleting notes: %s", err)
+			for _, areaNoteID := range areaNoteIDs {
+				_, err = queries.DeleteNote(ctx, areaNoteID)
+				if err != nil {
+					log.Fatalf("Error deleting note: %s", err)
+				}
+				_, err = queries.RecycleNoteID(ctx, areaNoteID)
+				if err != nil {
+					log.Fatalf("Error recycling note ID: %s", err)
+				}
 			}
 		}
 		areasToDelete := make([]int64, len(selectedIDs))

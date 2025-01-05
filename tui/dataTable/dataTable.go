@@ -671,10 +671,15 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		}
 		// delete those notes
 		if highlightedNote != "" {
-			_, err := queries.DeleteNotes(ctx, taskNoteIDs)
-			if err != nil {
-				log.Printf("Error deleting notes: %s", err)
-				return nil
+			for _, taskNoteID := range taskNoteIDs {
+				_, err = queries.DeleteNote(ctx, taskNoteID)
+				if err != nil {
+					log.Fatalf("Error deleting note: %s", err)
+				}
+				_, err = queries.RecycleNoteID(ctx, taskNoteID)
+				if err != nil {
+					log.Fatalf("Error recycling note ID: %s", err)
+				}
 			}
 		}
 		// delete the task
@@ -707,10 +712,15 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		}
 		// delete those notes
 		if highlightedNote != "" {
-			_, err := queries.DeleteNotes(ctx, taskNoteIDs)
-			if err != nil {
-				log.Printf("Error deleting notes: %s", err)
-				return nil
+			for _, taskNoteID := range taskNoteIDs {
+				_, err = queries.DeleteNote(ctx, taskNoteID)
+				if err != nil {
+					log.Fatalf("Error deleting note: %s", err)
+				}
+				_, err = queries.RecycleNoteID(ctx, taskNoteID)
+				if err != nil {
+					log.Fatalf("Error recycling note ID: %s", err)
+				}
 			}
 		}
 		toDeleteTasks := make([]int64, len(selectedIDs))
