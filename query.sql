@@ -1,3 +1,27 @@
+------------
+--- note_ids
+------------
+-- name: GetNoteID :one
+SELECT ID
+FROM note_ids LIMIT 1;
+
+-- name: NoNoteIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM notes
+WHERE id < 999;
+
+-- name: DeleteNoteID :execlastid
+DELETE FROM note_ids
+WHERE id = ?
+returning id;
+
+-- name: RecycleNoteID :execlastid
+INSERT INTO note_ids (id) VALUES (?)
+returning id;
+
+------------
+--- area_ids
+------------
 -- name: GetAreaID :one
 SELECT ID
 FROM area_ids LIMIT 1;
@@ -16,6 +40,9 @@ returning id;
 INSERT INTO area_ids (id) VALUES (?)
 returning id;
 
+------------
+--- task_ids
+------------
 -- name: GetTaskID :one
 SELECT id FROM task_ids LIMIT 1;
 
