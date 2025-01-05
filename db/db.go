@@ -84,93 +84,106 @@ SetupDB Setup the Initial DB Schema
  4. Uses prepared statements for better performance
 */
 func SetupDB(db *sql.DB) error {
-	initialQueries := `
-PRAGMA foreign_keys = ON;
+	queries := []string{
+		`PRAGMA foreign_keys=ON;`,
+		`CREATE TABLE IF NOT EXISTS areas (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            status TEXT,
+            archived BOOLEAN NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
+            last_mod TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime'))
+        );`,
+		`CREATE TABLE IF NOT EXISTS task_ids (
+            id INTEGER PRIMARY KEY
+        );`,
+		`CREATE TABLE IF NOT EXISTS area_ids (
+            id INTEGER PRIMARY KEY
+        );`,
+		`CREATE TABLE IF NOT EXISTS prog_proj_ids (
+            id INTEGER PRIMARY KEY
+        );`,
+		`CREATE TABLE IF NOT EXISTS note_ids (
+            id INTEGER PRIMARY KEY
+        );`,
+		`CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            priority TEXT,
+            status TEXT,
+            archived BOOLEAN NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
+            last_mod TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
+            due_date TEXT,
+            area_id INTEGER,
+            FOREIGN KEY(area_id) REFERENCES areas(id) ON DELETE SET NULL ON UPDATE CASCADE
+        );`,
+		`CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            path TEXT NOT NULL,
+            parent_area_id INTEGER,
+            parent_task_id INTEGER,
+            FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE
+        );`,
+		`CREATE TABLE IF NOT EXISTS bridge_notes (
+            note_id INTEGER,
+            parent_cat INTEGER,
+            parent_task_id INTEGER,
+            parent_area_id INTEGER,
+            FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            CHECK (parent_cat IN (1, 2)),
+            FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE
+        );`,
+		`CREATE TABLE IF NOT EXISTS programming_projects (
+            id INTEGER PRIMARY KEY,
+            path TEXT NOT NULL UNIQUE
+        );`,
+		`CREATE TABLE IF NOT EXISTS prog_project_links (
+            project_id INTEGER,
+            parent_cat INTEGER,
+            parent_task_id INTEGER,
+            parent_area_id INTEGER,
+            FOREIGN KEY(project_id) REFERENCES programming_projects(id) ON DELETE CASCADE,
+            CHECK (parent_cat IN (1, 2)),
+            FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+            FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE
+        );`,
+		`CREATE TRIGGER IF NOT EXISTS update_last_mod_tasks
+        AFTER UPDATE ON tasks
+        BEGIN
+            UPDATE tasks 
+            SET last_mod = datetime(current_timestamp, 'localtime')
+            WHERE id = OLD.id;
+        END;`,
+		`CREATE TRIGGER IF NOT EXISTS update_last_mod_areas
+        AFTER UPDATE ON areas
+        BEGIN
+            UPDATE areas 
+            SET last_mod = datetime(current_timestamp, 'localtime')
+            WHERE id = OLD.id;
+        END;`,
+	}
 
-CREATE TABLE IF NOT EXISTS areas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    status TEXT,
-    archived BOOLEAN NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
-    last_mod TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime'))
-);
-
-CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    priority TEXT,
-    status TEXT,
-    archived BOOLEAN NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
-    last_mod TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
-    due_date TEXT,
-    area_id INTEGER,
-    FOREIGN KEY(area_id) REFERENCES areas(id) ON DELETE SET NULL ON UPDATE CASCADE
-);
-
-CREATE TRIGGER update_last_mod_tasks
-BEFORE UPDATE ON tasks
-FOR EACH ROW
-BEGIN
-    UPDATE tasks SET last_mod = (datetime(current_timestamp, 'localtime')) WHERE id = OLD.id;
-END;
-
-CREATE TRIGGER update_last_mod_areas
-BEFORE UPDATE ON areas
-FOR EACH ROW
-BEGIN
-    UPDATE areas SET last_mod = (datetime(current_timestamp, 'localtime')) WHERE id = OLD.id;
-END;
-
-CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    path TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS bridge_notes (
-    note_id INTEGER,
-    parent_cat INTEGER,
-    parent_task_id INTEGER,
-    parent_area_id INTEGER,
-    FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CHECK (parent_cat IN (1, 2)),
-    FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS programming_projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    path TEXT NOT NULL UNIQUE
-);
-
-CREATE TABLE IF NOT EXISTS prog_project_links (
-    project_id INTEGER,
-    parent_cat INTEGER,
-    parent_task_id INTEGER, 
-    parent_area_id INTEGER,
-    FOREIGN KEY(project_id) REFERENCES programming_projects(id) ON DELETE CASCADE,
-    CHECK (parent_cat IN (1, 2)),
-    FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-    FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE
-);`
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	_, err = tx.Exec(initialQueries)
-	if err != nil {
-		err := tx.Rollback()
+	for _, query := range queries {
+		_, err = tx.Exec(query)
 		if err != nil {
-			fmt.Println("failed to rollback transaction: ", err)
+			rollbackErr := tx.Rollback()
+			if rollbackErr != nil {
+				return fmt.Errorf("failed to rollback after error: %v. Original error: %w", rollbackErr, err)
+			}
+			return fmt.Errorf("failed to execute query: %w", err)
 		}
-		return fmt.Errorf("failed to create table: %w", err)
 	}
 
-	err = tx.Commit()
-	if err != nil {
+	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
