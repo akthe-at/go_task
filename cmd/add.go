@@ -86,14 +86,31 @@ var addTaskCmd = &cobra.Command{
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
+			newTaskID, err := queries.GetTaskID(ctx)
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error getting task ID: %v", err)
+			}
+			if err == sql.ErrNoRows {
+				newTaskID, err = queries.NoTaskIDs(ctx)
+				if err != nil {
+					log.Fatalf("Failed to find the next available task ID: %v", err)
+				}
+			} else {
+				_, err = queries.DeleteTaskID(ctx, newTaskID)
+				if err != nil {
+					log.Fatalf("Error deleting task ID: %v", err)
+				}
+			}
+
 			newTask := sqlc.CreateTaskParams{
+				ID:       newTaskID,
 				Title:    inputTitle,
 				Priority: sql.NullString{String: string(validPriority), Valid: true},
 				Status:   sql.NullString{String: string(validStatus), Valid: true},
 				Archived: archived,
 			}
 
-			newTaskID, err := queries.CreateTask(ctx, newTask)
+			newTaskID, err = queries.CreateTask(ctx, newTask)
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
 			}
@@ -135,11 +152,28 @@ var addTaskCmd = &cobra.Command{
 			}
 
 			if form.Submit {
-				result, err := queries.CreateTask(ctx, sqlc.CreateTaskParams{
+				newTaskID, err := queries.GetTaskID(ctx)
+				if err != nil && err != sql.ErrNoRows {
+					log.Fatalf("Error getting task ID: %v", err)
+				}
+				if err == sql.ErrNoRows {
+					newTaskID, err = queries.NoTaskIDs(ctx)
+					if err != nil {
+						log.Fatalf("Failed to find the next available task ID: %v", err)
+					} else {
+						_, err = queries.DeleteTaskID(ctx, newTaskID)
+						if err != nil {
+							log.Fatalf("Error deleting task ID: %v", err)
+						}
+					}
+				}
+				newTask := sqlc.CreateTaskParams{
+					ID:       newTaskID,
 					Title:    form.TaskTitle,
 					Priority: sql.NullString{String: string(form.Priority), Valid: true},
 					Status:   sql.NullString{String: string(form.Status), Valid: true},
-				})
+				}
+				result, err := queries.CreateTask(ctx, newTask)
 				if err != nil {
 					log.Fatalf("Error creating task: %v", err)
 				}

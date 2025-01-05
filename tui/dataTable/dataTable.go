@@ -344,9 +344,26 @@ func (m *TaskModel) addTask() tea.Cmd {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
-
 		queries := sqlc.New(conn)
+
+		newTaskID, err := queries.GetTaskID(ctx)
+		if err != nil && err != sql.ErrNoRows {
+			log.Fatalf("addTask - TaskModel: Error getting task ID: %v", err)
+		}
+		if err == sql.ErrNoRows {
+			newTaskID, err = queries.NoTaskIDs(ctx)
+			if err != nil {
+				log.Fatalf("Failed to find the next available task ID: %v", err)
+			} else {
+				_, err = queries.DeleteTaskID(ctx, newTaskID)
+				if err != nil {
+					log.Fatalf("Error deleting task ID: %v", err)
+				}
+			}
+		}
+
 		newTask := sqlc.CreateTaskParams{
+			ID:       newTaskID,
 			Title:    form.TaskTitle,
 			Priority: sql.NullString{String: string(form.Priority), Valid: true},
 			Status:   sql.NullString{String: string(form.Status), Valid: true},
@@ -649,6 +666,10 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 			log.Printf("Error deleting task: %s", err)
 			return nil
 		}
+		_, err = queries.RecycleTaskID(ctx, deletedID)
+		if err != nil {
+			log.Fatalf("Error recycling task ID: %s", err)
+		}
 		if deletedID != taskID {
 			log.Fatalf("Error deleting task: %s", err)
 		} else {
@@ -683,13 +704,15 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 			}
 			toDeleteTasks[idx] = converted_id
 		}
-		result, err := queries.DeleteTasks(ctx, toDeleteTasks)
-		if err != nil {
-			log.Printf("Error deleting tasks: %s", err)
-			return nil
-		}
-		if result != int64(len(selectedIDs)) {
-			log.Printf("Error deleting tasks - Mismatch between selectedIDs and numDeleted: %s", err)
+		for _, taskID := range toDeleteTasks {
+			_, err := queries.DeleteTask(ctx, taskID)
+			if err != nil {
+				log.Fatalf("Error deleting task: %v", err)
+			}
+			_, err = queries.RecycleTaskID(ctx, taskID)
+			if err != nil {
+				log.Fatalf("Error recycling task ID: %v", err)
+			}
 		}
 		m.deleteMessage = fmt.Sprintf("You deleted the following tasks: %s", strings.Join(selectedIDs, ", "))
 	}

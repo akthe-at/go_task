@@ -18,6 +18,10 @@ type Area struct {
 	LastMod   time.Time      `json:"last_mod"`
 }
 
+type AreaID struct {
+	ID int64 `json:"id"`
+}
+
 type BridgeNote struct {
 	NoteID       sql.NullInt64 `json:"note_id"`
 	ParentCat    sql.NullInt64 `json:"parent_cat"`
@@ -29,6 +33,14 @@ type Note struct {
 	ID    int64  `json:"id"`
 	Title string `json:"title"`
 	Path  string `json:"path"`
+}
+
+type NoteID struct {
+	ID int64 `json:"id"`
+}
+
+type ProgProjID struct {
+	ID int64 `json:"id"`
 }
 
 type ProgProjectLink struct {
@@ -53,4 +65,8 @@ type Task struct {
 	LastMod   time.Time      `json:"last_mod"`
 	DueDate   sql.NullTime   `json:"due_date"`
 	AreaID    sql.NullInt64  `json:"area_id"`
+}
+
+type TaskID struct {
+	ID int64 `json:"id"`
 }

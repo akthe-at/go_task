@@ -118,11 +118,11 @@ func (q *Queries) CreateProjectTaskLink(ctx context.Context, arg CreateProjectTa
 
 const createTask = `-- name: CreateTask :execlastid
 INSERT INTO tasks (
-    title, priority, status, archived, due_date, area_id,
+    id, title, priority, status, archived, due_date, area_id,
     created_at, last_mod
 )
 VALUES (
-    ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?,
     datetime(current_timestamp, 'localtime'),
     datetime(current_timestamp, 'localtime')
 )
@@ -130,6 +130,7 @@ returning id
 `
 
 type CreateTaskParams struct {
+	ID       int64          `json:"id"`
 	Title    string         `json:"title"`
 	Priority sql.NullString `json:"priority"`
 	Status   sql.NullString `json:"status"`
@@ -140,6 +141,7 @@ type CreateTaskParams struct {
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createTask,
+		arg.ID,
 		arg.Title,
 		arg.Priority,
 		arg.Status,
@@ -284,6 +286,20 @@ func (q *Queries) DeleteTask(ctx context.Context, id int64) (int64, error) {
 	return id, err
 }
 
+const deleteTaskID = `-- name: DeleteTaskID :execlastid
+DELETE FROM task_ids
+WHERE id = ?
+returning id
+`
+
+func (q *Queries) DeleteTaskID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteTaskID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const deleteTasks = `-- name: DeleteTasks :execrows
 DELETE FROM tasks
 WHERE id in (/*SLICE:ids*/?)
@@ -351,6 +367,17 @@ func (q *Queries) FindProgProjectsForTask(ctx context.Context, parentTaskID sql.
 	return i, err
 }
 
+const getTaskID = `-- name: GetTaskID :one
+SELECT id FROM task_ids LIMIT 1
+`
+
+func (q *Queries) GetTaskID(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getTaskID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertProgProject = `-- name: InsertProgProject :one
 INSERT INTO programming_projects (path)
 VALUES (?)
@@ -362,6 +389,19 @@ func (q *Queries) InsertProgProject(ctx context.Context, path string) (int64, er
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const noTaskIDs = `-- name: NoTaskIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM tasks
+WHERE id < 999
+`
+
+func (q *Queries) NoTaskIDs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, noTaskIDs)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const readAllAreaNotes = `-- name: ReadAllAreaNotes :many
@@ -1131,6 +1171,19 @@ func (q *Queries) ReadTasks(ctx context.Context) ([]ReadTasksRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const recycleTaskID = `-- name: RecycleTaskID :execlastid
+INSERT INTO task_ids (id) VALUES (?)
+returning id
+`
+
+func (q *Queries) RecycleTaskID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, recycleTaskID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 const updateAreaArchived = `-- name: UpdateAreaArchived :execresult

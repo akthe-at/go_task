@@ -2,7 +2,7 @@ PRAGMA foreign_keys=ON;
 PRAGMA journal_mode=WAL;
 
 CREATE TABLE IF NOT EXISTS areas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     title TEXT NOT NULL,
     status TEXT,
     archived BOOLEAN NOT NULL DEFAULT 0,
@@ -10,8 +10,24 @@ CREATE TABLE IF NOT EXISTS areas (
     last_mod TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime'))
 );
 
+CREATE TABLE IF NOT EXISTS task_ids (
+  id integer PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS area_ids (
+  id integer PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS prog_proj_ids (
+  id integer PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS note_ids (
+  id integer PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     title TEXT NOT NULL,
     priority TEXT,
     status TEXT,
@@ -38,7 +54,7 @@ BEGIN
 END;
 
 CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     title TEXT NOT NULL,
     path TEXT NOT NULL,
 FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -57,7 +73,7 @@ CREATE TABLE IF NOT EXISTS bridge_notes (
 );
 
 CREATE TABLE IF NOT EXISTS programming_projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     path TEXT NOT NULL UNIQUE
 );
 

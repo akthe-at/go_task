@@ -1,3 +1,20 @@
+-- name: GetTaskID :one
+SELECT id FROM task_ids LIMIT 1;
+
+-- name: NoTaskIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM tasks
+WHERE id < 999;
+
+-- name: DeleteTaskID :execlastid
+DELETE FROM task_ids
+WHERE id = ?
+returning id;
+
+-- name: RecycleTaskID :execlastid
+INSERT INTO task_ids (id) VALUES (?)
+returning id;
+
 -- name: CreateNote :execlastid
 INSERT INTO notes (title, path) VALUES (?, ?)
 returning id;
@@ -223,11 +240,11 @@ returning *;
 
 -- name: CreateTask :execlastid
 INSERT INTO tasks (
-    title, priority, status, archived, due_date, area_id,
+    id, title, priority, status, archived, due_date, area_id,
     created_at, last_mod
 )
 VALUES (
-    ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?,
     datetime(current_timestamp, 'localtime'),
     datetime(current_timestamp, 'localtime')
 )

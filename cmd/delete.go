@@ -80,12 +80,17 @@ var deleteTaskCmd = &cobra.Command{
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
-		_, err = queries.DeleteTasks(ctx, taskIDs)
-		if err != nil {
-			log.Fatalf("Error deleting task(s): %v", err)
-		} else {
-			log.Printf("Succesfully Deleted!")
+		for _, taskID := range taskIDs {
+			_, err := queries.DeleteTask(ctx, taskID)
+			if err != nil {
+				log.Fatalf("Error deleting task: %v", err)
+			}
+			_, err = queries.RecycleTaskID(ctx, taskID)
+			if err != nil {
+				log.Fatalf("Error recycling task ID: %v", err)
+			}
 		}
+		fmt.Println("Succesfully Deleted!")
 	},
 }
 
