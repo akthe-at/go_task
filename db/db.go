@@ -3,7 +3,10 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -11,14 +14,30 @@ import (
 // ConnectDB opens a connection to a SQLite database.
 // It returns a pointer to the sql.DB object and an error if any occurs.
 func ConnectDB() (*sql.DB, error) {
-	// FIXME: This needs to point at a config set db path or a default backup. Or perhaps embedded?
-	XDG_DATA_HOME := os.Getenv("XDG_DATA_HOME")
-	dbPath := XDG_DATA_HOME + "/go_task"
+	var dbPath string
+	switch runtime.GOOS {
+	case "windows":
+		if windowsConfigDir := os.Getenv("LOCALAPPDATA"); windowsConfigDir != "" {
+			dbPath = filepath.Join(windowsConfigDir, "go_task")
+		} else {
+			log.Fatalf("LOCALAPPDATA is not set")
+		}
+	case "linux":
+		if xdgConfig := os.Getenv("XDG_DATA_HOME"); xdgConfig != "" {
+			dbPath = filepath.Join(xdgConfig, "go_task")
+		} else {
+			log.Fatalf("XDG_DATA_HOME is not set")
+		}
+		err := os.MkdirAll(dbPath, os.ModePerm)
+		if err != nil {
+			log.Fatalf("failed to create directory: %v", err)
+		}
+	}
 	err := os.MkdirAll(dbPath, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create directory: %2", err)
+		return nil, fmt.Errorf("failed to create directory: %v", err)
 	}
-	db, err := sql.Open("sqlite3", XDG_DATA_HOME+"/go_task/taskdb.db")
+	db, err := sql.Open("sqlite3", dbPath+"/taskdb.db")
 	if err != nil {
 		return nil, fmt.Errorf("invalid sql.Open() arguments: %w", err)
 	}
