@@ -1,3 +1,21 @@
+-- name: GetAreaID :one
+SELECT ID
+FROM area_ids LIMIT 1;
+
+-- name: NoAreaIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM areas
+WHERE id < 999;
+
+-- name: DeleteAreaID :execlastid
+DELETE FROM area_ids
+WHERE id = ?
+returning id;
+
+-- name: RecycleAreaID :execlastid
+INSERT INTO area_ids (id) VALUES (?)
+returning id;
+
 -- name: GetTaskID :one
 SELECT id FROM task_ids LIMIT 1;
 
@@ -180,8 +198,8 @@ DELETE FROM notes WHERE id in (sqlc.slice(ids))
 returning *;
 
 -- name: CreateArea :execlastid
-INSERT INTO areas (title, status, archived)
-VALUES (?, ?, ?)
+INSERT INTO areas (id, title, status, archived)
+VALUES (?, ?, ?, ?)
 returning id;
 
 -- name: ReadArea :one

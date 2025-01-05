@@ -251,7 +251,6 @@ var addAreaCmd = &cobra.Command{
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
-
 		if !rawFlag && len(args) > 1 {
 			log.Fatalf("You passed too many arguments for the form input, did you mean to use the --raw flag?")
 		}
@@ -274,7 +273,23 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
-			areaID, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+			areaID, err = queries.GetAreaID(ctx)
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error getting area ID: %v", err)
+			}
+			if err == sql.ErrNoRows {
+				areaID, err = queries.NoAreaIDs(ctx)
+				if err != nil {
+					log.Fatalf("Failed to find the next available area ID: %v", err)
+				} else {
+					_, err = queries.DeleteAreaID(ctx, areaID)
+					if err != nil {
+						log.Fatalf("Error deleting area ID: %v", err)
+					}
+				}
+			}
+			_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+				ID:       areaID,
 				Title:    inputTitle,
 				Status:   sql.NullString{String: string(validStatus), Valid: true},
 				Archived: archived,
@@ -296,7 +311,24 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 			}
 
 			if form.Submit {
-				areaID, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+
+				areaID, err = queries.GetAreaID(ctx)
+				if err != nil && err != sql.ErrNoRows {
+					log.Fatalf("Error getting area ID: %v", err)
+				}
+				if err == sql.ErrNoRows {
+					areaID, err = queries.NoAreaIDs(ctx)
+					if err != nil {
+						log.Fatalf("Failed to find the next available area ID: %v", err)
+					} else {
+						_, err = queries.DeleteAreaID(ctx, areaID)
+						if err != nil {
+							log.Fatalf("Error deleting area ID: %v", err)
+						}
+					}
+				}
+				_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+					ID:       areaID,
 					Title:    form.AreaTitle,
 					Status:   sql.NullString{String: string(form.Status), Valid: true},
 					Archived: form.Archived,

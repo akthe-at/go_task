@@ -140,6 +140,13 @@ var deleteAreaCmd = &cobra.Command{
 
 		qtx := queries.WithTx(tx)
 
+		for _, areaID := range areaIDs {
+			_, err = queries.RecycleAreaID(ctx, areaID)
+		}
+		if err != nil {
+			log.Fatalf("Error recycling area ID: %v", err)
+		}
+
 		_, err = qtx.DeleteMultipleAreas(ctx, areaIDs)
 		if err != nil {
 			log.Fatalf("Error deleting area(s): %v", err)
@@ -165,13 +172,5 @@ func init() {
 	deleteCmd.AddCommand(deleteTaskCmd)
 	deleteCmd.AddCommand(deleteAreaCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// deleteCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
 	deleteAreaCmd.PersistentFlags().BoolVar(&deleteNotes, "notes", false, "Pass this flag to delete the notes associated with the area that is to be deleted.")
 }

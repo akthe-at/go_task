@@ -27,19 +27,25 @@ func (q *Queries) CheckProgProjectExists(ctx context.Context, path string) (int6
 }
 
 const createArea = `-- name: CreateArea :execlastid
-INSERT INTO areas (title, status, archived)
-VALUES (?, ?, ?)
+INSERT INTO areas (id, title, status, archived)
+VALUES (?, ?, ?, ?)
 returning id
 `
 
 type CreateAreaParams struct {
+	ID       int64          `json:"id"`
 	Title    string         `json:"title"`
 	Status   sql.NullString `json:"status"`
 	Archived bool           `json:"archived"`
 }
 
 func (q *Queries) CreateArea(ctx context.Context, arg CreateAreaParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createArea, arg.Title, arg.Status, arg.Archived)
+	result, err := q.db.ExecContext(ctx, createArea,
+		arg.ID,
+		arg.Title,
+		arg.Status,
+		arg.Archived,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -167,6 +173,20 @@ type CreateTaskBridgeNoteParams struct {
 
 func (q *Queries) CreateTaskBridgeNote(ctx context.Context, arg CreateTaskBridgeNoteParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createTaskBridgeNote, arg.NoteID, arg.ParentCat, arg.ParentTaskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const deleteAreaID = `-- name: DeleteAreaID :execlastid
+DELETE FROM area_ids
+WHERE id = ?
+returning id
+`
+
+func (q *Queries) DeleteAreaID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAreaID, id)
 	if err != nil {
 		return 0, err
 	}
@@ -367,6 +387,18 @@ func (q *Queries) FindProgProjectsForTask(ctx context.Context, parentTaskID sql.
 	return i, err
 }
 
+const getAreaID = `-- name: GetAreaID :one
+SELECT ID
+FROM area_ids LIMIT 1
+`
+
+func (q *Queries) GetAreaID(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getAreaID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getTaskID = `-- name: GetTaskID :one
 SELECT id FROM task_ids LIMIT 1
 `
@@ -389,6 +421,19 @@ func (q *Queries) InsertProgProject(ctx context.Context, path string) (int64, er
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const noAreaIDs = `-- name: NoAreaIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM areas
+WHERE id < 999
+`
+
+func (q *Queries) NoAreaIDs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, noAreaIDs)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const noTaskIDs = `-- name: NoTaskIDs :one
@@ -1171,6 +1216,19 @@ func (q *Queries) ReadTasks(ctx context.Context) ([]ReadTasksRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const recycleAreaID = `-- name: RecycleAreaID :execlastid
+INSERT INTO area_ids (id) VALUES (?)
+returning id
+`
+
+func (q *Queries) RecycleAreaID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, recycleAreaID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 const recycleTaskID = `-- name: RecycleTaskID :execlastid

@@ -355,7 +355,23 @@ func (m *AreasModel) addArea() tea.Cmd {
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
+		areaID, err := queries.GetAreaID(ctx)
+		if err != nil && err != sql.ErrNoRows {
+			log.Fatalf("Error getting area ID: %v", err)
+		}
+		if err == sql.ErrNoRows {
+			areaID, err = queries.NoAreaIDs(ctx)
+			if err != nil {
+				log.Fatalf("Failed to find the next available area ID: %v", err)
+			} else {
+				_, err = queries.DeleteAreaID(ctx, areaID)
+				if err != nil {
+					log.Fatalf("Error deleting area ID: %v", err)
+				}
+			}
+		}
 		newArea := sqlc.CreateAreaParams{
+			ID:       areaID,
 			Title:    form.AreaTitle,
 			Status:   sql.NullString{String: string(form.Status), Valid: true},
 			Archived: form.Archived,
@@ -527,6 +543,10 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 		if err != nil {
 			log.Fatalf("Error deleting area: %s", err)
 		}
+		_, err = queries.RecycleAreaID(ctx, areaID)
+		if err != nil {
+			log.Fatalf("Error recycling area ID: %s", err)
+		}
 		if deletedID != areaID {
 			log.Fatalf("Error deleting area: %s", err)
 		} else {
@@ -559,12 +579,11 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 			}
 			areasToDelete[idx] = converted_id
 		}
-		result, err := queries.DeleteTasks(ctx, areasToDelete)
-		if err != nil {
-			log.Fatalf("Error deleting areas: %s", err)
-		}
-		if result != int64(len(selectedIDs)) {
-			log.Fatalf("Error deleting areas - Mismatch between selectedIDs and numDeleted: %s", err)
+		for _, areaID := range areasToDelete {
+			_, err := queries.DeleteSingleArea(ctx, areaID)
+			if err != nil {
+				log.Fatalf("Error recycling area ID: %v", err)
+			}
 		}
 		m.deleteMessage = fmt.Sprintf("You deleted these areas:  IDs: %s", strings.Join(selectedIDs, ", "))
 	}
