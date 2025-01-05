@@ -439,7 +439,7 @@ OR to generate a new note AND add it to a specific task:
 
 			noteID, err := qtx.GetNoteID(ctx)
 			if err != nil && err != sql.ErrNoRows {
-				log.Fatalf("Error getting note ID: %w", err)
+				log.Fatalf("Error getting note ID: %v", err)
 			}
 			if err == sql.ErrNoRows {
 				noteID, err = qtx.NoNoteIDs(ctx)
@@ -448,7 +448,7 @@ OR to generate a new note AND add it to a specific task:
 				} else {
 					_, err = qtx.DeleteNoteID(ctx, noteID)
 					if err != nil {
-						log.Fatalf("Error deleting note ID: %w", err)
+						log.Fatalf("Error deleting note ID: %v", err)
 					}
 				}
 			}
@@ -524,7 +524,7 @@ OR to generate a new note AND add it to a specific task:
 
 			noteID, err := qtx.GetNoteID(ctx)
 			if err != nil && err != sql.ErrNoRows {
-				log.Fatalf("Error getting note ID: %w", err)
+				log.Fatalf("Error getting note ID: %v", err)
 			}
 			if err == sql.ErrNoRows {
 				noteID, err = qtx.NoNoteIDs(ctx)
@@ -533,7 +533,7 @@ OR to generate a new note AND add it to a specific task:
 				} else {
 					_, err = qtx.DeleteNoteID(ctx, noteID)
 					if err != nil {
-						log.Fatalf("Error deleting note ID: %w", err)
+						log.Fatalf("Error deleting note ID: %v", err)
 					}
 				}
 			}
@@ -637,12 +637,12 @@ OR to generate a new note AND add it to a specific area:
 
 			err = form.NewNoteForm(*tui.ThemeGoTask(theme))
 			if err != nil {
-				log.Fatalf("Error creating form: %w", err)
+				log.Fatalf("Error creating form: %v", err)
 			}
 
 			noteID, err := qtx.GetNoteID(ctx)
 			if err != nil && err != sql.ErrNoRows {
-				log.Fatalf("Error getting note ID: %w", err)
+				log.Fatalf("Error getting note ID: %v", err)
 			}
 			if err == sql.ErrNoRows {
 				noteID, err = qtx.NoNoteIDs(ctx)
@@ -651,7 +651,7 @@ OR to generate a new note AND add it to a specific area:
 				} else {
 					_, err = qtx.DeleteNoteID(ctx, noteID)
 					if err != nil {
-						log.Fatalf("Error deleting note ID: %w", err)
+						log.Fatalf("Error deleting note ID: %v", err)
 					}
 				}
 			}
@@ -741,16 +741,16 @@ OR to generate a new note AND add it to a specific area:
 
 				noteID, err := qtx.GetNoteID(ctx)
 				if err != nil && err != sql.ErrNoRows {
-					log.Fatalf("Error getting note ID: %w", err)
+					log.Fatalf("Error getting note ID: %v", err)
 				}
 				if err == sql.ErrNoRows {
 					noteID, err = qtx.NoNoteIDs(ctx)
 					if err != nil {
-						log.Fatalf("Failed to find the next available note ID: %w", err)
+						log.Fatalf("Failed to find the next available note ID: %v", err)
 					} else {
 						_, err = qtx.DeleteNoteID(ctx, noteID)
 						if err != nil {
-							log.Fatalf("Error deleting note ID: %w", err)
+							log.Fatalf("Error deleting note ID: %v", err)
 						}
 					}
 				}
@@ -760,7 +760,7 @@ OR to generate a new note AND add it to a specific area:
 					Path:  outputPath,
 				})
 				if err != nil {
-					log.Fatalf("addAreaNoteCmd: There was an error creating the note: %w", err)
+					log.Fatalf("addAreaNoteCmd: There was an error creating the note: %v", err)
 				}
 
 				_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
@@ -769,22 +769,22 @@ OR to generate a new note AND add it to a specific area:
 					ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
 				})
 				if err != nil {
-					log.Fatalf("addAreaNoteCmd: Error creating area bridge note: %w", err)
+					log.Fatalf("addAreaNoteCmd: Error creating area bridge note: %v", err)
 				}
 
 				ok, projectDir, err := utils.CheckIfProjDir()
 				if err != nil {
-					log.Fatalf("Error while checking if in a project directory: %w", err)
+					log.Fatalf("Error while checking if in a project directory: %v", err)
 				}
 				if ok {
 					projID, err := qtx.CheckProgProjectExists(ctx, projectDir)
 					if err != nil {
-						log.Fatalf("Error while checking if project exists: %w", err)
+						log.Fatalf("Error while checking if project exists: %v", err)
 					}
 					if projID == 0 {
 						projID, err = qtx.InsertProgProject(ctx, projectDir)
 						if err != nil {
-							log.Fatalf("Error inserting project: %w", err)
+							log.Fatalf("Error inserting project: %v", err)
 						}
 					}
 
@@ -794,7 +794,7 @@ OR to generate a new note AND add it to a specific area:
 						ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
 					})
 					if err != nil {
-						log.Fatalf("Error inserting project link: %w", err)
+						log.Fatalf("Error inserting project link: %v", err)
 					}
 				}
 			} else {
@@ -804,16 +804,16 @@ OR to generate a new note AND add it to a specific area:
 
 				noteID, err := qtx.GetNoteID(ctx)
 				if err != nil && err != sql.ErrNoRows {
-					log.Fatalf("Error getting note ID: %w", err)
+					log.Fatalf("Error getting note ID: %v", err)
 				}
 				if err == sql.ErrNoRows {
 					noteID, err = qtx.NoNoteIDs(ctx)
 					if err != nil {
-						log.Fatalf("Failed to find the next available note ID: %w", err)
+						log.Fatalf("Failed to find the next available note ID: %v", err)
 					} else {
 						_, err = qtx.DeleteNoteID(ctx, noteID)
 						if err != nil {
-							log.Fatalf("Error deleting note ID: %w", err)
+							log.Fatalf("Error deleting note ID: %v", err)
 						}
 					}
 				}
@@ -824,7 +824,7 @@ OR to generate a new note AND add it to a specific area:
 					Path:  inputNotePath,
 				})
 				if err != nil {
-					fmt.Printf("addAreaNoteCmd: There was an error creating the note: %w", err)
+					fmt.Printf("addAreaNoteCmd: There was an error creating the note: %v", err)
 				}
 
 				_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
@@ -833,22 +833,22 @@ OR to generate a new note AND add it to a specific area:
 					ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
 				})
 				if err != nil {
-					log.Fatalf("addAreaNoteCmd: Error creating task bridge note: %w", err)
+					log.Fatalf("addAreaNoteCmd: Error creating task bridge note: %v", err)
 				}
 
 				ok, projectDir, err := utils.CheckIfProjDir()
 				if err != nil {
-					log.Fatalf("Error while checking if in a project directory: %w", err)
+					log.Fatalf("Error while checking if in a project directory: %v", err)
 				}
 				if ok {
 					projID, err := qtx.CheckProgProjectExists(ctx, projectDir)
 					if err != nil {
-						log.Fatalf("Error while checking if project exists: %w", err)
+						log.Fatalf("Error while checking if project exists: %v", err)
 					}
 					if projID == 0 {
 						project, err := qtx.InsertProgProject(ctx, projectDir)
 						if err != nil {
-							log.Fatalf("Error while inserting project: %w", err)
+							log.Fatalf("Error while inserting project: %v", err)
 						}
 						err = qtx.CreateProjectAreaLink(ctx,
 							sqlc.CreateProjectAreaLinkParams{
