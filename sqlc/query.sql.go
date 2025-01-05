@@ -70,22 +70,19 @@ func (q *Queries) CreateAreaBridgeNote(ctx context.Context, arg CreateAreaBridge
 	return result.LastInsertId()
 }
 
-const createNote = `-- name: CreateNote :execlastid
-INSERT INTO notes (title, path) VALUES (?, ?)
-returning id
+const createNote = `-- name: CreateNote :exec
+INSERT INTO notes (id, title, path) VALUES (?, ?, ?)
 `
 
 type CreateNoteParams struct {
+	ID    int64  `json:"id"`
 	Title string `json:"title"`
 	Path  string `json:"path"`
 }
 
-func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createNote, arg.Title, arg.Path)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) error {
+	_, err := q.db.ExecContext(ctx, createNote, arg.ID, arg.Title, arg.Path)
+	return err
 }
 
 const createProjectAreaLink = `-- name: CreateProjectAreaLink :exec

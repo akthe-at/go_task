@@ -60,9 +60,8 @@ returning id;
 INSERT INTO task_ids (id) VALUES (?)
 returning id;
 
--- name: CreateNote :execlastid
-INSERT INTO notes (title, path) VALUES (?, ?)
-returning id;
+-- name: CreateNote :exec
+INSERT INTO notes (id, title, path) VALUES (?, ?, ?);
 
 -- name: CreateTaskBridgeNote :execlastid
 INSERT INTO bridge_notes (note_id, parent_cat, parent_task_id) VALUES (?, ?, ?);
