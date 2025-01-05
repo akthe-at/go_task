@@ -154,6 +154,16 @@ var deleteAreaCmd = &cobra.Command{
 
 		if deleteNotes {
 			_, err = qtx.DeleteNotes(ctx, areaIDs)
+			for _, noteID := range areaIDs {
+				_, err := queries.DeleteNote(ctx, noteID)
+				if err != nil {
+					log.Fatalf("Error deleting task: %s", err)
+				}
+				_, err = queries.RecycleNoteID(ctx, noteID)
+				if err != nil {
+					log.Fatalf("Error recycling note ID: %v", err)
+				}
+			}
 			if err != nil {
 				log.Fatalf("There was an error deleting the notes associated with the area(s): %v", err)
 			}
