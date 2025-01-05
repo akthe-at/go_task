@@ -369,39 +369,48 @@ func (m *NotesModel) deleteNote() tea.Cmd {
 	for _, row := range m.tableModel.SelectedRows() {
 		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(int64))
 	}
-	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
+	noteID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
 
 	conn, _, err := db.ConnectDB()
 	if err != nil {
-		log.Printf("Error connecting to database: %s", err)
+		log.Fatalf("Error connecting to database: %s", err)
 		return nil
 	}
 	defer conn.Close()
 	queries := sqlc.New(conn)
 
 	if len(selectedIDs) == 1 {
-		_, err := queries.DeleteNote(ctx, int64(taskID))
+		_, err := queries.DeleteNote(ctx, noteID)
 		if err != nil {
-			log.Printf("Error deleting task: %s", err)
+			log.Fatalf("Error deleting task: %s", err)
 			return nil
 		}
-		// m.deleteMessage = fmt.Sprintf("You deleted this task:  IDs: %s", deletedNote.ID)
-	} else if len(selectedIDs) > 1 {
-		_, err := queries.DeleteNotes(ctx, selectedIDs)
+		_, err = queries.RecycleNoteID(ctx, noteID)
 		if err != nil {
-			log.Printf("Error deleting tasks: %s", err)
-			return nil
+			log.Fatalf("Error recycling note ID: %v", err)
 		}
 
+	} else if len(selectedIDs) > 1 {
+		for _, noteID := range selectedIDs {
+			_, err := queries.DeleteNote(ctx, noteID)
+			if err != nil {
+				log.Fatalf("Error deleting task: %s", err)
+				return nil
+			}
+			_, err = queries.RecycleNoteID(ctx, noteID)
+			if err != nil {
+				log.Fatalf("Error recycling note ID: %v", err)
+				return nil
+			}
+		}
 	}
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
-		log.Printf("Error loading rows from database: %s", err)
+		log.Fatalf("Error loading rows from database: %s", err)
 		return nil
 	}
 	m.tableModel = m.tableModel.WithRows(rows)
 
-	// Update the footer
 	m.updateFooter()
 
 	return nil
