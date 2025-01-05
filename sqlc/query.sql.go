@@ -227,6 +227,20 @@ func (q *Queries) DeleteNote(ctx context.Context, id int64) (Note, error) {
 	return i, err
 }
 
+const deleteNoteID = `-- name: DeleteNoteID :execlastid
+DELETE FROM note_ids
+WHERE id = ?
+returning id
+`
+
+func (q *Queries) DeleteNoteID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteNoteID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const deleteNotes = `-- name: DeleteNotes :execresult
 DELETE FROM notes WHERE id in (/*SLICE:ids*/?)
 returning id, title, path
@@ -392,8 +406,26 @@ SELECT ID
 FROM area_ids LIMIT 1
 `
 
+// ----------
+// - area_ids
+// ----------
 func (q *Queries) GetAreaID(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, getAreaID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getNoteID = `-- name: GetNoteID :one
+SELECT ID
+FROM note_ids LIMIT 1
+`
+
+// ----------
+// - note_ids
+// ----------
+func (q *Queries) GetNoteID(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getNoteID)
 	var id int64
 	err := row.Scan(&id)
 	return id, err
@@ -403,6 +435,9 @@ const getTaskID = `-- name: GetTaskID :one
 SELECT id FROM task_ids LIMIT 1
 `
 
+// ----------
+// - task_ids
+// ----------
 func (q *Queries) GetTaskID(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, getTaskID)
 	var id int64
@@ -431,6 +466,19 @@ WHERE id < 999
 
 func (q *Queries) NoAreaIDs(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, noAreaIDs)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const noNoteIDs = `-- name: NoNoteIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM notes
+WHERE id < 999
+`
+
+func (q *Queries) NoNoteIDs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, noNoteIDs)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -1225,6 +1273,19 @@ returning id
 
 func (q *Queries) RecycleAreaID(ctx context.Context, id int64) (int64, error) {
 	result, err := q.db.ExecContext(ctx, recycleAreaID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const recycleNoteID = `-- name: RecycleNoteID :execlastid
+INSERT INTO note_ids (id) VALUES (?)
+returning id
+`
+
+func (q *Queries) RecycleNoteID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, recycleNoteID, id)
 	if err != nil {
 		return 0, err
 	}
