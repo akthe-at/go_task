@@ -265,7 +265,24 @@ func (m *NotesModel) addNote() tea.Cmd {
 			queries := sqlc.New(conn)
 			defer conn.Close()
 
-			newNoteID, err := queries.CreateNote(ctx, sqlc.CreateNoteParams{
+			noteID, err := queries.GetNoteID(ctx)
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error getting note ID: %v", err)
+			}
+			if err == sql.ErrNoRows {
+				noteID, err = queries.NoNoteIDs(ctx)
+				if err != nil {
+					log.Fatalf("Failed to find the next available note ID: %v", err)
+				} else {
+					_, err = queries.DeleteNoteID(ctx, noteID)
+					if err != nil {
+						log.Fatalf("Error deleting note ID: %v", err)
+					}
+				}
+			}
+
+			err = queries.CreateNote(ctx, sqlc.CreateNoteParams{
+				ID:    noteID,
 				Title: form.Title,
 				Path:  form.Path,
 			},
@@ -277,7 +294,7 @@ func (m *NotesModel) addNote() tea.Cmd {
 			switch form.Type {
 			case data.TaskNoteType:
 				_, err = queries.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: newNoteID, Valid: true},
+					NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
 					ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 					ParentTaskID: sql.NullInt64{Int64: int64(form.ParentID), Valid: true},
 				},
@@ -288,7 +305,7 @@ func (m *NotesModel) addNote() tea.Cmd {
 				}
 			case data.AreaNoteType:
 				_, err := queries.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: newNoteID, Valid: true},
+					NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
 					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
 					ParentAreaID: sql.NullInt64{Int64: int64(form.ParentID), Valid: true},
 				},

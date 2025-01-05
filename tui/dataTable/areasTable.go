@@ -303,7 +303,24 @@ func (m *AreasModel) addNote() tea.Cmd {
 
 		queries := sqlc.New(conn)
 		defer conn.Close()
-		noteID, err := queries.CreateNote(ctx, newNote)
+
+		noteID, err := queries.GetNoteID(ctx)
+		if err != nil && err != sql.ErrNoRows {
+			log.Fatalf("Error getting note ID: %v", err)
+		}
+		if err == sql.ErrNoRows {
+			noteID, err = queries.NoNoteIDs(ctx)
+			if err != nil {
+				log.Fatalf("Failed to find the next available note ID: %v", err)
+			} else {
+				_, err = queries.DeleteNoteID(ctx, noteID)
+				if err != nil {
+					log.Fatalf("Error deleting note ID: %v", err)
+				}
+			}
+		}
+
+		err = queries.CreateNote(ctx, newNote)
 		if err != nil {
 			log.Fatalf("Error creating note: %v", err)
 		}
