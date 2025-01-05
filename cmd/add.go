@@ -57,7 +57,7 @@ var addTaskCmd = &cobra.Command{
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -244,7 +244,7 @@ var addAreaCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		var areaID int64
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -421,7 +421,7 @@ OR to generate a new note AND add it to a specific task:
 			}
 
 			ctx := context.Background()
-			conn, err := db.ConnectDB()
+			conn, _, err := db.ConnectDB()
 			if err != nil {
 				log.Fatalf("Error connecting to database: %v", err)
 			}
@@ -490,7 +490,7 @@ OR to generate a new note AND add it to a specific task:
 			}
 
 			ctx := context.Background()
-			conn, err := db.ConnectDB()
+			conn, _, err := db.ConnectDB()
 			if err != nil {
 				log.Fatalf("Error connecting to database: %v", err)
 			}
@@ -570,7 +570,7 @@ OR to generate a new note AND add it to a specific area:
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}

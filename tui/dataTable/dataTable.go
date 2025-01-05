@@ -155,7 +155,7 @@ func (m TaskModel) calculateHeight() int {
 
 func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 	ctx := context.Background()
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -207,7 +207,7 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 
 func (m *TaskModel) filterRows() tea.Cmd {
 	ctx := context.Background()
-	dbConn, err := db.ConnectDB()
+	dbConn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Fatalf("There was an issue connecting to the database: %s", err)
 	}
@@ -287,7 +287,7 @@ func (m *TaskModel) addNote() tea.Cmd {
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -339,7 +339,7 @@ func (m *TaskModel) addTask() tea.Cmd {
 
 	if form.Submit {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -437,7 +437,7 @@ func (m *TaskModel) addTask() tea.Cmd {
 func (m *TaskModel) togglePriorityStatus() tea.Cmd {
 	selectedIDs := make(map[int64]data.PriorityType)
 	ctx := context.Background()
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		slog.Error("TaskModel - togglePriorityStatus: Error connecting to database: %v", "error", err)
 		return nil
@@ -512,7 +512,7 @@ func (m *TaskModel) archiveTask() tea.Cmd {
 		selectedIDs[convertedID] = parsedArchiveStatus
 	}
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		slog.Error("TaskModel - archiveTask: Error connecting to database: %v", "error", err)
 		return nil
@@ -575,7 +575,7 @@ func (m *TaskModel) updateStatus(newStatus data.StatusType) tea.Cmd {
 		selectedIDs = append(selectedIDs, convertedID)
 	}
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		slog.Error("TaskModel - UpdateStatus: Error connecting to database: %v", "error", err)
 		return nil
@@ -633,7 +633,7 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		return nil
 	}
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Printf("Error connecting to database: %s", err)
 		return nil

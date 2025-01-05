@@ -159,7 +159,7 @@ func NotesView() NotesModel {
 	model := NotesModel{}
 	var filteredRows []table.Row
 	ctx := context.Background()
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Panicf("Notes View: There was an error connecting to the database: %v", err)
 	}
@@ -258,7 +258,7 @@ func (m *NotesModel) addNote() tea.Cmd {
 
 		if form.Submit {
 			ctx := context.Background()
-			conn, err := db.ConnectDB()
+			conn, _, err := db.ConnectDB()
 			if err != nil {
 				log.Panicf("error connecting to database: %v", err)
 			}
@@ -319,7 +319,7 @@ func (m *NotesModel) loadRowsFromDatabase() ([]table.Row, error) {
 	var filteredRows []table.Row
 	ctx := context.Background()
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		return nil, fmt.Errorf("loadRowsFromDatabase: error connecting to database: %w", err)
 	}
@@ -354,7 +354,7 @@ func (m *NotesModel) deleteNote() tea.Cmd {
 	}
 	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Printf("Error connecting to database: %s", err)
 		return nil
@@ -400,7 +400,7 @@ func (m *NotesModel) openNote() tea.Cmd {
 	}
 	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Printf("Error connecting to database: %s", err)
 		return nil

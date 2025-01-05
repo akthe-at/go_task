@@ -110,7 +110,7 @@ func fetchNoteParent(selection data.NoteType) []huh.Option[int] {
 	var options []huh.Option[int]
 	ctx := context.Background()
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Errorf("There was an error connecting to the database: %v", err)
 	}

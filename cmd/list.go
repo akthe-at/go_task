@@ -70,7 +70,7 @@ var taskCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("There was an error connecting to the database: %v", err)
 		}
@@ -96,7 +96,7 @@ var tasksCmd = &cobra.Command{
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
@@ -121,7 +121,7 @@ var taskNotesCmd = &cobra.Command{
 		ctx := context.Background()
 		var taskID int
 
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("There was an error connecting to the database: %v", err)
 		}
@@ -153,7 +153,7 @@ var allNotesCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
@@ -178,7 +178,7 @@ var projectsCmd = &cobra.Command{
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}

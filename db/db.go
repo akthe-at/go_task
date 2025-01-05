@@ -13,7 +13,7 @@ import (
 
 // ConnectDB opens a connection to a SQLite database.
 // It returns a pointer to the sql.DB object and an error if any occurs.
-func ConnectDB() (*sql.DB, error) {
+func ConnectDB() (*sql.DB, string, error) {
 	var dbPath string
 	switch runtime.GOOS {
 	case "windows":
@@ -35,18 +35,19 @@ func ConnectDB() (*sql.DB, error) {
 	}
 	err := os.MkdirAll(dbPath, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create directory: %v", err)
+		return nil, "", fmt.Errorf("failed to create directory: %w", err)
 	}
 	db, err := sql.Open("sqlite3", dbPath+"/taskdb.db")
 	if err != nil {
-		return nil, fmt.Errorf("invalid sql.Open() arguments: %w", err)
+		return nil, "", fmt.Errorf("invalid sql.Open() arguments: %w", err)
 	}
+	completePath := dbPath + "/taskdb.db"
 
 	err = db.Ping()
 	if err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+		return nil, "", fmt.Errorf("failed to ping database: %w", err)
 	}
-	return db, nil
+	return db, completePath, nil
 }
 
 // FileExists This function checks if a file exists, if it does returns true.

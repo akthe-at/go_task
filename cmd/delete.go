@@ -73,7 +73,7 @@ var deleteTaskCmd = &cobra.Command{
 		fmt.Println("delete cmd invoked for task(s):", taskIDs)
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -125,7 +125,7 @@ var deleteAreaCmd = &cobra.Command{
 		fmt.Println("delete called for the following area(s):", areaIDs)
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}

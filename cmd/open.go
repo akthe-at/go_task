@@ -56,7 +56,7 @@ var noteCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
@@ -100,7 +100,7 @@ var notesCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}

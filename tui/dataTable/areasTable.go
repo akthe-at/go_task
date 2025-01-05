@@ -116,7 +116,7 @@ func (m AreasModel) calculateHeight() int {
 
 func (m *AreasModel) loadRowsFromDatabase() ([]table.Row, error) {
 	ctx := context.Background()
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -163,7 +163,7 @@ func (m *AreasModel) loadRowsFromDatabase() ([]table.Row, error) {
 
 func (m *AreasModel) filterRows() tea.Cmd {
 	ctx := context.Background()
-	dbConn, err := db.ConnectDB()
+	dbConn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Fatalf("There was an issue connecting to the database: %s", err)
 	}
@@ -220,7 +220,7 @@ func (m *AreasModel) updateStatus(newStatus data.StatusType) tea.Cmd {
 		selectedIDs = append(selectedIDs, convertedID)
 	}
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Fatalf("AreasModel - UpdateStatus: Error connecting to database: %v", err)
 	}
@@ -296,7 +296,7 @@ func (m *AreasModel) addNote() tea.Cmd {
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -348,7 +348,7 @@ func (m *AreasModel) addArea() tea.Cmd {
 
 	if form.Submit {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -463,7 +463,7 @@ func (m *AreasModel) addTaskToArea() tea.Cmd {
 
 	if form.Submit {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -514,7 +514,7 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 		return nil
 	}
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Fatalf("Error connecting to database: %s", err)
 	}
@@ -730,7 +730,7 @@ func (m *AreasModel) archiveArea() tea.Cmd {
 		selectedIDs[convertedID] = parsedArchiveStatus
 	}
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		slog.Error("AreasModel - archiveArea: Error connecting to database: %v", "error", err)
 		return nil

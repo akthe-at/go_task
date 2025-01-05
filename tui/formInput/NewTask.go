@@ -114,7 +114,7 @@ func (n *NewTaskForm) NewTaskForm(theme huh.Theme) error {
 
 func fetchAreas() []huh.Option[string] {
 	ctx := context.Background()
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Errorf("There was an error connecting to the database: %v", err)
 	}
@@ -139,7 +139,7 @@ func fetchProgProjects() []huh.Option[string] {
 	existingProjects := make(map[string]bool)
 
 	ctx := context.Background()
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Errorf("There was an error connecting to the database: %v", err)
 	}
