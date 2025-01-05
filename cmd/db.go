@@ -22,13 +22,9 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 
-	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
-	"github.com/akthe-at/go_task/sqlc"
 	"github.com/spf13/cobra"
 )
 
@@ -48,37 +44,24 @@ var dbInitCmd = &cobra.Command{
 	Long:  `This command will perform the initial setup of the sqlite database to hold the tasks and user data.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("DB is being setup...")
-
-		ctx := context.Background()
-		// Open a database connection
-		conn, err := db.ConnectDB()
+		conn, dbPath, err := db.ConnectDB()
 		if err != nil {
 			fmt.Println("Error opening database:", err)
 		}
 		defer conn.Close()
 
-		// FIXME: This path can't stay hard coded like this.
-		if !db.IsSetup(conn) && !db.FileExists("../new_demo.db") {
+		if !db.IsSetup(conn) && !db.FileExists(dbPath) {
 			fmt.Println("Setting up the database...")
-
 			err = db.SetupDB(conn)
 			if err != nil {
 				fmt.Println("Error setting up database:", err)
 			}
 		}
-
-		// // Create and Insert a new Task
-		test := sqlc.CreateTaskParams{
-			Title:    "do some laundry",
-			Priority: sql.NullString{String: string(data.PriorityTypeHigh), Valid: true},
-			Status:   sql.NullString{String: string(data.StatusToDo), Valid: true},
-		}
-		queries := sqlc.New(conn)
-		result, err := queries.CreateTask(ctx, test)
+		err = db.SetupDB(conn)
 		if err != nil {
-			fmt.Println("Error creating task:", err)
+			fmt.Println("Error setting up database:", err)
 		}
-		fmt.Println("Result:", result)
+		// }
 
 		fmt.Println("Setup complete")
 	},
@@ -91,7 +74,7 @@ var dbResetCmd = &cobra.Command{
 	The tables will be then recreated to their blank, default state.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Open a database connection
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			fmt.Println("Error opening database:", err)
 		}

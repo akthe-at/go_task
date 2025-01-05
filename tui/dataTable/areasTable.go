@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path"
 	"strconv"
@@ -33,13 +34,14 @@ const (
 
 // This is the task table "screen" model
 type AreasModel struct {
-	tableModel       table.Model
-	totalWidth       int
-	totalHeight      int
-	horizontalMargin int
-	verticalMargin   int
-	deleteMessage    string
-	archiveFilter    bool
+	tableModel           table.Model
+	totalWidth           int
+	totalHeight          int
+	horizontalMargin     int
+	verticalMargin       int
+	deleteMessage        string
+	archiveFilterEnabled bool
+	rowFilter            bool
 }
 
 // Init initializes the model (can use this to run commands upon model initialization)
@@ -63,6 +65,8 @@ func (m *AreasModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tea.Quit)
 		case "F":
 			cmds = append(cmds, m.filterArchives())
+		case "enter":
+			cmds = append(cmds, m.filterRows())
 		case "left":
 			if m.calculateWidth() > minWidth {
 				m.horizontalMargin++
@@ -112,7 +116,7 @@ func (m AreasModel) calculateHeight() int {
 
 func (m *AreasModel) loadRowsFromDatabase() ([]table.Row, error) {
 	ctx := context.Background()
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -140,64 +144,119 @@ func (m *AreasModel) loadRowsFromDatabase() ([]table.Row, error) {
 		})
 		rows = append(rows, row)
 	}
-	return rows, nil
+	filteredRows := []table.Row{}
+	for _, row := range rows {
+		archived, ok := row.Data[areaColumnKeyArchived]
+		if !ok {
+			log.Printf("Error getting archived status from row: %s", err)
+			return nil, err
+		}
+		if m.archiveFilterEnabled && archived == "false" {
+			filteredRows = append(filteredRows, row)
+		} else if !m.archiveFilterEnabled {
+			filteredRows = append(filteredRows, row)
+		}
+	}
+
+	return filteredRows, nil
 }
 
-func (m *AreasModel) filterArchives() tea.Cmd {
-	var filteredRows []table.Row
-	// toggle m.archiveFilter from current status
-	m.archiveFilter = !m.archiveFilter
+func (m *AreasModel) filterRows() tea.Cmd {
+	ctx := context.Background()
+	dbConn, _, err := db.ConnectDB()
+	if err != nil {
+		log.Fatalf("There was an issue connecting to the database: %s", err)
+	}
+	defer dbConn.Close()
+	queries := sqlc.New(dbConn)
+	m.rowFilter = !m.rowFilter
 
-	if m.archiveFilter {
-
-		rows, err := m.loadRowsFromDatabase()
+	if m.tableModel.HighlightedRow().Data[areaColumnKeyID] != nil {
+		rowID, err := strconv.ParseInt(m.tableModel.HighlightedRow().Data[areaColumnKeyID].(string), 10, 64)
 		if err != nil {
-			log.Printf("Error loading rows from database: %s", err)
+			log.Fatalf("Error converting ID to int: %s", err)
+		}
+
+		result, err := queries.ReadArea(ctx, rowID)
+		if err != nil {
+			slog.Error("Error reading area from database: %s", "error", err)
 			return nil
 		}
 
-		for _, row := range rows {
-			archived, ok := row.Data[areaColumnKeyArchived]
-			if !ok {
-				log.Printf("Error getting archived status from row: %s", err)
-				return nil
-			}
-			if archived == "false" {
-				filteredRows = append(filteredRows, row)
-			}
-		}
-
-		m.tableModel = m.tableModel.WithRows(filteredRows)
-
-		// Update the footer
-		m.updateFooter()
-
-		return nil
-	} else {
-		rows, err := m.loadRowsFromDatabase()
-		if err != nil {
-			log.Printf("Error loading rows from database: %s", err)
-			return nil
-		}
-
-		for _, row := range rows {
-			archived, ok := row.Data[areaColumnKeyArchived]
-			if !ok {
-				log.Printf("Error getting archived status from row: %s", err)
-				return nil
-			}
-			if archived == "true" {
-				filteredRows = append(filteredRows, row)
-			}
-		}
+		var rows []table.Row
+		row := table.NewRow(table.RowData{
+			areaColumnKeyID:       fmt.Sprintf("%d", result.ID),
+			areaColumnKeyProject:  result.Title,
+			areaColumnKeyStatus:   result.Status.String,
+			areaColumnKeyArchived: fmt.Sprintf("%t", result.Archived),
+			areaColumnKeyNotes:    fmt.Sprintf("%v", result.Title_2),
+		})
+		rows = append(rows, row)
 
 		m.tableModel = m.tableModel.WithRows(rows)
-
-		// Update the footer
 		m.updateFooter()
 
 		return nil
 	}
+	return nil
+}
+
+func (m *AreasModel) filterArchives() tea.Cmd {
+	m.archiveFilterEnabled = !m.archiveFilterEnabled
+	m.refreshTableData()
+
+	m.updateFooter()
+	return nil
+}
+
+func (m *AreasModel) updateStatus(newStatus data.StatusType) tea.Cmd {
+	var selectedIDs []int64
+	ctx := context.Background()
+	for _, row := range m.tableModel.SelectedRows() {
+		convertedID, err := strconv.ParseInt(row.Data[columnKeyID].(string), 10, 64)
+		if err != nil {
+			log.Fatalf("AreasModel - UpdateStatus: Error converting ID to int64: %v", err)
+		}
+		selectedIDs = append(selectedIDs, convertedID)
+	}
+
+	conn, _, err := db.ConnectDB()
+	if err != nil {
+		log.Fatalf("AreasModel - UpdateStatus: Error connecting to database: %v", err)
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			log.Fatalf("AreasModel - UpdateStatus: Error converting ID to int64: %v", err)
+		}
+
+		_, err = queries.UpdateAreaStatus(ctx, sqlc.UpdateAreaStatusParams{Status: sql.NullString{String: string(newStatus), Valid: true}, ID: taskID})
+		if err != nil {
+			log.Fatalf("AreasModel - UpdateStatus: Error updating Area status: %v", err)
+		}
+	} else if len(selectedIDs) >= 1 {
+		for _, ID := range selectedIDs {
+			_, err := queries.UpdateAreaStatus(ctx, sqlc.UpdateAreaStatusParams{Status: sql.NullString{String: string(newStatus), Valid: true}, ID: ID})
+			if err != nil {
+				log.Fatalf("AreasModel - UpdateStatus: Error updating area status: %v", err)
+			}
+		}
+	}
+
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		log.Fatalf("Error loading rows from database: %s", err)
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+	m.updateFooter()
+
+	return nil
 }
 
 func (m *AreasModel) addNote() tea.Cmd {
@@ -237,7 +296,7 @@ func (m *AreasModel) addNote() tea.Cmd {
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -289,14 +348,30 @@ func (m *AreasModel) addArea() tea.Cmd {
 
 	if form.Submit {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
+		areaID, err := queries.GetAreaID(ctx)
+		if err != nil && err != sql.ErrNoRows {
+			log.Fatalf("Error getting area ID: %v", err)
+		}
+		if err == sql.ErrNoRows {
+			areaID, err = queries.NoAreaIDs(ctx)
+			if err != nil {
+				log.Fatalf("Failed to find the next available area ID: %v", err)
+			} else {
+				_, err = queries.DeleteAreaID(ctx, areaID)
+				if err != nil {
+					log.Fatalf("Error deleting area ID: %v", err)
+				}
+			}
+		}
 		newArea := sqlc.CreateAreaParams{
+			ID:       areaID,
 			Title:    form.AreaTitle,
 			Status:   sql.NullString{String: string(form.Status), Valid: true},
 			Archived: form.Archived,
@@ -354,23 +429,12 @@ func (m *AreasModel) addArea() tea.Cmd {
 }
 
 func (m *AreasModel) refreshTableData() {
-	var filteredRows []table.Row
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
 		log.Printf("Error loading rows from database: %s", err)
 	}
 
-	for _, row := range rows {
-		archived, ok := row.Data[areaColumnKeyArchived]
-		if !ok {
-			log.Printf("Error getting archived status from row: %s", err)
-		}
-		if archived == "false" {
-			filteredRows = append(filteredRows, row)
-		}
-	}
-
-	m.tableModel = m.tableModel.WithRows(filteredRows)
+	m.tableModel = m.tableModel.WithRows(rows)
 
 	m.updateFooter()
 }
@@ -399,7 +463,7 @@ func (m *AreasModel) addTaskToArea() tea.Cmd {
 
 	if form.Submit {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -450,7 +514,7 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 		return nil
 	}
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Fatalf("Error connecting to database: %s", err)
 	}
@@ -478,6 +542,10 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 		deletedID, err := queries.DeleteSingleArea(ctx, areaID)
 		if err != nil {
 			log.Fatalf("Error deleting area: %s", err)
+		}
+		_, err = queries.RecycleAreaID(ctx, areaID)
+		if err != nil {
+			log.Fatalf("Error recycling area ID: %s", err)
 		}
 		if deletedID != areaID {
 			log.Fatalf("Error deleting area: %s", err)
@@ -511,12 +579,11 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 			}
 			areasToDelete[idx] = converted_id
 		}
-		result, err := queries.DeleteTasks(ctx, areasToDelete)
-		if err != nil {
-			log.Fatalf("Error deleting areas: %s", err)
-		}
-		if result != int64(len(selectedIDs)) {
-			log.Fatalf("Error deleting areas - Mismatch between selectedIDs and numDeleted: %s", err)
+		for _, areaID := range areasToDelete {
+			_, err := queries.DeleteSingleArea(ctx, areaID)
+			if err != nil {
+				log.Fatalf("Error recycling area ID: %v", err)
+			}
 		}
 		m.deleteMessage = fmt.Sprintf("You deleted these areas:  IDs: %s", strings.Join(selectedIDs, ", "))
 	}
@@ -570,7 +637,7 @@ func (m AreasModel) View() string {
 	return body.String()
 }
 
-func ProjectViewModel() AreasModel {
+func AreaViewModel() AreasModel {
 	theme := tui.GetSelectedTheme()
 
 	columns := []table.Column{
@@ -586,20 +653,10 @@ func ProjectViewModel() AreasModel {
 		table.NewFlexColumn(areaColumnKeyNotes, "Notes", 3),
 	}
 
-	model := AreasModel{archiveFilter: true}
-	var filteredRows []table.Row
+	model := AreasModel{archiveFilterEnabled: true}
 	rows, err := model.loadRowsFromDatabase()
 	if err != nil {
 		log.Fatal(err)
-	}
-	for _, row := range rows {
-		archived, ok := row.Data[areaColumnKeyArchived]
-		if !ok {
-			log.Printf("Error getting archived status from row: %s", err)
-		}
-		if archived == "false" {
-			filteredRows = append(filteredRows, row)
-		}
 	}
 
 	keys := table.DefaultKeyMap()
@@ -607,7 +664,7 @@ func ProjectViewModel() AreasModel {
 	keys.RowUp.SetKeys("k", "up", "w")
 
 	model.tableModel = table.New(columns).
-		WithRows(filteredRows).
+		WithRows(rows).
 		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Accent)).Bold(true)).
 		SelectableRows(true).
 		Focused(true).
@@ -655,4 +712,72 @@ func RunProjectsModel(m *AreasModel) {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
+}
+
+func (m *AreasModel) archiveArea() tea.Cmd {
+	selectedIDs := make(map[int64]bool)
+	var currentArchiveState bool
+	ctx := context.Background()
+	for _, row := range m.tableModel.SelectedRows() {
+		convertedID, err := strconv.ParseInt(row.Data[areaColumnKeyID].(string), 10, 64)
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error converting ID to int64: %v", "error", err)
+		}
+		parsedArchiveStatus, err := strconv.ParseBool(row.Data[areaColumnKeyArchived].(string))
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error converting archived status to bool: %v", "error", err)
+		}
+		selectedIDs[convertedID] = parsedArchiveStatus
+	}
+
+	conn, _, err := db.ConnectDB()
+	if err != nil {
+		slog.Error("AreasModel - archiveArea: Error connecting to database: %v", "error", err)
+		return nil
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[areaColumnKeyID].(string)
+		currentArchiveState, err = strconv.ParseBool(m.tableModel.HighlightedRow().Data[areaColumnKeyArchived].(string))
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error converting archived status to bool: %v", "error", err)
+		}
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error converting ID to int64: %v", "error", err)
+			return nil
+		}
+		_, err = queries.UpdateAreaArchived(ctx, sqlc.UpdateAreaArchivedParams{
+			Archived: !currentArchiveState,
+			ID:       taskID,
+		})
+		if err != nil {
+			slog.Error("AreasModel - archiveArea: Error updating area archived status: %v", "error", err)
+		}
+
+	} else if len(selectedIDs) >= 1 {
+		for ID, archiveStatus := range selectedIDs {
+			_, err = queries.UpdateAreaArchived(ctx, sqlc.UpdateAreaArchivedParams{
+				Archived: !archiveStatus,
+				ID:       ID,
+			})
+			if err != nil {
+				slog.Error("AreasModel - archiveArea: Error updating area archived status: %v", "error", err)
+			}
+		}
+	}
+
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		slog.Error("AreasModel - archiveArea: Error loading rows from database: %v", "error", err)
+		return nil
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+	m.updateFooter()
+
+	return nil
 }

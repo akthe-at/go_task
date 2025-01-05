@@ -25,7 +25,7 @@ func (n *NewAreaForm) NewAreaForm(theme huh.Theme) error {
 	groups := []*huh.Group{
 		huh.NewGroup(
 			huh.NewInput().
-				Title("What is the the name of the Project/Area?").
+				Title("What is the the name of the Area?").
 				Prompt(">").
 				Value(&n.AreaTitle),
 			huh.NewSelect[data.StatusType]().
@@ -38,7 +38,7 @@ func (n *NewAreaForm) NewAreaForm(theme huh.Theme) error {
 				).
 				Value(&n.Status),
 			huh.NewSelect[bool]().
-				Title("Do you want to archive this project/area right away?").
+				Title("Do you want to archive this area right away?").
 				Options(
 					huh.NewOption("No", false).Selected(true),
 					huh.NewOption("Yes", true),

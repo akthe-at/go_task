@@ -70,7 +70,7 @@ var taskCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("There was an error connecting to the database: %v", err)
 		}
@@ -96,7 +96,7 @@ var tasksCmd = &cobra.Command{
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
@@ -121,7 +121,7 @@ var taskNotesCmd = &cobra.Command{
 		ctx := context.Background()
 		var taskID int
 
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("There was an error connecting to the database: %v", err)
 		}
@@ -153,7 +153,7 @@ var allNotesCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
@@ -178,7 +178,7 @@ var projectsCmd = &cobra.Command{
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Errorf("There was an error connecting to the database: %v", err)
 		}
@@ -229,7 +229,9 @@ func (t TasksRowWrapper) ToRow() []string {
 	return []string{
 		fmt.Sprintf("%d", t.ID),
 		t.Title,
-		fmt.Sprintf("%.2f", formattedDate),
+		t.Priority.String,
+		t.Status.String,
+		fmt.Sprintf("%.2f Days", formattedDate),
 		formattedNotes,
 		formattedPath,
 		t.ParentArea.String,
@@ -284,7 +286,9 @@ func (t TaskRowWrapper) ToRow() []string {
 	return []string{
 		fmt.Sprintf("%d", t.TaskID),
 		t.TaskTitle,
-		fmt.Sprintf("%.2f", t.AgeInDays),
+		t.Priority.String,
+		t.Status.String,
+		fmt.Sprintf("%.2f Days", t.AgeInDays),
 		formattedNotes,
 		formattedPath,
 		t.ParentArea.String,
@@ -311,7 +315,7 @@ func styleTable(rows []TableRow, headers []string, colWidths map[int]int) *table
 	re := lipgloss.NewRenderer(os.Stdout)
 	var (
 		HeaderStyle  = re.NewStyle().Foreground(lipgloss.Color(theme.Secondary)).Bold(true).Align(lipgloss.Center)
-		CellStyle    = re.NewStyle().Padding(0, 1).Width(20)
+		CellStyle    = re.NewStyle().Padding(0, 1).Width(10)
 		OddRowStyle  = CellStyle.Foreground(lipgloss.Color(theme.Secondary))
 		EvenRowStyle = CellStyle.Foreground(lipgloss.Color(theme.Primary))
 	)
@@ -342,6 +346,7 @@ func styleTable(rows []TableRow, headers []string, colWidths map[int]int) *table
 			return style
 		}).
 		Headers(headers...).
+		// Widh(96).
 		Rows(tableRows...)
 
 	return &t
@@ -353,8 +358,8 @@ func styleTasksTable(tasks []sqlc.ReadTasksRow) *table.Table {
 		rows = append(rows, TasksRowWrapper{task})
 	}
 
-	headers := []string{"ID", "Task", "Age of Task", "Notes", "Repo", "Area"}
-	colWidths := map[int]int{0: 5, 1: 15, 3: 45, 4: 15}
+	headers := []string{"ID", "Task", "Priority", "Status", "Task Age", "Notes", "Project", "Area"}
+	colWidths := map[int]int{0: 2, 1: 15, 2: 10, 3: 10, 4: 10, 5: 15, 6: 10, 7: 10}
 	return styleTable(rows, headers, colWidths)
 }
 
@@ -383,8 +388,8 @@ func styleTaskTable(task sqlc.ReadTaskRow) *table.Table {
 	var rows []TableRow
 
 	rows = append(rows, TaskRowWrapper{task})
-	headers := []string{"ID", "Task", "Age of Task", "Notes", "Project", "Area"}
-	colWidths := map[int]int{0: 5, 1: 15, 4: 45}
+	headers := []string{"ID", "Task", "Priority", "Status", "Task Age", "Notes", "Project", "Area"}
+	colWidths := map[int]int{0: 2, 1: 15, 2: 10, 3: 10, 4: 10, 5: 15, 6: 10, 7: 10}
 	return styleTable(rows, headers, colWidths)
 }
 

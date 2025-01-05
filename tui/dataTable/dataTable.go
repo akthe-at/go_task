@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path"
 	"strconv"
@@ -61,13 +62,15 @@ var customBorder = table.Border{
 
 // This is the task table "screen" model
 type TaskModel struct {
-	deleteMessage    string
-	tableModel       table.Model
-	totalWidth       int
-	totalHeight      int
-	horizontalMargin int
-	verticalMargin   int
-	archiveFilter    bool
+	deleteMessage        string
+	tableModel           table.Model
+	totalWidth           int
+	totalHeight          int
+	horizontalMargin     int
+	verticalMargin       int
+	selectedRowID        int
+	archiveFilterEnabled bool
+	rowFilter            bool
 }
 
 // Init initializes the model (can use this to run commands upon model initialization)
@@ -91,6 +94,8 @@ func (m *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tea.Quit)
 		case "F":
 			cmds = append(cmds, m.filterArchives())
+		case "enter":
+			cmds = append(cmds, m.filterRows())
 		case "left":
 			if m.calculateWidth() > minWidth {
 				m.horizontalMargin++
@@ -131,24 +136,12 @@ func (m *TaskModel) recalculateTable() {
 }
 
 func (m *TaskModel) refreshTableData() {
-	var filteredRows []table.Row
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
 		log.Printf("Error loading rows from database: %s", err)
 	}
 
-	for _, row := range rows {
-		archived, ok := row.Data[columnKeyArchived]
-		if !ok {
-			log.Printf("Error getting archived status from row: %s", err)
-		}
-		if archived == "false" {
-			filteredRows = append(filteredRows, row)
-		}
-	}
-
-	m.tableModel = m.tableModel.WithRows(filteredRows)
-
+	m.tableModel = m.tableModel.WithRows(rows)
 	m.updateFooter()
 }
 
@@ -162,7 +155,7 @@ func (m TaskModel) calculateHeight() int {
 
 func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 	ctx := context.Background()
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -186,71 +179,82 @@ func (m *TaskModel) loadRowsFromDatabase() ([]table.Row, error) {
 			columnKeyPriority: task.Priority.String,
 			columnKeyStatus:   task.Status.String,
 			columnKeyArchived: fmt.Sprintf("%t", task.Archived),
-			columnKeyTaskAge:  task.AgeInDays,
+			columnKeyTaskAge:  fmt.Sprintf("%v Days", task.AgeInDays),
 			columnKeyNotes:    task.NoteTitles,
 			columnKeyPath:     formattedPath,
 			columnKeyArea:     task.ParentArea.String,
 		})
 		rows = append(rows, row)
+
 	}
-	return rows, nil
+
+	filteredRows := []table.Row{}
+	for _, row := range rows {
+		archived, ok := row.Data[columnKeyArchived]
+		if !ok {
+			log.Printf("Error getting archived status from row: %s", err)
+			return nil, err
+		}
+		if m.archiveFilterEnabled && archived == "false" {
+			filteredRows = append(filteredRows, row)
+		} else if !m.archiveFilterEnabled {
+			filteredRows = append(filteredRows, row)
+		}
+	}
+
+	return filteredRows, nil
+}
+
+func (m *TaskModel) filterRows() tea.Cmd {
+	ctx := context.Background()
+	dbConn, _, err := db.ConnectDB()
+	if err != nil {
+		log.Fatalf("There was an issue connecting to the database: %s", err)
+	}
+	defer dbConn.Close()
+	queries := sqlc.New(dbConn)
+	m.rowFilter = !m.rowFilter
+
+	if m.tableModel.HighlightedRow().Data[columnKeyID] != nil {
+		rowID, err := strconv.ParseInt(m.tableModel.HighlightedRow().Data[columnKeyID].(string), 10, 64)
+		if err != nil {
+			log.Fatalf("Error converting ID to int: %s", err)
+		}
+
+		result, err := queries.ReadTask(ctx, rowID)
+		if err != nil {
+			log.Printf("Error reading task from database: %s", err)
+			return nil
+		}
+
+		var rows []table.Row
+		row := table.NewRow(table.RowData{
+			columnKeyID:       fmt.Sprintf("%d", result.TaskID),
+			columnKeyTask:     result.TaskTitle,
+			columnKeyPriority: result.Priority.String,
+			columnKeyStatus:   result.Status.String,
+			columnKeyArchived: fmt.Sprintf("%t", result.Archived),
+			columnKeyTaskAge:  fmt.Sprintf("%v Days", result.AgeInDays),
+			columnKeyNotes:    fmt.Sprintf("%v", result.NoteTitle),
+			columnKeyPath:     result.ProgProj.String,
+			columnKeyArea:     result.ParentArea.String,
+		})
+		rows = append(rows, row)
+
+		m.tableModel = m.tableModel.WithRows(rows)
+		m.updateFooter()
+
+		return nil
+	}
+	return nil
 }
 
 func (m *TaskModel) filterArchives() tea.Cmd {
-	var filteredRows []table.Row
-	// toggle m.archiveFilter from current status
-	m.archiveFilter = !m.archiveFilter
+	m.archiveFilterEnabled = !m.archiveFilterEnabled
+	m.refreshTableData()
 
-	if m.archiveFilter {
-
-		rows, err := m.loadRowsFromDatabase()
-		if err != nil {
-			log.Printf("Error loading rows from database: %s", err)
-			return nil
-		}
-
-		for _, row := range rows {
-			archived, ok := row.Data[columnKeyArchived]
-			if !ok {
-				log.Printf("Error getting archived status from row: %s", err)
-				return nil
-			}
-			if archived == "false" {
-				filteredRows = append(filteredRows, row)
-			}
-		}
-
-		m.tableModel = m.tableModel.WithRows(filteredRows)
-
-		// Update the footer
-		m.updateFooter()
-
-		return nil
-	} else {
-		rows, err := m.loadRowsFromDatabase()
-		if err != nil {
-			log.Printf("Error loading rows from database: %s", err)
-			return nil
-		}
-
-		for _, row := range rows {
-			archived, ok := row.Data[columnKeyArchived]
-			if !ok {
-				log.Printf("Error getting archived status from row: %s", err)
-				return nil
-			}
-			if archived == "true" {
-				filteredRows = append(filteredRows, row)
-			}
-		}
-
-		m.tableModel = m.tableModel.WithRows(rows)
-
-		// Update the footer
-		m.updateFooter()
-
-		return nil
-	}
+	m.updateFooter()
+	return nil
 }
 
 func (m *TaskModel) addNote() tea.Cmd {
@@ -283,7 +287,7 @@ func (m *TaskModel) addNote() tea.Cmd {
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -335,14 +339,31 @@ func (m *TaskModel) addTask() tea.Cmd {
 
 	if form.Submit {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
-
 		queries := sqlc.New(conn)
+
+		newTaskID, err := queries.GetTaskID(ctx)
+		if err != nil && err != sql.ErrNoRows {
+			log.Fatalf("addTask - TaskModel: Error getting task ID: %v", err)
+		}
+		if err == sql.ErrNoRows {
+			newTaskID, err = queries.NoTaskIDs(ctx)
+			if err != nil {
+				log.Fatalf("Failed to find the next available task ID: %v", err)
+			} else {
+				_, err = queries.DeleteTaskID(ctx, newTaskID)
+				if err != nil {
+					log.Fatalf("Error deleting task ID: %v", err)
+				}
+			}
+		}
+
 		newTask := sqlc.CreateTaskParams{
+			ID:       newTaskID,
 			Title:    form.TaskTitle,
 			Priority: sql.NullString{String: string(form.Priority), Valid: true},
 			Status:   sql.NullString{String: string(form.Status), Valid: true},
@@ -354,19 +375,33 @@ func (m *TaskModel) addTask() tea.Cmd {
 			log.Fatalf("Error creating task: %v", err)
 		}
 
+		if form.AreaAssignment == "yes" {
+			areaID, err := strconv.ParseInt(form.Area, 10, 64)
+			if err != nil {
+				log.Fatalf("Error parsing area ID: %v", err)
+			}
+			fmt.Println("AreaID Post Conversion is: ", areaID)
+			_, err = queries.UpdateTaskArea(ctx, sqlc.UpdateTaskAreaParams{
+				AreaID: sql.NullInt64{Int64: areaID, Valid: true}, ID: result,
+			})
+			if err != nil {
+				slog.Error("Error updating task area: %v", "error", err)
+			}
+		}
+
 		var projectID int64
 		if form.ProjectAssignment == "local" {
 			projID, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
 			if err != nil {
 				log.Fatalf("Error checking if project exists: %v", err)
 			}
-			switch projID {
-			case 0:
+			switch {
+			case projID == 0:
 				projectID, err = queries.InsertProgProject(ctx, form.ProgProject)
 				if err != nil {
 					log.Fatalf("Error inserting project: %v", err)
 				}
-			case 1:
+			case projID > 0:
 				projectID = projID
 			default:
 				log.Fatalf("Unexpected projID: %v", projID)
@@ -383,7 +418,6 @@ func (m *TaskModel) addTask() tea.Cmd {
 			}
 		}
 
-		// Requery the database and update the table model
 		rows, err := m.loadRowsFromDatabase()
 		if err != nil {
 			log.Printf("Error loading rows from database: %s", err)
@@ -396,6 +430,191 @@ func (m *TaskModel) addTask() tea.Cmd {
 			return SwitchToTasksTableViewMsg{}
 		}
 	}
+
+	return nil
+}
+
+func (m *TaskModel) togglePriorityStatus() tea.Cmd {
+	selectedIDs := make(map[int64]data.PriorityType)
+	ctx := context.Background()
+	conn, _, err := db.ConnectDB()
+	if err != nil {
+		slog.Error("TaskModel - togglePriorityStatus: Error connecting to database: %v", "error", err)
+		return nil
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
+		currentPriorityStateStr, ok := m.tableModel.HighlightedRow().Data[columnKeyPriority].(string)
+		if !ok {
+			slog.Error("TaskModel - togglePriorityStatus: Error converting priority status to PriorityType: %v", "error", err)
+			return nil
+		}
+
+		currentPriorityState, err := data.StringToPriorityType(currentPriorityStateStr)
+		if err != nil {
+			slog.Error("TaskModel - togglePriorityStatus: Error converting priority status to PriorityType: %v", "error", err)
+			return nil
+		}
+
+		var newPriorityState data.PriorityType
+		switch currentPriorityState {
+		case data.PriorityTypeLow:
+			newPriorityState = data.PriorityTypeMedium
+		case data.PriorityTypeMedium:
+			newPriorityState = data.PriorityTypeHigh
+		case data.PriorityTypeHigh:
+			newPriorityState = data.PriorityTypeUrgent
+		case data.PriorityTypeUrgent:
+			newPriorityState = data.PriorityTypeLow
+		}
+
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - togglePriorityStatus: Error converting ID to int64: %v", "error", err)
+			return nil
+		}
+		queries.UpdateTaskPriority(ctx, sqlc.UpdateTaskPriorityParams{
+			Priority: sql.NullString{String: string(newPriorityState), Valid: true},
+			ID:       taskID,
+		},
+		)
+	}
+
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		slog.Error("TaskModel - togglePriorityStatus: Error loading rows from database: %v", "error", err)
+		return nil
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+	m.updateFooter()
+
+	return nil
+}
+
+func (m *TaskModel) archiveTask() tea.Cmd {
+	selectedIDs := make(map[int64]bool)
+	var currentArchiveState bool
+	ctx := context.Background()
+	for _, row := range m.tableModel.SelectedRows() {
+		convertedID, err := strconv.ParseInt(row.Data[columnKeyID].(string), 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error converting ID to int64: %v", "error", err)
+		}
+		parsedArchiveStatus, err := strconv.ParseBool(row.Data[columnKeyArchived].(string))
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error converting archived status to bool: %v", "error", err)
+		}
+		selectedIDs[convertedID] = parsedArchiveStatus
+	}
+
+	conn, _, err := db.ConnectDB()
+	if err != nil {
+		slog.Error("TaskModel - archiveTask: Error connecting to database: %v", "error", err)
+		return nil
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
+		currentArchiveState, err = strconv.ParseBool(m.tableModel.HighlightedRow().Data[columnKeyArchived].(string))
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error converting archived status to bool: %v", "error", err)
+		}
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error converting ID to int64: %v", "error", err)
+			return nil
+		}
+		_, err = queries.UpdateTaskArchived(ctx, sqlc.UpdateTaskArchivedParams{
+			Archived: !currentArchiveState,
+			ID:       taskID,
+		})
+		if err != nil {
+			slog.Error("TaskModel - archiveTask: Error updating task archived status: %v", "error", err)
+		}
+
+	} else if len(selectedIDs) >= 1 {
+		for ID, archiveStatus := range selectedIDs {
+			_, err = queries.UpdateTaskArchived(ctx, sqlc.UpdateTaskArchivedParams{
+				Archived: !archiveStatus,
+				ID:       ID,
+			})
+			if err != nil {
+				slog.Error("TaskModel - archiveTask: Error updating task archived status: %v", "error", err)
+			}
+		}
+	}
+
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		slog.Error("TaskModel - archiveTask: Error loading rows from database: %v", "error", err)
+		return nil
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+	m.updateFooter()
+
+	return nil
+}
+
+func (m *TaskModel) updateStatus(newStatus data.StatusType) tea.Cmd {
+	var selectedIDs []int64
+	ctx := context.Background()
+	for _, row := range m.tableModel.SelectedRows() {
+		convertedID, err := strconv.ParseInt(row.Data[columnKeyID].(string), 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - UpdateStatus: Error converting ID to int64: %v", "error", err)
+		}
+		selectedIDs = append(selectedIDs, convertedID)
+	}
+
+	conn, _, err := db.ConnectDB()
+	if err != nil {
+		slog.Error("TaskModel - UpdateStatus: Error connecting to database: %v", "error", err)
+		return nil
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+
+	if len(selectedIDs) < 1 {
+		highlightedInfo := m.tableModel.HighlightedRow().Data[columnKeyID].(string)
+		taskID, err := strconv.ParseInt(highlightedInfo, 10, 64)
+		if err != nil {
+			slog.Error("TaskModel - UpdateStatus: Error converting ID to int64: %v", "error", err)
+			return nil
+		}
+
+		_, err = queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{Status: sql.NullString{String: string(newStatus), Valid: true}, ID: taskID})
+		if err != nil {
+			slog.Error("TaskModel - UpdateStatus: Error updating task status: %v", "error", err)
+			return nil
+		}
+	} else if len(selectedIDs) >= 1 {
+		for _, ID := range selectedIDs {
+			_, err := queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{Status: sql.NullString{String: string(newStatus), Valid: true}, ID: ID})
+			if err != nil {
+				slog.Error("TaskModel - UpdateStatus: Error updating task status: %v", "error", err)
+				return nil
+			}
+		}
+	}
+
+	rows, err := m.loadRowsFromDatabase()
+	if err != nil {
+		log.Printf("Error loading rows from database: %s", err)
+		return nil
+	}
+
+	m.tableModel = m.tableModel.WithRows(rows)
+	m.updateFooter()
 
 	return nil
 }
@@ -414,7 +633,7 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		return nil
 	}
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Printf("Error connecting to database: %s", err)
 		return nil
@@ -446,6 +665,10 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		if err != nil {
 			log.Printf("Error deleting task: %s", err)
 			return nil
+		}
+		_, err = queries.RecycleTaskID(ctx, deletedID)
+		if err != nil {
+			log.Fatalf("Error recycling task ID: %s", err)
 		}
 		if deletedID != taskID {
 			log.Fatalf("Error deleting task: %s", err)
@@ -481,26 +704,25 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 			}
 			toDeleteTasks[idx] = converted_id
 		}
-		result, err := queries.DeleteTasks(ctx, toDeleteTasks)
-		if err != nil {
-			log.Printf("Error deleting tasks: %s", err)
-			return nil
-		}
-		if result != int64(len(selectedIDs)) {
-			log.Printf("Error deleting tasks - Mismatch between selectedIDs and numDeleted: %s", err)
+		for _, taskID := range toDeleteTasks {
+			_, err := queries.DeleteTask(ctx, taskID)
+			if err != nil {
+				log.Fatalf("Error deleting task: %v", err)
+			}
+			_, err = queries.RecycleTaskID(ctx, taskID)
+			if err != nil {
+				log.Fatalf("Error recycling task ID: %v", err)
+			}
 		}
 		m.deleteMessage = fmt.Sprintf("You deleted the following tasks: %s", strings.Join(selectedIDs, ", "))
 	}
 
-	// Requery the database and update the table model
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
 		log.Printf("Error loading rows from database: %s", err)
 		return nil
 	}
 	m.tableModel = m.tableModel.WithRows(rows)
-
-	// Update the footer
 	m.updateFooter()
 
 	return nil
@@ -510,13 +732,17 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 func (m TaskModel) View() string {
 	body := strings.Builder{}
 
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add a new Task by pressing 'A'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+n to switch to the Notes View.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press ctrl+p to switch to the Projects View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Add a new Task by pressing 'A'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Filter Archived Tasks by pressing 'F'") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press left/right or page up/down to move between pages") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'space' to select a row, 'q' or 'ctrl+c' to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'enter' to filter table to a singular task") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'backspace' to delete row(s) after selecting or highlighting them.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 't'/'p'/'d'/'D' to Toggle Task Status to Todo, Planning, Doing, or Done, respectively.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'P' to toggle the priority status of a highlighted task.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'a' to toggle archive status of a highlighted or selected tasks.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'ctrl+n' to switch to the Notes View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'ctrl+p' to switch to the Areas View.") + "\n")
 
 	selectedIDs := []string{}
 
@@ -558,26 +784,17 @@ func TaskViewModel() TaskModel {
 		table.NewColumn(columnKeyPriority, "Priority", 10),
 		table.NewColumn(columnKeyStatus, "Status", 10),
 		table.NewColumn(columnKeyArchived, "Archived", 10),
-		table.NewColumn(columnKeyTaskAge, "Task Age(Days)", 15),
+		table.NewColumn(columnKeyTaskAge, "Task Age", 15),
 		table.NewFlexColumn(columnKeyNotes, "Notes", 3),
 		table.NewFlexColumn(columnKeyPath, "Repo", 1),
 		table.NewFlexColumn(columnKeyArea, "Area", 3),
 	}
 
-	model := TaskModel{archiveFilter: true}
-	var filteredRows []table.Row
+	model := TaskModel{archiveFilterEnabled: true, rowFilter: false}
+
 	rows, err := model.loadRowsFromDatabase()
 	if err != nil {
 		log.Fatal(err)
-	}
-	for _, row := range rows {
-		archived, ok := row.Data[columnKeyArchived]
-		if !ok {
-			log.Printf("Error getting archived status from row: %s", err)
-		}
-		if archived == "false" {
-			filteredRows = append(filteredRows, row)
-		}
 	}
 
 	keys := table.DefaultKeyMap()
@@ -585,7 +802,7 @@ func TaskViewModel() TaskModel {
 	keys.RowUp.SetKeys("k", "up", "w")
 
 	model.tableModel = table.New(columns).
-		WithRows(filteredRows).
+		WithRows(rows).
 		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Accent)).Bold(true)).
 		SelectableRows(true).
 		Focused(true).
@@ -643,10 +860,3 @@ func extractNoteTitles(notes []sqlc.Note) string {
 	}
 	return strings.Join(titles, ", ")
 }
-
-// func (tm *TaskModel) PrintRow(row table.Row) {
-// 	for key, value := range row.Data {
-// 		row.Data[key] = fmt.Sprintf("%v", strings.TrimSpace(fmt.Sprintf("%v ", value)))
-// 		fmt.Printf("%s: %v | ", key, row.Data[key])
-// 	}
-// }

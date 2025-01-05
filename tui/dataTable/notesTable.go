@@ -8,11 +8,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/akthe-at/go_task/config"
 	data "github.com/akthe-at/go_task/data"
 	db "github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/akthe-at/go_task/tui"
 	"github.com/akthe-at/go_task/tui/formInput"
+	"github.com/akthe-at/go_task/utils"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/evertras/bubble-table/table"
@@ -111,10 +113,10 @@ func (m *NotesModel) View() string {
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add a new Note by pressing 'A'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Projects by pressing 'F'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+t to switch to the Tasks View.") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press ctrl+p to switch to the Projects/Areas View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'space' to select a row, 'q' or 'ctrl+c' to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'backspace' to delete row(s) after selecting or highlighting them.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'ctrl+t' to switch to the Tasks View.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'ctrl+p' to switch to the Areas View.") + "\n")
 	selectedIDs := []int64{}
 
 	for _, row := range m.tableModel.SelectedRows() {
@@ -157,7 +159,7 @@ func NotesView() NotesModel {
 	model := NotesModel{}
 	var filteredRows []table.Row
 	ctx := context.Background()
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Panicf("Notes View: There was an error connecting to the database: %v", err)
 	}
@@ -256,7 +258,7 @@ func (m *NotesModel) addNote() tea.Cmd {
 
 		if form.Submit {
 			ctx := context.Background()
-			conn, err := db.ConnectDB()
+			conn, _, err := db.ConnectDB()
 			if err != nil {
 				log.Panicf("error connecting to database: %v", err)
 			}
@@ -317,7 +319,7 @@ func (m *NotesModel) loadRowsFromDatabase() ([]table.Row, error) {
 	var filteredRows []table.Row
 	ctx := context.Background()
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		return nil, fmt.Errorf("loadRowsFromDatabase: error connecting to database: %w", err)
 	}
@@ -350,9 +352,9 @@ func (m *NotesModel) deleteNote() tea.Cmd {
 	for _, row := range m.tableModel.SelectedRows() {
 		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(int64))
 	}
-	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int)
+	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
 
-	conn, err := db.ConnectDB()
+	conn, _, err := db.ConnectDB()
 	if err != nil {
 		log.Printf("Error connecting to database: %s", err)
 		return nil
@@ -381,6 +383,70 @@ func (m *NotesModel) deleteNote() tea.Cmd {
 		return nil
 	}
 	m.tableModel = m.tableModel.WithRows(rows)
+
+	// Update the footer
+	m.updateFooter()
+
+	return nil
+}
+
+func (m *NotesModel) openNote() tea.Cmd {
+	editor := config.GetEditorConfig()
+	ctx := context.Background()
+	selectedIDs := []int64{}
+
+	for _, row := range m.tableModel.SelectedRows() {
+		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(int64))
+	}
+	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
+
+	conn, _, err := db.ConnectDB()
+	if err != nil {
+		log.Printf("Error connecting to database: %s", err)
+		return nil
+	}
+	defer conn.Close()
+
+	queries := sqlc.New(conn)
+	if len(selectedIDs) == 1 {
+		note, err := queries.ReadNoteByID(ctx, taskID)
+		if err != nil {
+			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
+		}
+		notePath, err := utils.ExpandPath(note.Path)
+
+		utils.OpenNoteInEditor(editor, notePath)
+		if err != nil {
+			log.Fatalf("There was an error expanding the path: %v", err)
+		}
+	} else if len(selectedIDs) > 1 {
+		notes, err := queries.ReadNoteByIDs(ctx, selectedIDs)
+		if err != nil {
+			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
+		}
+		notePaths := make([]string, len(notes))
+		for i, note := range notes {
+			notePath, err := utils.ExpandPath(note.Path)
+			if err != nil {
+				log.Fatalf("There was an error expanding the path: %v", err)
+			}
+			notePaths[i] = notePath
+		}
+		utils.OpenNoteInEditor(editor, notePaths...)
+
+	} else if len(selectedIDs) == 0 {
+
+		note, err := queries.ReadNoteByID(ctx, taskID)
+		if err != nil {
+			fmt.Printf("ReadNoteByID: There was an error reading the note: %v", err)
+		}
+		notePath, err := utils.ExpandPath(note.Path)
+
+		utils.OpenNoteInEditor(editor, notePath)
+		if err != nil {
+			log.Fatalf("There was an error expanding the path: %v", err)
+		}
+	}
 
 	// Update the footer
 	m.updateFooter()

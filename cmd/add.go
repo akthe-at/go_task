@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strconv"
@@ -55,39 +56,61 @@ var addTaskCmd = &cobra.Command{
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		var (
-			inputTitle    = args[0]
-			inputPriority = args[1]
-			inputStatus   = args[2]
-		)
-
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
+
 		defer conn.Close()
 		queries := sqlc.New(conn)
 
+		if !rawFlag && len(args) > 1 {
+			log.Fatalf("You passed too many arguments for the form input, did you mean to use the --raw flag?")
+		}
+
 		if rawFlag {
-			validPriority, err := mapToPriorityType(inputPriority)
+
+			var (
+				inputTitle    = args[0]
+				inputPriority = args[1]
+				inputStatus   = args[2]
+			)
+			validPriority, err := data.StringToPriorityType(inputPriority)
 			if err != nil {
 				log.Fatalf("Invalid priority type: %v", err)
 			}
 
-			validStatus, err := mapToStatusType(inputStatus)
+			validStatus, err := data.StringToStatusType(inputStatus)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
+			newTaskID, err := queries.GetTaskID(ctx)
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error getting task ID: %v", err)
+			}
+			if err == sql.ErrNoRows {
+				newTaskID, err = queries.NoTaskIDs(ctx)
+				if err != nil {
+					log.Fatalf("Failed to find the next available task ID: %v", err)
+				}
+			} else {
+				_, err = queries.DeleteTaskID(ctx, newTaskID)
+				if err != nil {
+					log.Fatalf("Error deleting task ID: %v", err)
+				}
+			}
+
 			newTask := sqlc.CreateTaskParams{
+				ID:       newTaskID,
 				Title:    inputTitle,
 				Priority: sql.NullString{String: string(validPriority), Valid: true},
 				Status:   sql.NullString{String: string(validStatus), Valid: true},
 				Archived: archived,
 			}
 
-			newTaskID, err := queries.CreateTask(ctx, newTask)
+			newTaskID, err = queries.CreateTask(ctx, newTask)
 			if err != nil {
 				log.Fatalf("Error creating task: %v", err)
 			}
@@ -129,45 +152,77 @@ var addTaskCmd = &cobra.Command{
 			}
 
 			if form.Submit {
-				result, err := queries.CreateTask(ctx, sqlc.CreateTaskParams{
+				newTaskID, err := queries.GetTaskID(ctx)
+				if err != nil && err != sql.ErrNoRows {
+					log.Fatalf("Error getting task ID: %v", err)
+				}
+				if err == sql.ErrNoRows {
+					newTaskID, err = queries.NoTaskIDs(ctx)
+					if err != nil {
+						log.Fatalf("Failed to find the next available task ID: %v", err)
+					} else {
+						_, err = queries.DeleteTaskID(ctx, newTaskID)
+						if err != nil {
+							log.Fatalf("Error deleting task ID: %v", err)
+						}
+					}
+				}
+				newTask := sqlc.CreateTaskParams{
+					ID:       newTaskID,
 					Title:    form.TaskTitle,
 					Priority: sql.NullString{String: string(form.Priority), Valid: true},
 					Status:   sql.NullString{String: string(form.Status), Valid: true},
-				})
+				}
+				result, err := queries.CreateTask(ctx, newTask)
 				if err != nil {
 					log.Fatalf("Error creating task: %v", err)
 				}
-				fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
 
-				ok, projectDir, err := utils.CheckIfProjDir()
-				if err != nil {
-					log.Fatalf("Error checking if project directory: %v", err)
+				fmt.Println("Successfully created a task and it was assigned the following ID: ", result)
+				if form.AreaAssignment == "yes" {
+					areaID, err := strconv.ParseInt(form.Area, 10, 64)
+					if err != nil {
+						log.Fatalf("Error parsing area ID: %v", err)
+					}
+					_, err = queries.UpdateTaskArea(ctx, sqlc.UpdateTaskAreaParams{
+						AreaID: sql.NullInt64{Int64: areaID, Valid: true}, ID: result,
+					})
+					if err != nil {
+						slog.Error("Error updating task area: %v", "error", err)
+					}
 				}
-				if ok {
-					projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+
+				var projectID int64
+				if form.ProjectAssignment == "local" {
+					projExists, err := queries.CheckProgProjectExists(ctx, form.ProgProject)
 					if err != nil {
 						log.Fatalf("Error checking if project exists: %v", err)
-					} else if projID == 0 {
-						project, err := queries.InsertProgProject(ctx, projectDir)
+					}
+					switch {
+					case projExists == 0:
+						projectID, err = queries.InsertProgProject(ctx, form.ProgProject)
 						if err != nil {
 							log.Fatalf("Error inserting project: %v", err)
 						}
-						err = queries.CreateProjectTaskLink(ctx,
-							sqlc.CreateProjectTaskLinkParams{
-								ProjectID:    sql.NullInt64{Int64: project, Valid: true},
-								ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
-								ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
-							},
-						)
-						if err != nil {
-							log.Fatalf("Error inserting project link: %v", err)
-						}
+					case projExists > 0:
+						projectID = projExists
+					default:
+						log.Fatalf("Unexpected error, projID is an issue: %v", projExists)
 					}
-
+					err = queries.CreateProjectTaskLink(ctx,
+						sqlc.CreateProjectTaskLinkParams{
+							ProjectID:    sql.NullInt64{Int64: projectID, Valid: true},
+							ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+							ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
+						},
+					)
+					if err != nil {
+						log.Fatalf("Error inserting project link: %v", err)
+					}
 				}
 
-				fmt.Println("Successfully assigned the new task a programming project ID: ", projectDir)
 			}
+			fmt.Println("Successfully assigned the new task a programming project ID: ", form.ProgProject)
 		}
 	},
 }
@@ -187,16 +242,18 @@ var addAreaCmd = &cobra.Command{
 	Raw Example: 'go_task add area "<area_title> <area_status>"'
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: This command doesn't add a repo to the area currently...make sure to
-		// do this in both the form/and raw input variants
+		var areaID int64
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
+		if !rawFlag && len(args) > 1 {
+			log.Fatalf("You passed too many arguments for the form input, did you mean to use the --raw flag?")
+		}
 
 		if rawFlag {
 
@@ -211,12 +268,28 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 				inputTitle  = args[0]
 				inputStatus = args[1]
 			)
-			validStatus, err := mapToStatusType(inputStatus)
+			validStatus, err := data.StringToStatusType(inputStatus)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
+			areaID, err = queries.GetAreaID(ctx)
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error getting area ID: %v", err)
+			}
+			if err == sql.ErrNoRows {
+				areaID, err = queries.NoAreaIDs(ctx)
+				if err != nil {
+					log.Fatalf("Failed to find the next available area ID: %v", err)
+				} else {
+					_, err = queries.DeleteAreaID(ctx, areaID)
+					if err != nil {
+						log.Fatalf("Error deleting area ID: %v", err)
+					}
+				}
+			}
 			_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+				ID:       areaID,
 				Title:    inputTitle,
 				Status:   sql.NullString{String: string(validStatus), Valid: true},
 				Archived: archived,
@@ -238,7 +311,24 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 			}
 
 			if form.Submit {
+
+				areaID, err = queries.GetAreaID(ctx)
+				if err != nil && err != sql.ErrNoRows {
+					log.Fatalf("Error getting area ID: %v", err)
+				}
+				if err == sql.ErrNoRows {
+					areaID, err = queries.NoAreaIDs(ctx)
+					if err != nil {
+						log.Fatalf("Failed to find the next available area ID: %v", err)
+					} else {
+						_, err = queries.DeleteAreaID(ctx, areaID)
+						if err != nil {
+							log.Fatalf("Error deleting area ID: %v", err)
+						}
+					}
+				}
 				_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
+					ID:       areaID,
 					Title:    form.AreaTitle,
 					Status:   sql.NullString{String: string(form.Status), Valid: true},
 					Archived: form.Archived,
@@ -248,6 +338,33 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 				} else {
 					fmt.Println("Successfully created a new area")
 				}
+			}
+		}
+
+		ok, projectDir, err := utils.CheckIfProjDir()
+		if err != nil {
+			log.Fatalf("Error while checking if in a project directory: %v", err)
+		}
+		if ok {
+			projID, err := queries.CheckProgProjectExists(ctx, projectDir)
+			if err != nil {
+				log.Fatalf("Error while checking if project exists: %v", err)
+			}
+			if projID == 0 {
+				projID, err = queries.InsertProgProject(ctx, projectDir)
+				if err != nil {
+					log.Fatalf("Error inserting project: %v", err)
+				}
+			}
+
+			err = queries.CreateProjectAreaLink(ctx,
+				sqlc.CreateProjectAreaLinkParams{
+					ProjectID:    sql.NullInt64{Int64: projID, Valid: true},
+					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
+					ParentAreaID: sql.NullInt64{Int64: areaID, Valid: true},
+				})
+			if err != nil {
+				log.Fatalf("Error inserting project link: %v", err)
 			}
 		}
 	},
@@ -304,7 +421,7 @@ OR to generate a new note AND add it to a specific task:
 			}
 
 			ctx := context.Background()
-			conn, err := db.ConnectDB()
+			conn, _, err := db.ConnectDB()
 			if err != nil {
 				log.Fatalf("Error connecting to database: %v", err)
 			}
@@ -373,7 +490,7 @@ OR to generate a new note AND add it to a specific task:
 			}
 
 			ctx := context.Background()
-			conn, err := db.ConnectDB()
+			conn, _, err := db.ConnectDB()
 			if err != nil {
 				log.Fatalf("Error connecting to database: %v", err)
 			}
@@ -453,7 +570,7 @@ OR to generate a new note AND add it to a specific area:
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -685,36 +802,4 @@ func init() {
 	addCmd.PersistentFlags().StringVarP(&noteTags, "tags", "t", "", "Tags for the note")
 	addCmd.PersistentFlags().StringVarP(&noteAliases, "aliases", "a", "", "Aliases for the note")
 	addCmd.PersistentFlags().StringVarP(&noteBody, "body", "b", "", "Text for the Note Body")
-}
-
-// mapToPriorityType maps a string to a PriorityType
-func mapToPriorityType(input string) (data.PriorityType, error) {
-	switch input {
-	case "low":
-		return data.PriorityTypeLow, nil
-	case "medium":
-		return data.PriorityTypeMedium, nil
-	case "high":
-		return data.PriorityTypeHigh, nil
-	case "urgent":
-		return data.PriorityTypeUrgent, nil
-	default:
-		return "", fmt.Errorf("invalid priority type ( %v ) is not one of the valid priority values (low, medium, high, urgent)", input)
-	}
-}
-
-// mapToStatusType maps a string to a StatusType
-func mapToStatusType(input string) (data.StatusType, error) {
-	switch input {
-	case "todo":
-		return data.StatusToDo, nil
-	case "planning":
-		return data.StatusPlanning, nil
-	case "doing":
-		return data.StatusDoing, nil
-	case "done":
-		return data.StatusDone, nil
-	default:
-		return "", fmt.Errorf("invalid status type ( %v ) is not one of the valid status values (todo, planning, doing, done)", input)
-	}
 }

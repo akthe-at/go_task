@@ -93,13 +93,21 @@ func initConfig() {
 	} else {
 		switch runtime.GOOS {
 		case "windows":
-			configPath = filepath.Join(home, ".config", "go_task")
+			if windowsConfigDir := os.Getenv("LOCALAPPDATA"); windowsConfigDir != "" {
+				configPath = filepath.Join(windowsConfigDir, "go_task", "config")
+			} else {
+				configPath = filepath.Join(home, ".config", "go_task")
+			}
 		case "linux":
 			if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
 				configPath = filepath.Join(xdgConfig, "go_task")
 			} else {
 				configPath = filepath.Join(home, ".config", "go_task")
 			}
+		}
+		err := os.MkdirAll(configPath, os.ModePerm)
+		if err != nil {
+			log.Fatalf("failed to create directory: %v", err)
 		}
 	}
 

@@ -13,11 +13,10 @@ import (
 
 const checkProgProjectExists = `-- name: CheckProgProjectExists :one
 SELECT
-  CASE WHEN EXISTS (
-    SELECT 1
-    FROM programming_projects
-    WHERE path = ?
-  ) THEN 1 ELSE 0 END AS prog_proj_exists
+  COALESCE(pp.id, 0) AS prog_proj_exists
+FROM
+  (SELECT ? AS path) AS input
+  LEFT JOIN programming_projects pp ON pp.path = input.path
 `
 
 func (q *Queries) CheckProgProjectExists(ctx context.Context, path string) (int64, error) {
@@ -28,19 +27,25 @@ func (q *Queries) CheckProgProjectExists(ctx context.Context, path string) (int6
 }
 
 const createArea = `-- name: CreateArea :execlastid
-INSERT INTO areas (title, status, archived)
-VALUES (?, ?, ?)
+INSERT INTO areas (id, title, status, archived)
+VALUES (?, ?, ?, ?)
 returning id
 `
 
 type CreateAreaParams struct {
+	ID       int64          `json:"id"`
 	Title    string         `json:"title"`
 	Status   sql.NullString `json:"status"`
 	Archived bool           `json:"archived"`
 }
 
 func (q *Queries) CreateArea(ctx context.Context, arg CreateAreaParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createArea, arg.Title, arg.Status, arg.Archived)
+	result, err := q.db.ExecContext(ctx, createArea,
+		arg.ID,
+		arg.Title,
+		arg.Status,
+		arg.Archived,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -119,11 +124,11 @@ func (q *Queries) CreateProjectTaskLink(ctx context.Context, arg CreateProjectTa
 
 const createTask = `-- name: CreateTask :execlastid
 INSERT INTO tasks (
-    title, priority, status, archived, due_date, area_id,
+    id, title, priority, status, archived, due_date, area_id,
     created_at, last_mod
 )
 VALUES (
-    ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?,
     datetime(current_timestamp, 'localtime'),
     datetime(current_timestamp, 'localtime')
 )
@@ -131,6 +136,7 @@ returning id
 `
 
 type CreateTaskParams struct {
+	ID       int64          `json:"id"`
 	Title    string         `json:"title"`
 	Priority sql.NullString `json:"priority"`
 	Status   sql.NullString `json:"status"`
@@ -141,6 +147,7 @@ type CreateTaskParams struct {
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createTask,
+		arg.ID,
 		arg.Title,
 		arg.Priority,
 		arg.Status,
@@ -166,6 +173,20 @@ type CreateTaskBridgeNoteParams struct {
 
 func (q *Queries) CreateTaskBridgeNote(ctx context.Context, arg CreateTaskBridgeNoteParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createTaskBridgeNote, arg.NoteID, arg.ParentCat, arg.ParentTaskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const deleteAreaID = `-- name: DeleteAreaID :execlastid
+DELETE FROM area_ids
+WHERE id = ?
+returning id
+`
+
+func (q *Queries) DeleteAreaID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAreaID, id)
 	if err != nil {
 		return 0, err
 	}
@@ -285,6 +306,20 @@ func (q *Queries) DeleteTask(ctx context.Context, id int64) (int64, error) {
 	return id, err
 }
 
+const deleteTaskID = `-- name: DeleteTaskID :execlastid
+DELETE FROM task_ids
+WHERE id = ?
+returning id
+`
+
+func (q *Queries) DeleteTaskID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteTaskID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const deleteTasks = `-- name: DeleteTasks :execrows
 DELETE FROM tasks
 WHERE id in (/*SLICE:ids*/?)
@@ -352,6 +387,29 @@ func (q *Queries) FindProgProjectsForTask(ctx context.Context, parentTaskID sql.
 	return i, err
 }
 
+const getAreaID = `-- name: GetAreaID :one
+SELECT ID
+FROM area_ids LIMIT 1
+`
+
+func (q *Queries) GetAreaID(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getAreaID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getTaskID = `-- name: GetTaskID :one
+SELECT id FROM task_ids LIMIT 1
+`
+
+func (q *Queries) GetTaskID(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getTaskID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertProgProject = `-- name: InsertProgProject :one
 INSERT INTO programming_projects (path)
 VALUES (?)
@@ -363,6 +421,32 @@ func (q *Queries) InsertProgProject(ctx context.Context, path string) (int64, er
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const noAreaIDs = `-- name: NoAreaIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM areas
+WHERE id < 999
+`
+
+func (q *Queries) NoAreaIDs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, noAreaIDs)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const noTaskIDs = `-- name: NoTaskIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM tasks
+WHERE id < 999
+`
+
+func (q *Queries) NoTaskIDs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, noTaskIDs)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const readAllAreaNotes = `-- name: ReadAllAreaNotes :many
@@ -395,6 +479,59 @@ func (q *Queries) ReadAllAreaNotes(ctx context.Context) ([]ReadAllAreaNotesRow, 
 			&i.Path,
 			&i.AreaTitle,
 			&i.ParentID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const readAllAreas = `-- name: ReadAllAreas :many
+SELECT 
+    areas.id, areas.title, areas.status, areas.archived,
+    notes.id, notes.title, notes.path
+FROM 
+    areas
+LEFT JOIN 
+    bridge_notes ON areas.id = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2
+LEFT JOIN 
+    notes ON bridge_notes.note_id = notes.id
+`
+
+type ReadAllAreasRow struct {
+	ID       int64          `json:"id"`
+	Title    string         `json:"title"`
+	Status   sql.NullString `json:"status"`
+	Archived bool           `json:"archived"`
+	ID_2     sql.NullInt64  `json:"id_2"`
+	Title_2  sql.NullString `json:"title_2"`
+	Path     sql.NullString `json:"path"`
+}
+
+func (q *Queries) ReadAllAreas(ctx context.Context) ([]ReadAllAreasRow, error) {
+	rows, err := q.db.QueryContext(ctx, readAllAreas)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadAllAreasRow
+	for rows.Next() {
+		var i ReadAllAreasRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Status,
+			&i.Archived,
+			&i.ID_2,
+			&i.Title_2,
+			&i.Path,
 		); err != nil {
 			return nil, err
 		}
@@ -700,7 +837,7 @@ LEFT JOIN
     bridge_notes ON areas.id = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2
 LEFT JOIN 
     notes ON bridge_notes.note_id = notes.id
-LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_task_id = areas.id
+LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_area_id = areas.id
 LEFT OUTER JOIN programming_projects pp ON pjl.project_id = pp.id
 GROUP BY 
     areas.id
@@ -805,6 +942,58 @@ func (q *Queries) ReadNoteByID(ctx context.Context, id int64) (ReadNoteByIDRow, 
 		&i.Type,
 	)
 	return i, err
+}
+
+const readNoteByIDs = `-- name: ReadNoteByIDs :many
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE notes.id in (/*SLICE:ids*/?)
+`
+
+type ReadNoteByIDsRow struct {
+	ID    int64         `json:"id"`
+	Title string        `json:"title"`
+	Path  string        `json:"path"`
+	Type  sql.NullInt64 `json:"type"`
+}
+
+func (q *Queries) ReadNoteByIDs(ctx context.Context, ids []int64) ([]ReadNoteByIDsRow, error) {
+	query := readNoteByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadNoteByIDsRow
+	for rows.Next() {
+		var i ReadNoteByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Path,
+			&i.Type,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const readTask = `-- name: ReadTask :one
@@ -1029,6 +1218,32 @@ func (q *Queries) ReadTasks(ctx context.Context) ([]ReadTasksRow, error) {
 	return items, nil
 }
 
+const recycleAreaID = `-- name: RecycleAreaID :execlastid
+INSERT INTO area_ids (id) VALUES (?)
+returning id
+`
+
+func (q *Queries) RecycleAreaID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, recycleAreaID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const recycleTaskID = `-- name: RecycleTaskID :execlastid
+INSERT INTO task_ids (id) VALUES (?)
+returning id
+`
+
+func (q *Queries) RecycleTaskID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, recycleTaskID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const updateAreaArchived = `-- name: UpdateAreaArchived :execresult
 UPDATE areas SET archived = ?  where id = ?
 returning id, title, status, archived, created_at, last_mod
@@ -1087,6 +1302,20 @@ type UpdateTaskArchivedParams struct {
 
 func (q *Queries) UpdateTaskArchived(ctx context.Context, arg UpdateTaskArchivedParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateTaskArchived, arg.Archived, arg.ID)
+}
+
+const updateTaskArea = `-- name: UpdateTaskArea :execresult
+UPDATE tasks set area_id = ? where id = ?
+returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id
+`
+
+type UpdateTaskAreaParams struct {
+	AreaID sql.NullInt64 `json:"area_id"`
+	ID     int64         `json:"id"`
+}
+
+func (q *Queries) UpdateTaskArea(ctx context.Context, arg UpdateTaskAreaParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateTaskArea, arg.AreaID, arg.ID)
 }
 
 const updateTaskPriority = `-- name: UpdateTaskPriority :execresult

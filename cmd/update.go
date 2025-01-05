@@ -28,6 +28,7 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/akthe-at/go_task/data"
 	"github.com/akthe-at/go_task/db"
 	"github.com/akthe-at/go_task/sqlc"
 	"github.com/spf13/cobra"
@@ -44,22 +45,17 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("update called")
+		fmt.Println("update root called without subcommand, please see help for more information")
 	},
 }
 
-// TODO: This is going to require good helper text!!!
-//
 // updateTaskCmd represents the task update command
 var updateTaskCmd = &cobra.Command{
 	Use:   "task",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Update a task's field",
+	Long: `To update a task you must pass  the field you wish to to modify, followed by the id of the task, and the new value for that field. 
+	For example, to update the title of a task with an id of 1 you would pass the following command:
+	go_task update task title 1 "New Title"`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var (
 			inputID    = args[1]
@@ -72,7 +68,7 @@ to quickly create a Cobra application.`,
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -81,32 +77,51 @@ to quickly create a Cobra application.`,
 
 		switch inputField {
 		case "title":
-			queries.UpdateTaskTitle(ctx, sqlc.UpdateTaskTitleParams{
+			_, err = queries.UpdateTaskTitle(ctx, sqlc.UpdateTaskTitleParams{
 				Title: inputEdit,
 				ID:    convertedID,
 			})
+			if err != nil {
+				log.Fatalf("Error updating task title: %v", err)
+			}
 
 		case "priority":
-			priority, err := mapToPriorityType(inputEdit)
+			priority, err := data.StringToPriorityType(inputEdit)
 			if err != nil {
 				log.Fatalf("Invalid priority type: %v", err)
 			}
 
-			queries.UpdateTaskPriority(ctx, sqlc.UpdateTaskPriorityParams{
+			_, err = queries.UpdateTaskPriority(ctx, sqlc.UpdateTaskPriorityParams{
 				Priority: sql.NullString{String: string(priority), Valid: true},
 				ID:       convertedID,
 			})
+			if err != nil {
+				log.Fatalf("There was an error updating the task priority: %v", err)
+			}
 
 		case "status":
-			status, err := mapToStatusType(inputEdit)
+			status, err := data.StringToStatusType(inputEdit)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
-			queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
+			_, err = queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
 				Status: sql.NullString{String: string(status), Valid: true},
 				ID:     convertedID,
 			})
+			if err != nil {
+				log.Fatalf("Error updating task status: %v", err)
+			}
+
+		case "area":
+			areaID, err := strconv.ParseInt(inputEdit, 10, 64)
+			if err != nil {
+				log.Fatalf("Error parsing area id: %v", err)
+			}
+			_, err = queries.UpdateTaskArea(ctx, sqlc.UpdateTaskAreaParams{AreaID: sql.NullInt64{Int64: areaID, Valid: true}, ID: convertedID})
+			if err != nil {
+				log.Fatalf("Error updating task area: %v", err)
+			}
 
 		case "archived":
 			archiveState, err := strconv.ParseBool(inputField)
@@ -146,7 +161,7 @@ var updateAreaCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -164,7 +179,7 @@ var updateAreaCmd = &cobra.Command{
 			}
 
 		case "status":
-			status, err := mapToStatusType(inputField)
+			status, err := data.StringToStatusType(inputField)
 			if err != nil {
 				log.Fatalf("Invalid status type: %v", err)
 			}
@@ -201,14 +216,4 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 	updateCmd.AddCommand(updateTaskCmd)
 	updateCmd.AddCommand(updateAreaCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// updateCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// updateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

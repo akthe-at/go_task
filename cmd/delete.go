@@ -73,19 +73,24 @@ var deleteTaskCmd = &cobra.Command{
 		fmt.Println("delete cmd invoked for task(s):", taskIDs)
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
-		_, err = queries.DeleteTasks(ctx, taskIDs)
-		if err != nil {
-			log.Fatalf("Error deleting task(s): %v", err)
-		} else {
-			log.Printf("Succesfully Deleted!")
+		for _, taskID := range taskIDs {
+			_, err := queries.DeleteTask(ctx, taskID)
+			if err != nil {
+				log.Fatalf("Error deleting task: %v", err)
+			}
+			_, err = queries.RecycleTaskID(ctx, taskID)
+			if err != nil {
+				log.Fatalf("Error recycling task ID: %v", err)
+			}
 		}
+		fmt.Println("Succesfully Deleted!")
 	},
 }
 
@@ -120,7 +125,7 @@ var deleteAreaCmd = &cobra.Command{
 		fmt.Println("delete called for the following area(s):", areaIDs)
 
 		ctx := context.Background()
-		conn, err := db.ConnectDB()
+		conn, _, err := db.ConnectDB()
 		if err != nil {
 			log.Fatalf("Error connecting to database: %v", err)
 		}
@@ -134,6 +139,13 @@ var deleteAreaCmd = &cobra.Command{
 		queries := sqlc.New(conn)
 
 		qtx := queries.WithTx(tx)
+
+		for _, areaID := range areaIDs {
+			_, err = queries.RecycleAreaID(ctx, areaID)
+		}
+		if err != nil {
+			log.Fatalf("Error recycling area ID: %v", err)
+		}
 
 		_, err = qtx.DeleteMultipleAreas(ctx, areaIDs)
 		if err != nil {
@@ -160,13 +172,5 @@ func init() {
 	deleteCmd.AddCommand(deleteTaskCmd)
 	deleteCmd.AddCommand(deleteAreaCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// deleteCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
 	deleteAreaCmd.PersistentFlags().BoolVar(&deleteNotes, "notes", false, "Pass this flag to delete the notes associated with the area that is to be deleted.")
 }

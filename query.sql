@@ -1,3 +1,38 @@
+-- name: GetAreaID :one
+SELECT ID
+FROM area_ids LIMIT 1;
+
+-- name: NoAreaIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM areas
+WHERE id < 999;
+
+-- name: DeleteAreaID :execlastid
+DELETE FROM area_ids
+WHERE id = ?
+returning id;
+
+-- name: RecycleAreaID :execlastid
+INSERT INTO area_ids (id) VALUES (?)
+returning id;
+
+-- name: GetTaskID :one
+SELECT id FROM task_ids LIMIT 1;
+
+-- name: NoTaskIDs :one
+SELECT COALESCE(MAX(id), 0) + 1
+FROM tasks
+WHERE id < 999;
+
+-- name: DeleteTaskID :execlastid
+DELETE FROM task_ids
+WHERE id = ?
+returning id;
+
+-- name: RecycleTaskID :execlastid
+INSERT INTO task_ids (id) VALUES (?)
+returning id;
+
 -- name: CreateNote :execlastid
 INSERT INTO notes (title, path) VALUES (?, ?)
 returning id;
@@ -79,6 +114,7 @@ LEFT OUTER JOIN
     areas area ON area.id = tasks.area_id
 GROUP BY 
     tasks.id;
+
 -- name: ReadNote :many
 SELECT notes.id, notes.title, bridge_notes.parent_cat as type
 FROM notes
@@ -90,6 +126,13 @@ SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
 FROM notes
 JOIN bridge_notes on notes.id = bridge_notes.note_id
 WHERE notes.id = ?;
+
+
+-- name: ReadNoteByIDs :many
+SELECT notes.id, notes.title, notes.path, bridge_notes.parent_cat as type
+FROM notes
+JOIN bridge_notes on notes.id = bridge_notes.note_id
+WHERE notes.id in (sqlc.slice(ids));
 
 -- name: ReadAllTaskNotes :many
 SELECT notes.id, notes.title, notes.path, tasks.title as task_title, tasks.id  as parent_id
@@ -141,6 +184,10 @@ returning *;
 UPDATE tasks SET archived = ? WHERE id = ?
 returning *;
 
+-- name: UpdateTaskArea :execresult
+UPDATE tasks set area_id = ? where id = ?
+returning *;
+
 
 -- name: DeleteNote :one
 DELETE FROM notes WHERE id = ?
@@ -151,8 +198,8 @@ DELETE FROM notes WHERE id in (sqlc.slice(ids))
 returning *;
 
 -- name: CreateArea :execlastid
-INSERT INTO areas (title, status, archived)
-VALUES (?, ?, ?)
+INSERT INTO areas (id, title, status, archived)
+VALUES (?, ?, ?, ?)
 returning id;
 
 -- name: ReadArea :one
@@ -167,6 +214,18 @@ LEFT JOIN
     notes ON bridge_notes.note_id = notes.id
 WHERE 
     areas.id = ?;
+
+
+-- name: ReadAllAreas :many
+SELECT 
+    areas.id, areas.title, areas.status, areas.archived,
+    notes.id, notes.title, notes.path
+FROM 
+    areas
+LEFT JOIN 
+    bridge_notes ON areas.id = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2
+LEFT JOIN 
+    notes ON bridge_notes.note_id = notes.id;
 
 
 -- name: DeleteNotesFromSingleArea :execresult
@@ -199,11 +258,11 @@ returning *;
 
 -- name: CreateTask :execlastid
 INSERT INTO tasks (
-    title, priority, status, archived, due_date, area_id,
+    id, title, priority, status, archived, due_date, area_id,
     created_at, last_mod
 )
 VALUES (
-    ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?,
     datetime(current_timestamp, 'localtime'),
     datetime(current_timestamp, 'localtime')
 )
@@ -271,7 +330,7 @@ LEFT JOIN
     bridge_notes ON areas.id = bridge_notes.parent_area_id AND bridge_notes.parent_cat = 2
 LEFT JOIN 
     notes ON bridge_notes.note_id = notes.id
-LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_task_id = areas.id
+LEFT OUTER JOIN prog_project_links pjl ON pjl.parent_area_id = areas.id
 LEFT OUTER JOIN programming_projects pp ON pjl.project_id = pp.id
 GROUP BY 
     areas.id;
@@ -282,11 +341,10 @@ FROM programming_projects;
 
 -- name: CheckProgProjectExists :one
 SELECT
-  CASE WHEN EXISTS (
-    SELECT 1
-    FROM programming_projects
-    WHERE path = ?
-  ) THEN 1 ELSE 0 END AS prog_proj_exists;
+  COALESCE(pp.id, 0) AS prog_proj_exists
+FROM
+  (SELECT ? AS path) AS input
+  LEFT JOIN programming_projects pp ON pp.path = input.path;
 
 
 -- name: FindProgProjectsForTask :one
