@@ -1,5 +1,5 @@
 PRAGMA foreign_keys=ON;
--- PRAGMA journal_mode=WAL;
+PRAGMA journal_mode=WAL;
 
 CREATE TABLE IF NOT EXISTS areas (
     id INTEGER PRIMARY KEY,
@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS task_ids (
 CREATE TABLE IF NOT EXISTS area_ids (
   id integer PRIMARY KEY
 );
+
 
 CREATE TABLE IF NOT EXISTS prog_proj_ids (
   id integer PRIMARY KEY
@@ -56,9 +57,7 @@ END;
 CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY,
     title TEXT NOT NULL,
-    path TEXT NOT NULL,
-FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE,
-FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE
+    path TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS bridge_notes (

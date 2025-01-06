@@ -176,6 +176,26 @@ func (q *Queries) CreateTaskBridgeNote(ctx context.Context, arg CreateTaskBridge
 	return result.LastInsertId()
 }
 
+const deleteAreaBridgeNote = `-- name: DeleteAreaBridgeNote :execlastid
+DELETE FROM bridge_notes 
+WHERE note_id = ?
+AND parent_area_id = ?
+AND parent_cat = 2
+`
+
+type DeleteAreaBridgeNoteParams struct {
+	NoteID       sql.NullInt64 `json:"note_id"`
+	ParentAreaID sql.NullInt64 `json:"parent_area_id"`
+}
+
+func (q *Queries) DeleteAreaBridgeNote(ctx context.Context, arg DeleteAreaBridgeNoteParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAreaBridgeNote, arg.NoteID, arg.ParentAreaID)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const deleteAreaID = `-- name: DeleteAreaID :execlastid
 DELETE FROM area_ids
 WHERE id = ?
@@ -315,6 +335,26 @@ func (q *Queries) DeleteTask(ctx context.Context, id int64) (int64, error) {
 	row := q.db.QueryRowContext(ctx, deleteTask, id)
 	err := row.Scan(&id)
 	return id, err
+}
+
+const deleteTaskBridgeNote = `-- name: DeleteTaskBridgeNote :execlastid
+DELETE FROM bridge_notes 
+WHERE note_id = ? 
+AND parent_task_id = ?
+AND parent_cat = 1
+`
+
+type DeleteTaskBridgeNoteParams struct {
+	NoteID       sql.NullInt64 `json:"note_id"`
+	ParentTaskID sql.NullInt64 `json:"parent_task_id"`
+}
+
+func (q *Queries) DeleteTaskBridgeNote(ctx context.Context, arg DeleteTaskBridgeNoteParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteTaskBridgeNote, arg.NoteID, arg.ParentTaskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 const deleteTaskID = `-- name: DeleteTaskID :execlastid
@@ -1042,6 +1082,8 @@ func (q *Queries) ReadNoteByIDs(ctx context.Context, ids []int64) ([]ReadNoteByI
 }
 
 const readTask = `-- name: ReadTask :one
+;
+
 SELECT
     tasks.id AS task_id,
     tasks.title AS task_title,

@@ -66,8 +66,22 @@ INSERT INTO notes (id, title, path) VALUES (?, ?, ?);
 -- name: CreateTaskBridgeNote :execlastid
 INSERT INTO bridge_notes (note_id, parent_cat, parent_task_id) VALUES (?, ?, ?);
 
+-- name: DeleteTaskBridgeNote :execlastid
+DELETE FROM bridge_notes 
+WHERE note_id = ? 
+AND parent_task_id = ?
+AND parent_cat = 1;
+
 -- name: CreateAreaBridgeNote :execlastid
 INSERT INTO bridge_notes (note_id, parent_cat, parent_area_id) VALUES (?, ?, ?);
+
+
+-- name: DeleteAreaBridgeNote :execlastid
+DELETE FROM bridge_notes 
+WHERE note_id = ?
+AND parent_area_id = ?
+AND parent_cat = 2
+;
 
 -- name: ReadTask :one
 SELECT
