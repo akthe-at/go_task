@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strconv"
 
@@ -80,6 +81,7 @@ var deleteTaskCmd = &cobra.Command{
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
+		// TODO: Deal with deleting the bridge note connection to a task
 		for _, taskID := range taskIDs {
 			_, err := queries.DeleteTask(ctx, taskID)
 			if err != nil {
@@ -154,10 +156,18 @@ var deleteAreaCmd = &cobra.Command{
 
 		if deleteNotes {
 			_, err = qtx.DeleteNotes(ctx, areaIDs)
-			for _, noteID := range areaIDs {
+			for i, noteID := range areaIDs {
 				_, err := queries.DeleteNote(ctx, noteID)
 				if err != nil {
 					log.Fatalf("Error deleting task: %s", err)
+				}
+				bridgeNote := sqlc.DeleteAreaBridgeNoteParams{
+					NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+					ParentAreaID: sql.NullInt64{Int64: areaIDs[i], Valid: true},
+				}
+				_, err = queries.DeleteAreaBridgeNote(ctx, bridgeNote)
+				if err != nil {
+					log.Fatalf("Error deleting bridge note: %v", err)
 				}
 				_, err = queries.RecycleNoteID(ctx, noteID)
 				if err != nil {
