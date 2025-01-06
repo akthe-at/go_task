@@ -124,9 +124,7 @@ func SetupDB(db *sql.DB) error {
             title TEXT NOT NULL,
             path TEXT NOT NULL,
             parent_area_id INTEGER,
-            parent_task_id INTEGER,
-            FOREIGN KEY(parent_area_id) REFERENCES areas(id) ON DELETE CASCADE ON UPDATE CASCADE,
-            FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE
+            parent_task_id INTEGER
         );`,
 		`CREATE TABLE IF NOT EXISTS bridge_notes (
             note_id INTEGER,
@@ -200,6 +198,8 @@ func ResetDB(db *sql.DB) error {
 		DROP TABLE IF EXISTS bridge_notes;
 		DROP TABLE IF EXISTS programming_projects;
 		DROP TABLE IF EXISTS prog_project_links;
+		DROP TRIGGER IF EXISTS update_last_mod_tasks;
+		DROP TRIGGER IF EXISTS update_last_mod_areas;
 	`
 	tx, err := db.Begin()
 	if err != nil {
