@@ -125,20 +125,20 @@ var addTaskCmd = &cobra.Command{
 				if err != nil {
 					log.Fatalf("Error while checking if project exists: %v", err)
 				} else if projID == 0 {
-					project, err := queries.InsertProgProject(ctx, projectDir)
+					projID, err = queries.InsertProgProject(ctx, projectDir)
 					if err != nil {
 						log.Fatalf("Error inserting project: %v", err)
 					}
-					err = queries.CreateProjectTaskLink(ctx,
-						sqlc.CreateProjectTaskLinkParams{
-							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
-							ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
-							ParentTaskID: sql.NullInt64{Int64: newTaskID, Valid: true},
-						},
-					)
-					if err != nil {
-						log.Fatalf("Error inserting project link: %v", err)
-					}
+				}
+				err = queries.CreateProjectTaskLink(ctx,
+					sqlc.CreateProjectTaskLinkParams{
+						ProjectID:    sql.NullInt64{Int64: projID, Valid: true},
+						ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+						ParentTaskID: sql.NullInt64{Int64: newTaskID, Valid: true},
+					},
+				)
+				if err != nil {
+					log.Fatalf("Error inserting project link: %v", err)
 				}
 			}
 
@@ -824,7 +824,7 @@ OR to generate a new note AND add it to a specific area:
 					Path:  inputNotePath,
 				})
 				if err != nil {
-					fmt.Printf("addAreaNoteCmd: There was an error creating the note: %v", err)
+					fmt.Printf("addAreaNoteCmd: There was an error creating the note: %\n", err)
 				}
 
 				_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
