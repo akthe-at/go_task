@@ -663,8 +663,7 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 		taskNoteIDs := []int64{}
 		taskNotes, err := queries.ReadTaskNote(ctx, sql.NullInt64{Int64: taskID, Valid: true})
 		if err != nil {
-			log.Printf("Error reading notes: %s", err)
-			return nil
+			log.Fatalf("Error reading notes: %s", err)
 		}
 		for _, note := range taskNotes {
 			taskNoteIDs = append(taskNoteIDs, note.ID)
@@ -675,6 +674,13 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 				_, err = queries.DeleteNote(ctx, taskNoteID)
 				if err != nil {
 					log.Fatalf("Error deleting note: %s", err)
+				}
+				_, err = queries.DeleteTaskBridgeNote(ctx, sqlc.DeleteTaskBridgeNoteParams{
+					NoteID:       sql.NullInt64{Int64: taskNoteID, Valid: true},
+					ParentTaskID: sql.NullInt64{Int64: taskID, Valid: true},
+				})
+				if err != nil {
+					log.Fatalf("Error deleting bridge note: %s", err)
 				}
 				_, err = queries.RecycleNoteID(ctx, taskNoteID)
 				if err != nil {
@@ -716,6 +722,14 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 				_, err = queries.DeleteNote(ctx, taskNoteID)
 				if err != nil {
 					log.Fatalf("Error deleting note: %s", err)
+				}
+				bridgeNote := sqlc.DeleteTaskBridgeNoteParams{
+					NoteID:       sql.NullInt64{Int64: taskNoteID, Valid: true},
+					ParentTaskID: sql.NullInt64{Int64: taskID, Valid: true},
+				}
+				_, err = queries.DeleteTaskBridgeNote(ctx, bridgeNote)
+				if err != nil {
+					log.Fatalf("Error deleting bridge note: %s", err)
 				}
 				_, err = queries.RecycleNoteID(ctx, taskNoteID)
 				if err != nil {

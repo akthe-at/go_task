@@ -81,11 +81,23 @@ var deleteTaskCmd = &cobra.Command{
 		defer conn.Close()
 
 		queries := sqlc.New(conn)
-		// TODO: Deal with deleting the bridge note connection to a task
 		for _, taskID := range taskIDs {
-			_, err := queries.DeleteTask(ctx, taskID)
+			deletedTaskID, err := queries.DeleteTask(ctx, taskID)
 			if err != nil {
 				log.Fatalf("Error deleting task: %v", err)
+			}
+			noteRows, err := queries.ReadTaskNote(ctx, sql.NullInt64{Int64: deletedTaskID, Valid: true})
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error reading task notes: %v", err)
+			}
+			for _, row := range noteRows {
+				_, err = queries.DeleteTaskBridgeNote(ctx, sqlc.DeleteTaskBridgeNoteParams{
+					NoteID:       sql.NullInt64{Int64: row.ID, Valid: true},
+					ParentTaskID: sql.NullInt64{Int64: deletedTaskID, Valid: true},
+				})
+				if err != nil {
+					log.Fatalf("Error deleting bridge note: %v", err)
+				}
 			}
 			_, err = queries.RecycleTaskID(ctx, taskID)
 			if err != nil {
