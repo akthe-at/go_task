@@ -85,10 +85,6 @@ var deleteTaskCmd = &cobra.Command{
 			if err != nil {
 				log.Fatalf("Error deleting task: %v", err)
 			}
-			_, err = queries.RecycleTaskID(ctx, taskID)
-			if err != nil {
-				log.Fatalf("Error recycling task ID: %v", err)
-			}
 		}
 		fmt.Println("Succesfully Deleted!")
 	},
@@ -140,13 +136,6 @@ var deleteAreaCmd = &cobra.Command{
 
 		qtx := queries.WithTx(tx)
 
-		for _, areaID := range areaIDs {
-			_, err = queries.RecycleAreaID(ctx, areaID)
-		}
-		if err != nil {
-			log.Fatalf("Error recycling area ID: %v", err)
-		}
-
 		_, err = qtx.DeleteMultipleAreas(ctx, areaIDs)
 		if err != nil {
 			log.Fatalf("Error deleting area(s): %v", err)
@@ -154,6 +143,12 @@ var deleteAreaCmd = &cobra.Command{
 
 		if deleteNotes {
 			_, err = qtx.DeleteNotes(ctx, areaIDs)
+			for _, noteID := range areaIDs {
+				_, err := queries.DeleteNote(ctx, noteID)
+				if err != nil {
+					log.Fatalf("Error deleting task: %s", err)
+				}
+			}
 			if err != nil {
 				log.Fatalf("There was an error deleting the notes associated with the area(s): %v", err)
 			}

@@ -130,6 +130,9 @@ func fetchAreas() []huh.Option[string] {
 	for _, area := range areas {
 		options = append(options, huh.Option[string]{Value: strconv.FormatInt(area.ID, 10), Key: area.Title})
 	}
+	if len(options) == 0 {
+		options = append(options, huh.Option[string]{Value: "", Key: ""})
+	}
 
 	return options
 }

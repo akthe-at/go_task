@@ -57,7 +57,7 @@ INSERT INTO bridge_notes (note_id, parent_cat, parent_area_id) VALUES (?, ?, ?)
 `
 
 type CreateAreaBridgeNoteParams struct {
-	NoteID       sql.NullInt64 `json:"note_id"`
+	NoteID       int64         `json:"note_id"`
 	ParentCat    sql.NullInt64 `json:"parent_cat"`
 	ParentAreaID sql.NullInt64 `json:"parent_area_id"`
 }
@@ -70,22 +70,19 @@ func (q *Queries) CreateAreaBridgeNote(ctx context.Context, arg CreateAreaBridge
 	return result.LastInsertId()
 }
 
-const createNote = `-- name: CreateNote :execlastid
-INSERT INTO notes (title, path) VALUES (?, ?)
-returning id
+const createNote = `-- name: CreateNote :exec
+INSERT INTO notes (id, title, path) VALUES (?, ?, ?)
 `
 
 type CreateNoteParams struct {
+	ID    int64  `json:"id"`
 	Title string `json:"title"`
 	Path  string `json:"path"`
 }
 
-func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createNote, arg.Title, arg.Path)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) error {
+	_, err := q.db.ExecContext(ctx, createNote, arg.ID, arg.Title, arg.Path)
+	return err
 }
 
 const createProjectAreaLink = `-- name: CreateProjectAreaLink :exec
@@ -166,7 +163,7 @@ INSERT INTO bridge_notes (note_id, parent_cat, parent_task_id) VALUES (?, ?, ?)
 `
 
 type CreateTaskBridgeNoteParams struct {
-	NoteID       sql.NullInt64 `json:"note_id"`
+	NoteID       int64         `json:"note_id"`
 	ParentCat    sql.NullInt64 `json:"parent_cat"`
 	ParentTaskID sql.NullInt64 `json:"parent_task_id"`
 }
@@ -179,14 +176,20 @@ func (q *Queries) CreateTaskBridgeNote(ctx context.Context, arg CreateTaskBridge
 	return result.LastInsertId()
 }
 
-const deleteAreaID = `-- name: DeleteAreaID :execlastid
-DELETE FROM area_ids
-WHERE id = ?
-returning id
+const deleteAreaBridgeNote = `-- name: DeleteAreaBridgeNote :execlastid
+DELETE FROM bridge_notes 
+WHERE note_id = ?
+AND parent_area_id = ?
+AND parent_cat = 2
 `
 
-func (q *Queries) DeleteAreaID(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteAreaID, id)
+type DeleteAreaBridgeNoteParams struct {
+	NoteID       int64         `json:"note_id"`
+	ParentAreaID sql.NullInt64 `json:"parent_area_id"`
+}
+
+func (q *Queries) DeleteAreaBridgeNote(ctx context.Context, arg DeleteAreaBridgeNoteParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAreaBridgeNote, arg.NoteID, arg.ParentAreaID)
 	if err != nil {
 		return 0, err
 	}
@@ -294,26 +297,34 @@ func (q *Queries) DeleteSingleArea(ctx context.Context, id int64) (int64, error)
 	return id, err
 }
 
-const deleteTask = `-- name: DeleteTask :one
+const deleteTask = `-- name: DeleteTask :execlastid
 DELETE FROM tasks
 WHERE id = ?
-returning id
+returning id, title, priority, status, archived, created_at, last_mod, due_date, area_id
 `
 
 func (q *Queries) DeleteTask(ctx context.Context, id int64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, deleteTask, id)
-	err := row.Scan(&id)
-	return id, err
+	result, err := q.db.ExecContext(ctx, deleteTask, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
-const deleteTaskID = `-- name: DeleteTaskID :execlastid
-DELETE FROM task_ids
-WHERE id = ?
-returning id
+const deleteTaskBridgeNote = `-- name: DeleteTaskBridgeNote :execlastid
+DELETE FROM bridge_notes 
+WHERE note_id = ? 
+AND parent_task_id = ?
+AND parent_cat = 1
 `
 
-func (q *Queries) DeleteTaskID(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteTaskID, id)
+type DeleteTaskBridgeNoteParams struct {
+	NoteID       int64         `json:"note_id"`
+	ParentTaskID sql.NullInt64 `json:"parent_task_id"`
+}
+
+func (q *Queries) DeleteTaskBridgeNote(ctx context.Context, arg DeleteTaskBridgeNoteParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteTaskBridgeNote, arg.NoteID, arg.ParentTaskID)
 	if err != nil {
 		return 0, err
 	}
@@ -388,26 +399,45 @@ func (q *Queries) FindProgProjectsForTask(ctx context.Context, parentTaskID sql.
 }
 
 const getAreaID = `-- name: GetAreaID :one
-SELECT ID
-FROM area_ids LIMIT 1
+SELECT CAST(COALESCE(MIN(a1.id + 1), 1) AS INT) AS missing_id
+FROM areas a1
+LEFT JOIN areas a2 ON a1.id + 1 = a2.id
+WHERE a2.id IS NULL
 `
 
 func (q *Queries) GetAreaID(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, getAreaID)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+	var missing_id int64
+	err := row.Scan(&missing_id)
+	return missing_id, err
+}
+
+const getNoteID = `-- name: GetNoteID :one
+SELECT CAST(COALESCE(MIN(n1.id + 1), 1) AS INT) AS missing_id
+FROM notes n1
+LEFT JOIN notes n2 ON n1.id + 1 = n2.id
+WHERE n2.id IS NULL
+`
+
+func (q *Queries) GetNoteID(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getNoteID)
+	var missing_id int64
+	err := row.Scan(&missing_id)
+	return missing_id, err
 }
 
 const getTaskID = `-- name: GetTaskID :one
-SELECT id FROM task_ids LIMIT 1
+SELECT CAST(COALESCE(MIN(t1.id + 1), 1) AS INT) AS missing_id
+FROM tasks t1
+LEFT JOIN tasks t2 ON t1.id + 1 = t2.id
+WHERE t2.id IS NULL
 `
 
 func (q *Queries) GetTaskID(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, getTaskID)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+	var missing_id int64
+	err := row.Scan(&missing_id)
+	return missing_id, err
 }
 
 const insertProgProject = `-- name: InsertProgProject :one
@@ -421,32 +451,6 @@ func (q *Queries) InsertProgProject(ctx context.Context, path string) (int64, er
 	var id int64
 	err := row.Scan(&id)
 	return id, err
-}
-
-const noAreaIDs = `-- name: NoAreaIDs :one
-SELECT COALESCE(MAX(id), 0) + 1
-FROM areas
-WHERE id < 999
-`
-
-func (q *Queries) NoAreaIDs(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, noAreaIDs)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const noTaskIDs = `-- name: NoTaskIDs :one
-SELECT COALESCE(MAX(id), 0) + 1
-FROM tasks
-WHERE id < 999
-`
-
-func (q *Queries) NoTaskIDs(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, noTaskIDs)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
 }
 
 const readAllAreaNotes = `-- name: ReadAllAreaNotes :many
@@ -547,7 +551,7 @@ func (q *Queries) ReadAllAreas(ctx context.Context) ([]ReadAllAreasRow, error) {
 }
 
 const readAllNotes = `-- name: ReadAllNotes :many
-SELECT notes.id, notes.title, notes.path, coalesce(tasks.title, areas.title) [area_or_task_title], case when bridge_notes.parent_cat = 1 then 'Task' else 'Area' end as [parent_type]
+SELECT notes.id, notes.title, notes.path, coalesce(tasks.title, areas.title, 'Unknown') [area_or_task_title], case when bridge_notes.parent_cat = 1 then 'Task' else 'Area' end as [parent_type]
 FROM notes
 INNER JOIN bridge_notes ON bridge_notes.note_id = notes.id
 LEFT JOIN tasks ON tasks.ID = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
@@ -895,7 +899,7 @@ type ReadNoteRow struct {
 	Type  sql.NullInt64 `json:"type"`
 }
 
-func (q *Queries) ReadNote(ctx context.Context, noteID sql.NullInt64) ([]ReadNoteRow, error) {
+func (q *Queries) ReadNote(ctx context.Context, noteID int64) ([]ReadNoteRow, error) {
 	rows, err := q.db.QueryContext(ctx, readNote, noteID)
 	if err != nil {
 		return nil, err
@@ -997,6 +1001,8 @@ func (q *Queries) ReadNoteByIDs(ctx context.Context, ids []int64) ([]ReadNoteByI
 }
 
 const readTask = `-- name: ReadTask :one
+;
+
 SELECT
     tasks.id AS task_id,
     tasks.title AS task_title,
@@ -1216,32 +1222,6 @@ func (q *Queries) ReadTasks(ctx context.Context) ([]ReadTasksRow, error) {
 		return nil, err
 	}
 	return items, nil
-}
-
-const recycleAreaID = `-- name: RecycleAreaID :execlastid
-INSERT INTO area_ids (id) VALUES (?)
-returning id
-`
-
-func (q *Queries) RecycleAreaID(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.ExecContext(ctx, recycleAreaID, id)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
-}
-
-const recycleTaskID = `-- name: RecycleTaskID :execlastid
-INSERT INTO task_ids (id) VALUES (?)
-returning id
-`
-
-func (q *Queries) RecycleTaskID(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.ExecContext(ctx, recycleTaskID, id)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
 }
 
 const updateAreaArchived = `-- name: UpdateAreaArchived :execresult

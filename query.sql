@@ -1,47 +1,43 @@
+-- name: GetNoteID :one
+SELECT CAST(COALESCE(MIN(n1.id + 1), 1) AS INT) AS missing_id
+FROM notes n1
+LEFT JOIN notes n2 ON n1.id + 1 = n2.id
+WHERE n2.id IS NULL;
+
 -- name: GetAreaID :one
-SELECT ID
-FROM area_ids LIMIT 1;
-
--- name: NoAreaIDs :one
-SELECT COALESCE(MAX(id), 0) + 1
-FROM areas
-WHERE id < 999;
-
--- name: DeleteAreaID :execlastid
-DELETE FROM area_ids
-WHERE id = ?
-returning id;
-
--- name: RecycleAreaID :execlastid
-INSERT INTO area_ids (id) VALUES (?)
-returning id;
+SELECT CAST(COALESCE(MIN(a1.id + 1), 1) AS INT) AS missing_id
+FROM areas a1
+LEFT JOIN areas a2 ON a1.id + 1 = a2.id
+WHERE a2.id IS NULL;
 
 -- name: GetTaskID :one
-SELECT id FROM task_ids LIMIT 1;
+SELECT CAST(COALESCE(MIN(t1.id + 1), 1) AS INT) AS missing_id
+FROM tasks t1
+LEFT JOIN tasks t2 ON t1.id + 1 = t2.id
+WHERE t2.id IS NULL;
 
--- name: NoTaskIDs :one
-SELECT COALESCE(MAX(id), 0) + 1
-FROM tasks
-WHERE id < 999;
-
--- name: DeleteTaskID :execlastid
-DELETE FROM task_ids
-WHERE id = ?
-returning id;
-
--- name: RecycleTaskID :execlastid
-INSERT INTO task_ids (id) VALUES (?)
-returning id;
-
--- name: CreateNote :execlastid
-INSERT INTO notes (title, path) VALUES (?, ?)
-returning id;
+-- name: CreateNote :exec
+INSERT INTO notes (id, title, path) VALUES (?, ?, ?);
 
 -- name: CreateTaskBridgeNote :execlastid
 INSERT INTO bridge_notes (note_id, parent_cat, parent_task_id) VALUES (?, ?, ?);
 
+-- name: DeleteTaskBridgeNote :execlastid
+DELETE FROM bridge_notes 
+WHERE note_id = ? 
+AND parent_task_id = ?
+AND parent_cat = 1;
+
 -- name: CreateAreaBridgeNote :execlastid
 INSERT INTO bridge_notes (note_id, parent_cat, parent_area_id) VALUES (?, ?, ?);
+
+
+-- name: DeleteAreaBridgeNote :execlastid
+DELETE FROM bridge_notes 
+WHERE note_id = ?
+AND parent_area_id = ?
+AND parent_cat = 2
+;
 
 -- name: ReadTask :one
 SELECT
@@ -149,7 +145,7 @@ INNER JOIN areas ON areas.ID = bridge_notes.parent_area_id AND bridge_notes.pare
 
 
 -- name: ReadAllNotes :many
-SELECT notes.id, notes.title, notes.path, coalesce(tasks.title, areas.title) [area_or_task_title], case when bridge_notes.parent_cat = 1 then 'Task' else 'Area' end as [parent_type]
+SELECT notes.id, notes.title, notes.path, coalesce(tasks.title, areas.title, 'Unknown') [area_or_task_title], case when bridge_notes.parent_cat = 1 then 'Task' else 'Area' end as [parent_type]
 FROM notes
 INNER JOIN bridge_notes ON bridge_notes.note_id = notes.id
 LEFT JOIN tasks ON tasks.ID = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
@@ -293,10 +289,10 @@ AND bridge_notes.parent_cat = 1;
 	GROUP BY tasks.id;
 
 
--- name: DeleteTask :one
+-- name: DeleteTask :execlastid
 DELETE FROM tasks
 WHERE id = ?
-returning id;
+returning *;
 
 
 -- name: DeleteTasks :execrows

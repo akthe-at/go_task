@@ -90,17 +90,6 @@ var addTaskCmd = &cobra.Command{
 			if err != nil && err != sql.ErrNoRows {
 				log.Fatalf("Error getting task ID: %v", err)
 			}
-			if err == sql.ErrNoRows {
-				newTaskID, err = queries.NoTaskIDs(ctx)
-				if err != nil {
-					log.Fatalf("Failed to find the next available task ID: %v", err)
-				}
-			} else {
-				_, err = queries.DeleteTaskID(ctx, newTaskID)
-				if err != nil {
-					log.Fatalf("Error deleting task ID: %v", err)
-				}
-			}
 
 			newTask := sqlc.CreateTaskParams{
 				ID:       newTaskID,
@@ -125,20 +114,20 @@ var addTaskCmd = &cobra.Command{
 				if err != nil {
 					log.Fatalf("Error while checking if project exists: %v", err)
 				} else if projID == 0 {
-					project, err := queries.InsertProgProject(ctx, projectDir)
+					projID, err = queries.InsertProgProject(ctx, projectDir)
 					if err != nil {
 						log.Fatalf("Error inserting project: %v", err)
 					}
-					err = queries.CreateProjectTaskLink(ctx,
-						sqlc.CreateProjectTaskLinkParams{
-							ProjectID:    sql.NullInt64{Int64: project, Valid: true},
-							ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
-							ParentTaskID: sql.NullInt64{Int64: newTaskID, Valid: true},
-						},
-					)
-					if err != nil {
-						log.Fatalf("Error inserting project link: %v", err)
-					}
+				}
+				err = queries.CreateProjectTaskLink(ctx,
+					sqlc.CreateProjectTaskLinkParams{
+						ProjectID:    sql.NullInt64{Int64: projID, Valid: true},
+						ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
+						ParentTaskID: sql.NullInt64{Int64: newTaskID, Valid: true},
+					},
+				)
+				if err != nil {
+					log.Fatalf("Error inserting project link: %v", err)
 				}
 			}
 
@@ -155,17 +144,6 @@ var addTaskCmd = &cobra.Command{
 				newTaskID, err := queries.GetTaskID(ctx)
 				if err != nil && err != sql.ErrNoRows {
 					log.Fatalf("Error getting task ID: %v", err)
-				}
-				if err == sql.ErrNoRows {
-					newTaskID, err = queries.NoTaskIDs(ctx)
-					if err != nil {
-						log.Fatalf("Failed to find the next available task ID: %v", err)
-					} else {
-						_, err = queries.DeleteTaskID(ctx, newTaskID)
-						if err != nil {
-							log.Fatalf("Error deleting task ID: %v", err)
-						}
-					}
 				}
 				newTask := sqlc.CreateTaskParams{
 					ID:       newTaskID,
@@ -273,20 +251,9 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 				log.Fatalf("Invalid status type: %v", err)
 			}
 
-			areaID, err = queries.GetAreaID(ctx)
-			if err != nil && err != sql.ErrNoRows {
+			areaID, err := queries.GetAreaID(ctx)
+			if err != nil {
 				log.Fatalf("Error getting area ID: %v", err)
-			}
-			if err == sql.ErrNoRows {
-				areaID, err = queries.NoAreaIDs(ctx)
-				if err != nil {
-					log.Fatalf("Failed to find the next available area ID: %v", err)
-				} else {
-					_, err = queries.DeleteAreaID(ctx, areaID)
-					if err != nil {
-						log.Fatalf("Error deleting area ID: %v", err)
-					}
-				}
 			}
 			_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
 				ID:       areaID,
@@ -312,20 +279,9 @@ if one of your arguments has white space, please wrap it in "" marks.`)
 
 			if form.Submit {
 
-				areaID, err = queries.GetAreaID(ctx)
+				areaID, err := queries.GetAreaID(ctx)
 				if err != nil && err != sql.ErrNoRows {
 					log.Fatalf("Error getting area ID: %v", err)
-				}
-				if err == sql.ErrNoRows {
-					areaID, err = queries.NoAreaIDs(ctx)
-					if err != nil {
-						log.Fatalf("Failed to find the next available area ID: %v", err)
-					} else {
-						_, err = queries.DeleteAreaID(ctx, areaID)
-						if err != nil {
-							log.Fatalf("Error deleting area ID: %v", err)
-						}
-					}
 				}
 				_, err = queries.CreateArea(ctx, sqlc.CreateAreaParams{
 					ID:       areaID,
@@ -436,7 +392,14 @@ OR to generate a new note AND add it to a specific task:
 
 			queries := sqlc.New(conn)
 			qtx := queries.WithTx(tx)
-			noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+
+			noteID, err := qtx.GetNoteID(ctx)
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error getting note ID: %v", err)
+			}
+
+			err = qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+				ID:    noteID,
 				Title: inputNoteTitle,
 				Path:  outputPath,
 			})
@@ -445,7 +408,7 @@ OR to generate a new note AND add it to a specific task:
 			}
 
 			_, err = qtx.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
-				NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+				NoteID:       noteID,
 				ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 				ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
 			})
@@ -503,7 +466,14 @@ OR to generate a new note AND add it to a specific task:
 
 			queries := sqlc.New(conn)
 			qtx := queries.WithTx(tx)
-			noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+
+			noteID, err := qtx.GetNoteID(ctx)
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error getting note ID: %v", err)
+			}
+
+			err = qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+				ID:    noteID,
 				Title: inputNoteTitle,
 				Path:  inputNotePath,
 			})
@@ -512,7 +482,7 @@ OR to generate a new note AND add it to a specific task:
 			}
 
 			_, err = qtx.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
-				NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+				NoteID:       noteID,
 				ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 				ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
 			})
@@ -604,8 +574,14 @@ OR to generate a new note AND add it to a specific area:
 				log.Fatalf("Error creating form: %v", err)
 			}
 
+			noteID, err := qtx.GetNoteID(ctx)
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error getting note ID: %v", err)
+			}
+
 			if form.Submit {
-				noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+				err = qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+					ID:    noteID,
 					Title: form.Title,
 					Path:  form.Path,
 				})
@@ -613,7 +589,7 @@ OR to generate a new note AND add it to a specific area:
 					log.Fatalf("addAreaNoteCmd: There was an error creating the note: %v", err)
 				}
 				_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+					NoteID:       noteID,
 					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
 					ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
 				})
@@ -686,7 +662,12 @@ OR to generate a new note AND add it to a specific area:
 					}
 				}
 
-				noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+				noteID, err := qtx.GetNoteID(ctx)
+				if err != nil && err != sql.ErrNoRows {
+					log.Fatalf("Error getting note ID: %v", err)
+				}
+				err = qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+					ID:    noteID,
 					Title: inputNoteTitle,
 					Path:  outputPath,
 				})
@@ -695,7 +676,7 @@ OR to generate a new note AND add it to a specific area:
 				}
 
 				_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+					NoteID:       noteID,
 					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
 					ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
 				})
@@ -733,16 +714,22 @@ OR to generate a new note AND add it to a specific area:
 					log.Fatalf("You must provide at least 3 arguments! Usage: add area note <area_id> <note_title> <note_path>")
 				}
 
-				noteID, err := qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+				noteID, err := qtx.GetNoteID(ctx)
+				if err != nil && err != sql.ErrNoRows {
+					log.Fatalf("Error getting note ID: %v", err)
+				}
+
+				err = qtx.CreateNote(ctx, sqlc.CreateNoteParams{
+					ID:    noteID,
 					Title: inputNoteTitle,
 					Path:  inputNotePath,
 				})
 				if err != nil {
-					fmt.Printf("addAreaNoteCmd: There was an error creating the note: %v", err)
+					fmt.Printf("addAreaNoteCmd: There was an error creating the note: %\n", err)
 				}
 
 				_, err = qtx.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+					NoteID:       noteID,
 					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
 					ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
 				})

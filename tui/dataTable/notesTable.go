@@ -265,7 +265,13 @@ func (m *NotesModel) addNote() tea.Cmd {
 			queries := sqlc.New(conn)
 			defer conn.Close()
 
-			newNoteID, err := queries.CreateNote(ctx, sqlc.CreateNoteParams{
+			noteID, err := queries.GetNoteID(ctx)
+			if err != nil && err != sql.ErrNoRows {
+				log.Fatalf("Error getting note ID: %v", err)
+			}
+
+			err = queries.CreateNote(ctx, sqlc.CreateNoteParams{
+				ID:    noteID,
 				Title: form.Title,
 				Path:  form.Path,
 			},
@@ -277,7 +283,7 @@ func (m *NotesModel) addNote() tea.Cmd {
 			switch form.Type {
 			case data.TaskNoteType:
 				_, err = queries.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: newNoteID, Valid: true},
+					NoteID:       noteID,
 					ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 					ParentTaskID: sql.NullInt64{Int64: int64(form.ParentID), Valid: true},
 				},
@@ -288,7 +294,7 @@ func (m *NotesModel) addNote() tea.Cmd {
 				}
 			case data.AreaNoteType:
 				_, err := queries.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: newNoteID, Valid: true},
+					NoteID:       noteID,
 					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
 					ParentAreaID: sql.NullInt64{Int64: int64(form.ParentID), Valid: true},
 				},
@@ -352,39 +358,47 @@ func (m *NotesModel) deleteNote() tea.Cmd {
 	for _, row := range m.tableModel.SelectedRows() {
 		selectedIDs = append(selectedIDs, row.Data[NoteColumnKeyID].(int64))
 	}
-	taskID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
+	noteID := m.tableModel.HighlightedRow().Data[NoteColumnKeyID].(int64)
 
 	conn, _, err := db.ConnectDB()
 	if err != nil {
-		log.Printf("Error connecting to database: %s", err)
+		log.Fatalf("Error connecting to database: %s", err)
 		return nil
 	}
 	defer conn.Close()
 	queries := sqlc.New(conn)
 
-	if len(selectedIDs) == 1 {
-		_, err := queries.DeleteNote(ctx, int64(taskID))
+	switch len(selectedIDs) {
+	case 0:
+		_, err := queries.DeleteNote(ctx, noteID)
 		if err != nil {
-			log.Printf("Error deleting task: %s", err)
-			return nil
-		}
-		// m.deleteMessage = fmt.Sprintf("You deleted this task:  IDs: %s", deletedNote.ID)
-	} else if len(selectedIDs) > 1 {
-		_, err := queries.DeleteNotes(ctx, selectedIDs)
-		if err != nil {
-			log.Printf("Error deleting tasks: %s", err)
+			log.Fatalf("Error deleting task: %s", err)
 			return nil
 		}
 
+	case 1:
+		_, err := queries.DeleteNote(ctx, noteID)
+		if err != nil {
+			log.Fatalf("Error deleting task: %s", err)
+			return nil
+		}
+	default:
+		for _, noteID := range selectedIDs {
+			_, err := queries.DeleteNote(ctx, noteID)
+			if err != nil {
+				log.Fatalf("Error deleting task: %s", err)
+				return nil
+			}
+		}
 	}
+
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
-		log.Printf("Error loading rows from database: %s", err)
+		log.Fatalf("Error loading rows from database: %s", err)
 		return nil
 	}
 	m.tableModel = m.tableModel.WithRows(rows)
 
-	// Update the footer
 	m.updateFooter()
 
 	return nil

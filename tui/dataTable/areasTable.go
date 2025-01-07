@@ -303,12 +303,18 @@ func (m *AreasModel) addNote() tea.Cmd {
 
 		queries := sqlc.New(conn)
 		defer conn.Close()
-		noteID, err := queries.CreateNote(ctx, newNote)
+
+		noteID, err := queries.GetNoteID(ctx)
+		if err != nil && err != sql.ErrNoRows {
+			log.Fatalf("Error getting note ID: %v", err)
+		}
+
+		err = queries.CreateNote(ctx, newNote)
 		if err != nil {
 			log.Fatalf("Error creating note: %v", err)
 		}
 		id, err := queries.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
-			NoteID:       sql.NullInt64{Int64: int64(noteID), Valid: true},
+			NoteID:       noteID,
 			ParentCat:    sql.NullInt64{Int64: int64(form.Type), Valid: true},
 			ParentAreaID: sql.NullInt64{Int64: int64(areaID), Valid: true},
 		},
@@ -358,17 +364,6 @@ func (m *AreasModel) addArea() tea.Cmd {
 		areaID, err := queries.GetAreaID(ctx)
 		if err != nil && err != sql.ErrNoRows {
 			log.Fatalf("Error getting area ID: %v", err)
-		}
-		if err == sql.ErrNoRows {
-			areaID, err = queries.NoAreaIDs(ctx)
-			if err != nil {
-				log.Fatalf("Failed to find the next available area ID: %v", err)
-			} else {
-				_, err = queries.DeleteAreaID(ctx, areaID)
-				if err != nil {
-					log.Fatalf("Error deleting area ID: %v", err)
-				}
-			}
 		}
 		newArea := sqlc.CreateAreaParams{
 			ID:       areaID,
@@ -533,19 +528,17 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 		}
 		// delete those notes
 		if highlightedNote != "" {
-			_, err := queries.DeleteNotes(ctx, areaNoteIDs)
-			if err != nil {
-				log.Fatalf("Error deleting notes: %s", err)
+			for _, areaNoteID := range areaNoteIDs {
+				_, err = queries.DeleteNote(ctx, areaNoteID)
+				if err != nil {
+					log.Fatalf("Error deleting note: %s", err)
+				}
 			}
 		}
 		// delete the project
 		deletedID, err := queries.DeleteSingleArea(ctx, areaID)
 		if err != nil {
 			log.Fatalf("Error deleting area: %s", err)
-		}
-		_, err = queries.RecycleAreaID(ctx, areaID)
-		if err != nil {
-			log.Fatalf("Error recycling area ID: %s", err)
 		}
 		if deletedID != areaID {
 			log.Fatalf("Error deleting area: %s", err)
@@ -566,9 +559,11 @@ func (m *AreasModel) deleteArea() tea.Cmd {
 		}
 		// delete those notes
 		if highlightedNote != "" {
-			_, err := queries.DeleteNotes(ctx, areaNoteIDs)
-			if err != nil {
-				log.Fatalf("Error deleting notes: %s", err)
+			for _, areaNoteID := range areaNoteIDs {
+				_, err = queries.DeleteNote(ctx, areaNoteID)
+				if err != nil {
+					log.Fatalf("Error deleting note: %s", err)
+				}
 			}
 		}
 		areasToDelete := make([]int64, len(selectedIDs))

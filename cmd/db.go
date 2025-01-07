@@ -61,7 +61,6 @@ var dbInitCmd = &cobra.Command{
 		if err != nil {
 			fmt.Println("Error setting up database:", err)
 		}
-		// }
 
 		fmt.Println("Setup complete")
 	},
