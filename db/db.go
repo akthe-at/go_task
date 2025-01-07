@@ -43,6 +43,11 @@ func ConnectDB() (*sql.DB, string, error) {
 	}
 	completePath := dbPath + "/taskdb.db"
 
+	_, err = db.Exec("PRAGMA foreign_keys=ON;")
+	if err != nil {
+		log.Fatalf("Failed to enable foreign keys: %v", err)
+	}
+
 	err = db.Ping()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to ping database: %w", err)
@@ -86,7 +91,6 @@ SetupDB Setup the Initial DB Schema
 */
 func SetupDB(db *sql.DB) error {
 	query := `
-		PRAGMA foreign_keys=ON;
 		PRAGMA journal_mode=WAL;
 		CREATE TABLE IF NOT EXISTS areas (
 			id INTEGER PRIMARY KEY,
