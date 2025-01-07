@@ -299,24 +299,13 @@ func (m *TaskModel) addNote() tea.Cmd {
 		if err != nil && err != sql.ErrNoRows {
 			log.Fatalf("Error getting note ID: %v", err)
 		}
-		if err == sql.ErrNoRows {
-			noteID, err = queries.NoNoteIDs(ctx)
-			if err != nil {
-				log.Fatalf("Failed to find the next available note ID: %v", err)
-			} else {
-				_, err = queries.DeleteNoteID(ctx, noteID)
-				if err != nil {
-					log.Fatalf("Error deleting note ID: %v", err)
-				}
-			}
-		}
 
 		err = queries.CreateNote(ctx, newNote)
 		if err != nil {
 			log.Fatalf("Error creating note: %v", err)
 		}
 		id, err := queries.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
-			NoteID:       sql.NullInt64{Int64: int64(noteID), Valid: true},
+			NoteID:       noteID,
 			ParentCat:    sql.NullInt64{Int64: int64(form.Type), Valid: true},
 			ParentTaskID: sql.NullInt64{Int64: int64(taskID), Valid: true},
 		},
@@ -364,19 +353,8 @@ func (m *TaskModel) addTask() tea.Cmd {
 		queries := sqlc.New(conn)
 
 		newTaskID, err := queries.GetTaskID(ctx)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil {
 			log.Fatalf("addTask - TaskModel: Error getting task ID: %v", err)
-		}
-		if err == sql.ErrNoRows {
-			newTaskID, err = queries.NoTaskIDs(ctx)
-			if err != nil {
-				log.Fatalf("Failed to find the next available task ID: %v", err)
-			} else {
-				_, err = queries.DeleteTaskID(ctx, newTaskID)
-				if err != nil {
-					log.Fatalf("Error deleting task ID: %v", err)
-				}
-			}
 		}
 
 		newTask := sqlc.CreateTaskParams{
@@ -675,17 +653,6 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 				if err != nil {
 					log.Fatalf("Error deleting note: %s", err)
 				}
-				_, err = queries.DeleteTaskBridgeNote(ctx, sqlc.DeleteTaskBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: taskNoteID, Valid: true},
-					ParentTaskID: sql.NullInt64{Int64: taskID, Valid: true},
-				})
-				if err != nil {
-					log.Fatalf("Error deleting bridge note: %s", err)
-				}
-				_, err = queries.RecycleNoteID(ctx, taskNoteID)
-				if err != nil {
-					log.Fatalf("Error recycling note ID: %s", err)
-				}
 			}
 		}
 		// delete the task
@@ -694,15 +661,7 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 			log.Printf("Error deleting task: %s", err)
 			return nil
 		}
-		_, err = queries.RecycleTaskID(ctx, deletedID)
-		if err != nil {
-			log.Fatalf("Error recycling task ID: %s", err)
-		}
-		if deletedID != taskID {
-			log.Fatalf("Error deleting task: %s", err)
-		} else {
-			m.deleteMessage = fmt.Sprintf("You deleted the following task: %s", highlightedInfo)
-		}
+		m.deleteMessage = fmt.Sprintf("You deleted the following task: %v", deletedID)
 
 	} else if len(selectedIDs) > 1 {
 		queries := sqlc.New(conn)
@@ -723,18 +682,6 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 				if err != nil {
 					log.Fatalf("Error deleting note: %s", err)
 				}
-				bridgeNote := sqlc.DeleteTaskBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: taskNoteID, Valid: true},
-					ParentTaskID: sql.NullInt64{Int64: taskID, Valid: true},
-				}
-				_, err = queries.DeleteTaskBridgeNote(ctx, bridgeNote)
-				if err != nil {
-					log.Fatalf("Error deleting bridge note: %s", err)
-				}
-				_, err = queries.RecycleNoteID(ctx, taskNoteID)
-				if err != nil {
-					log.Fatalf("Error recycling note ID: %s", err)
-				}
 			}
 		}
 		toDeleteTasks := make([]int64, len(selectedIDs))
@@ -749,10 +696,6 @@ func (m *TaskModel) deleteTask() tea.Cmd {
 			_, err := queries.DeleteTask(ctx, taskID)
 			if err != nil {
 				log.Fatalf("Error deleting task: %v", err)
-			}
-			_, err = queries.RecycleTaskID(ctx, taskID)
-			if err != nil {
-				log.Fatalf("Error recycling task ID: %v", err)
 			}
 		}
 		m.deleteMessage = fmt.Sprintf("You deleted the following tasks: %s", strings.Join(selectedIDs, ", "))

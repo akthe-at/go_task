@@ -1,64 +1,20 @@
-------------
---- note_ids
-------------
 -- name: GetNoteID :one
-SELECT ID
-FROM note_ids LIMIT 1;
+SELECT CAST(COALESCE(MIN(n1.id + 1), 1) AS INT) AS missing_id
+FROM notes n1
+LEFT JOIN notes n2 ON n1.id + 1 = n2.id
+WHERE n2.id IS NULL;
 
--- name: NoNoteIDs :one
-SELECT COALESCE(MAX(id), 0) + 1
-FROM notes
-WHERE id < 999;
-
--- name: DeleteNoteID :execlastid
-DELETE FROM note_ids
-WHERE id = ?
-returning id;
-
--- name: RecycleNoteID :execlastid
-INSERT INTO note_ids (id) VALUES (?)
-returning id;
-
-------------
---- area_ids
-------------
 -- name: GetAreaID :one
-SELECT ID
-FROM area_ids LIMIT 1;
+SELECT CAST(COALESCE(MIN(a1.id + 1), 1) AS INT) AS missing_id
+FROM areas a1
+LEFT JOIN areas a2 ON a1.id + 1 = a2.id
+WHERE a2.id IS NULL;
 
--- name: NoAreaIDs :one
-SELECT COALESCE(MAX(id), 0) + 1
-FROM areas
-WHERE id < 999;
-
--- name: DeleteAreaID :execlastid
-DELETE FROM area_ids
-WHERE id = ?
-returning id;
-
--- name: RecycleAreaID :execlastid
-INSERT INTO area_ids (id) VALUES (?)
-returning id;
-
-------------
---- task_ids
-------------
 -- name: GetTaskID :one
-SELECT id FROM task_ids LIMIT 1;
-
--- name: NoTaskIDs :one
-SELECT COALESCE(MAX(id), 0) + 1
-FROM tasks
-WHERE id < 999;
-
--- name: DeleteTaskID :execlastid
-DELETE FROM task_ids
-WHERE id = ?
-returning id;
-
--- name: RecycleTaskID :execlastid
-INSERT INTO task_ids (id) VALUES (?)
-returning id;
+SELECT CAST(COALESCE(MIN(t1.id + 1), 1) AS INT) AS missing_id
+FROM tasks t1
+LEFT JOIN tasks t2 ON t1.id + 1 = t2.id
+WHERE t2.id IS NULL;
 
 -- name: CreateNote :exec
 INSERT INTO notes (id, title, path) VALUES (?, ?, ?);
@@ -189,7 +145,7 @@ INNER JOIN areas ON areas.ID = bridge_notes.parent_area_id AND bridge_notes.pare
 
 
 -- name: ReadAllNotes :many
-SELECT notes.id, notes.title, notes.path, coalesce(tasks.title, areas.title) [area_or_task_title], case when bridge_notes.parent_cat = 1 then 'Task' else 'Area' end as [parent_type]
+SELECT notes.id, notes.title, notes.path, coalesce(tasks.title, areas.title, 'Unknown') [area_or_task_title], case when bridge_notes.parent_cat = 1 then 'Task' else 'Area' end as [parent_type]
 FROM notes
 INNER JOIN bridge_notes ON bridge_notes.note_id = notes.id
 LEFT JOIN tasks ON tasks.ID = bridge_notes.parent_task_id AND bridge_notes.parent_cat = 1
@@ -333,10 +289,10 @@ AND bridge_notes.parent_cat = 1;
 	GROUP BY tasks.id;
 
 
--- name: DeleteTask :one
+-- name: DeleteTask :execlastid
 DELETE FROM tasks
 WHERE id = ?
-returning id;
+returning *;
 
 
 -- name: DeleteTasks :execrows

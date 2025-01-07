@@ -96,18 +96,6 @@ func SetupDB(db *sql.DB) error {
 			created_at TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime')),
 			last_mod TEXT NOT NULL DEFAULT (datetime(current_timestamp, 'localtime'))
 		);
-		CREATE TABLE IF NOT EXISTS task_ids (
-			id INTEGER PRIMARY KEY
-		);
-		CREATE TABLE IF NOT EXISTS area_ids (
-			id INTEGER PRIMARY KEY
-		);
-		CREATE TABLE IF NOT EXISTS prog_proj_ids (
-			id INTEGER PRIMARY KEY
-		);
-		CREATE TABLE IF NOT EXISTS note_ids (
-			id INTEGER PRIMARY KEY
-		);
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY,
 			title TEXT NOT NULL,
@@ -126,7 +114,7 @@ func SetupDB(db *sql.DB) error {
 			path TEXT NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS bridge_notes (
-			note_id INTEGER,
+			note_id INTEGER PRIMARY KEY,
 			parent_cat INTEGER,
 			parent_task_id INTEGER,
 			parent_area_id INTEGER,

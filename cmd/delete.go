@@ -23,7 +23,6 @@ package cmd
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strconv"
 
@@ -82,26 +81,9 @@ var deleteTaskCmd = &cobra.Command{
 
 		queries := sqlc.New(conn)
 		for _, taskID := range taskIDs {
-			deletedTaskID, err := queries.DeleteTask(ctx, taskID)
+			_, err := queries.DeleteTask(ctx, taskID)
 			if err != nil {
 				log.Fatalf("Error deleting task: %v", err)
-			}
-			noteRows, err := queries.ReadTaskNote(ctx, sql.NullInt64{Int64: deletedTaskID, Valid: true})
-			if err != nil && err != sql.ErrNoRows {
-				log.Fatalf("Error reading task notes: %v", err)
-			}
-			for _, row := range noteRows {
-				_, err = queries.DeleteTaskBridgeNote(ctx, sqlc.DeleteTaskBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: row.ID, Valid: true},
-					ParentTaskID: sql.NullInt64{Int64: deletedTaskID, Valid: true},
-				})
-				if err != nil {
-					log.Fatalf("Error deleting bridge note: %v", err)
-				}
-			}
-			_, err = queries.RecycleTaskID(ctx, taskID)
-			if err != nil {
-				log.Fatalf("Error recycling task ID: %v", err)
 			}
 		}
 		fmt.Println("Succesfully Deleted!")
@@ -154,13 +136,6 @@ var deleteAreaCmd = &cobra.Command{
 
 		qtx := queries.WithTx(tx)
 
-		for _, areaID := range areaIDs {
-			_, err = queries.RecycleAreaID(ctx, areaID)
-		}
-		if err != nil {
-			log.Fatalf("Error recycling area ID: %v", err)
-		}
-
 		_, err = qtx.DeleteMultipleAreas(ctx, areaIDs)
 		if err != nil {
 			log.Fatalf("Error deleting area(s): %v", err)
@@ -168,22 +143,10 @@ var deleteAreaCmd = &cobra.Command{
 
 		if deleteNotes {
 			_, err = qtx.DeleteNotes(ctx, areaIDs)
-			for i, noteID := range areaIDs {
+			for _, noteID := range areaIDs {
 				_, err := queries.DeleteNote(ctx, noteID)
 				if err != nil {
 					log.Fatalf("Error deleting task: %s", err)
-				}
-				bridgeNote := sqlc.DeleteAreaBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
-					ParentAreaID: sql.NullInt64{Int64: areaIDs[i], Valid: true},
-				}
-				_, err = queries.DeleteAreaBridgeNote(ctx, bridgeNote)
-				if err != nil {
-					log.Fatalf("Error deleting bridge note: %v", err)
-				}
-				_, err = queries.RecycleNoteID(ctx, noteID)
-				if err != nil {
-					log.Fatalf("Error recycling note ID: %v", err)
 				}
 			}
 			if err != nil {

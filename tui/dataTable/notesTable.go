@@ -269,17 +269,6 @@ func (m *NotesModel) addNote() tea.Cmd {
 			if err != nil && err != sql.ErrNoRows {
 				log.Fatalf("Error getting note ID: %v", err)
 			}
-			if err == sql.ErrNoRows {
-				noteID, err = queries.NoNoteIDs(ctx)
-				if err != nil {
-					log.Fatalf("Failed to find the next available note ID: %v", err)
-				} else {
-					_, err = queries.DeleteNoteID(ctx, noteID)
-					if err != nil {
-						log.Fatalf("Error deleting note ID: %v", err)
-					}
-				}
-			}
 
 			err = queries.CreateNote(ctx, sqlc.CreateNoteParams{
 				ID:    noteID,
@@ -294,7 +283,7 @@ func (m *NotesModel) addNote() tea.Cmd {
 			switch form.Type {
 			case data.TaskNoteType:
 				_, err = queries.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+					NoteID:       noteID,
 					ParentCat:    sql.NullInt64{Int64: int64(data.TaskNoteType), Valid: true},
 					ParentTaskID: sql.NullInt64{Int64: int64(form.ParentID), Valid: true},
 				},
@@ -305,7 +294,7 @@ func (m *NotesModel) addNote() tea.Cmd {
 				}
 			case data.AreaNoteType:
 				_, err := queries.CreateAreaBridgeNote(ctx, sqlc.CreateAreaBridgeNoteParams{
-					NoteID:       sql.NullInt64{Int64: noteID, Valid: true},
+					NoteID:       noteID,
 					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
 					ParentAreaID: sql.NullInt64{Int64: int64(form.ParentID), Valid: true},
 				},
@@ -379,31 +368,30 @@ func (m *NotesModel) deleteNote() tea.Cmd {
 	defer conn.Close()
 	queries := sqlc.New(conn)
 
-	if len(selectedIDs) == 1 {
+	switch len(selectedIDs) {
+	case 0:
 		_, err := queries.DeleteNote(ctx, noteID)
 		if err != nil {
 			log.Fatalf("Error deleting task: %s", err)
 			return nil
 		}
-		_, err = queries.RecycleNoteID(ctx, noteID)
-		if err != nil {
-			log.Fatalf("Error recycling note ID: %v", err)
-		}
 
-	} else if len(selectedIDs) > 1 {
+	case 1:
+		_, err := queries.DeleteNote(ctx, noteID)
+		if err != nil {
+			log.Fatalf("Error deleting task: %s", err)
+			return nil
+		}
+	default:
 		for _, noteID := range selectedIDs {
 			_, err := queries.DeleteNote(ctx, noteID)
 			if err != nil {
 				log.Fatalf("Error deleting task: %s", err)
 				return nil
 			}
-			_, err = queries.RecycleNoteID(ctx, noteID)
-			if err != nil {
-				log.Fatalf("Error recycling note ID: %v", err)
-				return nil
-			}
 		}
 	}
+
 	rows, err := m.loadRowsFromDatabase()
 	if err != nil {
 		log.Fatalf("Error loading rows from database: %s", err)
