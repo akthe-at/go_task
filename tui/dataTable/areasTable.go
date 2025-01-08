@@ -362,7 +362,7 @@ func (m *AreasModel) addArea() tea.Cmd {
 
 		queries := sqlc.New(conn)
 		areaID, err := queries.GetAreaID(ctx)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil {
 			log.Fatalf("Error getting area ID: %v", err)
 		}
 		newArea := sqlc.CreateAreaParams{
@@ -394,11 +394,11 @@ func (m *AreasModel) addArea() tea.Cmd {
 			default:
 				log.Fatalf("Unexpected projID: %v", projID)
 			}
-			err = queries.CreateProjectTaskLink(ctx,
-				sqlc.CreateProjectTaskLinkParams{
+			err = queries.CreateProjectAreaLink(ctx,
+				sqlc.CreateProjectAreaLinkParams{
 					ProjectID:    sql.NullInt64{Int64: projectID, Valid: true},
 					ParentCat:    sql.NullInt64{Int64: int64(data.AreaNoteType), Valid: true},
-					ParentTaskID: sql.NullInt64{Int64: result, Valid: true},
+					ParentAreaID: sql.NullInt64{Int64: result, Valid: true},
 				},
 			)
 			if err != nil {
