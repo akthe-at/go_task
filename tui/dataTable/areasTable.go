@@ -63,8 +63,6 @@ func (m *AreasModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "esc", "q":
 			cmds = append(cmds, tea.Quit)
-		case "F":
-			cmds = append(cmds, m.filterArchives())
 		case "enter":
 			cmds = append(cmds, m.filterRows())
 		case "left":
@@ -204,8 +202,6 @@ func (m *AreasModel) filterRows() tea.Cmd {
 func (m *AreasModel) filterArchives() tea.Cmd {
 	m.archiveFilterEnabled = !m.archiveFilterEnabled
 	m.refreshTableData()
-
-	m.updateFooter()
 	return nil
 }
 
@@ -415,9 +411,6 @@ func (m *AreasModel) addArea() tea.Cmd {
 		m.tableModel = m.tableModel.WithRows(rows)
 
 		m.updateFooter()
-		return func() tea.Msg {
-			return SwitchToProjectsTableViewMsg{}
-		}
 	}
 
 	return nil
@@ -430,7 +423,6 @@ func (m *AreasModel) refreshTableData() {
 	}
 
 	m.tableModel = m.tableModel.WithRows(rows)
-
 	m.updateFooter()
 }
 
@@ -464,7 +456,13 @@ func (m *AreasModel) addTaskToArea() tea.Cmd {
 		}
 		defer conn.Close()
 		queries := sqlc.New(conn)
+
+		taskID, err := queries.GetTaskID(ctx)
+		if err != nil {
+			log.Fatalf("addTaskToArea - Unable to retrieve desired task ID")
+		}
 		_, err = queries.CreateTask(ctx, sqlc.CreateTaskParams{
+			ID:       taskID,
 			Title:    form.TaskTitle,
 			Priority: sql.NullString{String: string(form.Priority), Valid: true},
 			Status:   sql.NullString{String: string(form.Status), Valid: true},
@@ -484,14 +482,7 @@ func (m *AreasModel) addTaskToArea() tea.Cmd {
 		m.tableModel = m.tableModel.WithRows(rows)
 
 		m.updateFooter()
-		m.recalculateTable()
-		// FIXME: theres a visual bug here after completing this!
-		//
-		return func() tea.Msg {
-			return SwitchToProjectsTableViewMsg{}
-		}
 	}
-
 	return nil
 }
 
@@ -601,8 +592,8 @@ func (m AreasModel) View() string {
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Add a new Area by pressing 'A'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Filter Archived Areas by pressing 'F'") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press left/right or page up/down to move between pages") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press space/enter to select a row, q or ctrl+c to quit") + "\n")
-	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press D to delete row(s) after selecting them.") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press 'space' to select a row, 'q' or 'ctrl+c' to quit") + "\n")
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press 'backspace' to delete row(s) after selecting or highlighting them.") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Warning)).Render("-Press ctrl+n to switch to the Notes View.") + "\n")
 	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render("-Press ctrl+t to switch to the Tasks View.") + "\n")
 	selectedIDs := []string{}
@@ -636,14 +627,14 @@ func AreaViewModel() AreasModel {
 	theme := tui.GetSelectedTheme()
 
 	columns := []table.Column{
-		table.NewColumn(areaColumnKeyID, "ID", 10).WithStyle(
+		table.NewColumn(areaColumnKeyID, "ID", 5).WithStyle(
 			lipgloss.NewStyle().
 				Faint(true).
 				Foreground(lipgloss.Color(theme.Secondary)).
 				Align(lipgloss.Center)),
 		table.NewFlexColumn(areaColumnKeyProject, "Area", 3),
-		table.NewFlexColumn(areaColumnKeyStatus, "Status", 1),
-		table.NewFlexColumn(areaColumnKeyArchived, "Archived", 1),
+		table.NewColumn(areaColumnKeyStatus, "Status", 10),
+		table.NewColumn(areaColumnKeyArchived, "Archived", 10),
 		table.NewFlexColumn(areaColumnKeyPath, "Repo", 1),
 		table.NewFlexColumn(areaColumnKeyNotes, "Notes", 3),
 	}

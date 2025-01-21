@@ -280,6 +280,9 @@ func (m *NotesModel) addNote() tea.Cmd {
 				log.Panicf("Error creating note: %s", err)
 			}
 			// FIXME: This is correctly adding to the TaskBridgeNotes/Notes tables now but when switching back to the datatable view, it needs to refresh the data.
+			// This is the same bug that is impacting me on the AreasModel.
+			// This hits all of them now actually. Add Area/Task/Note.
+			// When I downgraded versions this stopped being a bug for Add Task& Note, now just for adding a task to an area.
 			switch form.Type {
 			case data.TaskNoteType:
 				_, err = queries.CreateTaskBridgeNote(ctx, sqlc.CreateTaskBridgeNoteParams{
@@ -315,6 +318,10 @@ func (m *NotesModel) addNote() tea.Cmd {
 
 			// Update the footer
 			m.updateFooter()
+
+			return func() tea.Msg {
+				return SwitchToProjectsTableViewMsg{}
+			}
 		}
 	}
 

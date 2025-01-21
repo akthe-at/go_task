@@ -36,7 +36,7 @@ const (
 	columnKeyPath       = "path"
 	columnKeyArea       = "parent_area"
 	minWidth            = 120
-	minHeight           = 10
+	minHeight           = 5
 	fixedVerticalMargin = 80
 )
 

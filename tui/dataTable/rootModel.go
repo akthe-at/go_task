@@ -20,6 +20,7 @@ type (
 	AddNoteMsg                   struct{}
 	AddTaskMsg                   struct{}
 	AddAreaMsg                   struct{}
+	AddAreaTaskMsg               struct{}
 	SwitchToTasksTableViewMsg    struct{}
 	SwitchToProjectsTableViewMsg struct{}
 )
@@ -121,6 +122,13 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case NotesTableView:
 				m.Notes.openNote()
 			}
+		case "F":
+			switch m.CurrentView {
+			case TasksTableView:
+				m.Tasks.filterArchives()
+			case AreasTableView:
+				m.Areas.filterArchives()
+			}
 		case "A":
 			switch m.CurrentView {
 			case TasksTableView:
@@ -134,6 +142,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.CurrentView {
 			case AreasTableView:
 				m.Areas.addTaskToArea()
+				m.Areas.recalculateTable()
 			case TasksTableView:
 				m.Tasks.recalculateTable()
 			case NotesTableView:
@@ -171,6 +180,9 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case AddAreaMsg:
 		updatedAreas, _ := m.Areas.Update(msg)
 		m.Areas = *updatedAreas.(*AreasModel)
+	case AddAreaTaskMsg:
+		updatedAreaTask, _ := m.Areas.Update(msg)
+		m.Areas = *updatedAreaTask.(*AreasModel)
 	case AddTaskMsg:
 		updatedTasks, _ := m.Tasks.Update(msg)
 		m.Tasks = *updatedTasks.(*TaskModel)
@@ -183,12 +195,16 @@ func (m *RootModel) propagate(msg tea.Msg) tea.Model {
 	var updatedTasks tea.Model
 	var updatedNotes tea.Model
 	var updatedAreas tea.Model
+	var updatedAreaTask tea.Model
 
 	updatedTasks, _ = m.Tasks.Update(msg)
 	m.Tasks = *updatedTasks.(*TaskModel)
 
 	updatedNotes, _ = m.Notes.Update(msg)
 	m.Notes = *updatedNotes.(*NotesModel)
+
+	updatedAreaTask, _ = m.Areas.Update(msg)
+	m.Areas = *updatedAreaTask.(*AreasModel)
 
 	updatedAreas, _ = m.Areas.Update(msg)
 	m.Areas = *updatedAreas.(*AreasModel)
